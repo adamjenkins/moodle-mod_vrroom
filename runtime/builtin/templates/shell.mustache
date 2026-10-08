@@ -20,7 +20,7 @@
     The frame of the built-in viewer: launch buttons, message region, live room panel (filled by
     vrroomruntime_builtin/liveroom when live mode is on), 3D stage (with the VR, AR and mixed reality
     buttons, which stay hidden until the device is known to support them) inside a viewport that
-    also holds the bar under the room (fullscreen, reversed drag directions), list view, progress
+    also holds the bar under the room (fullscreen, reversed or locked dragging), list view, progress
     panel and the live region for screen readers.
 
     Classes required for JS:
@@ -84,6 +84,10 @@
         <div class="form-check mb-0">
             <input class="form-check-input" type="checkbox" id="vrroom-inverty-{{cmid}}" data-action="vrroom-inverty">
             <label class="form-check-label" for="vrroom-inverty-{{cmid}}">{{#str}}invertlooky, vrroomruntime_builtin{{/str}}</label>
+        </div>
+        <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="vrroom-locky-{{cmid}}" data-action="vrroom-locky">
+            <label class="form-check-label" for="vrroom-locky-{{cmid}}">{{#str}}locklooky, vrroomruntime_builtin{{/str}}</label>
         </div>
     </div>
     </div>

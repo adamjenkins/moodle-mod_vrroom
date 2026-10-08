@@ -108,6 +108,7 @@ $string['livewherevr'] = 'In VR';
 $string['liveyou'] = '{$a} (you)';
 $string['loadfailed'] = 'The room could not be loaded. You can continue in the list view.';
 $string['loading'] = 'Loading the room…';
+$string['locklooky'] = 'Lock up/down drag';
 $string['mediapause'] = 'Pause {$a}';
 $string['mediaplay'] = 'Play {$a}';
 $string['modelinlist'] = 'This station has a 3D model, which can be seen in the 3D room.';

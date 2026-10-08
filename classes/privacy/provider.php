@@ -44,7 +44,7 @@ class provider implements
     \core_privacy\local\request\plugin\provider,
     \core_privacy\local\request\user_preference_provider {
     /** @var string[] The user preferences VR room stores. */
-    private const PREFERENCES = ['mod_vrroom_invertx', 'mod_vrroom_inverty'];
+    private const PREFERENCES = ['mod_vrroom_invertx', 'mod_vrroom_inverty', 'mod_vrroom_locky'];
 
     /** @var string This component. */
     private const COMPONENT = 'mod_vrroom';
@@ -133,7 +133,7 @@ class provider implements
     }
 
     /**
-     * Export the user's VR room preferences (reversed drag directions).
+     * Export the user's VR room preferences (reversed and locked dragging).
      *
      * @param int $userid the user
      * @return void

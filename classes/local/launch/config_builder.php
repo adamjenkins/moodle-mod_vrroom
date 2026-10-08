@@ -138,6 +138,7 @@ final class config_builder {
             'look' => [
                 'invertx' => (bool)get_user_preferences('mod_vrroom_invertx', 0, $user),
                 'inverty' => (bool)get_user_preferences('mod_vrroom_inverty', 0, $user),
+                'locky' => (bool)get_user_preferences('mod_vrroom_locky', 0, $user),
             ],
         ];
     }

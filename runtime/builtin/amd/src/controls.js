@@ -63,13 +63,13 @@ const MOVES = {
  * Options: bounds {min, max}; eyeHeight (default 1.6); stick (HTMLElement of the virtual stick);
  * rig (THREE.Object3D that holds the camera; optional); onClick(ndc {x, y}) → true when the click
  * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen);
- * invertX, invertY (reverse the drag-to-look direction on that axis).
+ * invertX, invertY (reverse the drag-to-look direction on that axis); lockY (dragging never tilts).
  *
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
  * @param {Object} options Options.
  * @returns {Object} {update(dt), teleport(position, yaw), getPosition(), getYaw(), setBounds(bounds),
- *     setInvert(x, y), setEnabled(enabled), detach()}
+ *     setInvert(x, y), setLockY(locked), setEnabled(enabled), detach()}
  */
 export const attach = (camera, canvas, options = {}) => {
     const eye = Number.isFinite(options.eyeHeight) ? options.eyeHeight : 1.6;
@@ -81,6 +81,7 @@ export const attach = (camera, canvas, options = {}) => {
     let pitch = 0;
     let invertx = !!options.invertX;
     let inverty = !!options.invertY;
+    let locky = !!options.lockY;
     let target = null;
     const keys = new Set();
     let turn = 0;
@@ -215,7 +216,9 @@ export const attach = (camera, canvas, options = {}) => {
         drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
         if (drag.moved >= CLICK) {
             yaw -= (invertx ? -dx : dx) * LOOK;
-            pitch = Math.max(-PITCH, Math.min(PITCH, pitch - (inverty ? -dy : dy) * LOOK));
+            if (!locky) {
+                pitch = Math.max(-PITCH, Math.min(PITCH, pitch - (inverty ? -dy : dy) * LOOK));
+            }
         }
     });
     const endDrag = (e, cancelled) => {
@@ -404,6 +407,19 @@ export const attach = (camera, canvas, options = {}) => {
         setInvert(x, y) {
             invertx = !!x;
             inverty = !!y;
+        },
+
+        /**
+         * Lock (or unlock) up/down dragging; locking also levels the view.
+         *
+         * @param {boolean} locked Whether dragging may tilt the view.
+         */
+        setLockY(locked) {
+            locky = !!locked;
+            if (locky) {
+                pitch = 0;
+                apply();
+            }
         },
 
         /**

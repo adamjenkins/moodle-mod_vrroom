@@ -120,13 +120,13 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     }
 
     /**
-     * Metadata lists both tables, both subsystem links and the two drag preferences.
+     * Metadata lists both tables, both subsystem links and the three drag preferences.
      */
     public function test_get_metadata(): void {
         $collection = provider::get_metadata(new collection('mod_vrroom'));
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
         $this->assertEqualsCanonicalizing(['vrroom_attempts', 'vrroom_events', 'core_question', 'core_xapi',
-            'mod_vrroom_invertx', 'mod_vrroom_inverty'], $names);
+            'mod_vrroom_invertx', 'mod_vrroom_inverty', 'mod_vrroom_locky'], $names);
     }
 
     /**
@@ -136,12 +136,14 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $student = $this->students[1];
         set_user_preference('mod_vrroom_invertx', 1, $student);
         set_user_preference('mod_vrroom_inverty', 0, $student);
+        set_user_preference('mod_vrroom_locky', 1, $student);
         set_user_preference('mod_vrroom_invertx', 1, $this->students[2]);
 
         provider::export_user_preferences((int)$student->id);
         $prefs = writer::with_context(\context_system::instance())->get_user_preferences('mod_vrroom');
         $this->assertSame(get_string('yes'), $prefs->mod_vrroom_invertx->value);
         $this->assertSame(get_string('no'), $prefs->mod_vrroom_inverty->value);
+        $this->assertSame(get_string('yes'), $prefs->mod_vrroom_locky->value);
         $this->assertSame(
             get_string('privacy:metadata:preference:mod_vrroom_invertx', 'mod_vrroom'),
             $prefs->mod_vrroom_invertx->description

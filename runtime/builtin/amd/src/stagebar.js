@@ -14,11 +14,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The bar under the 3D room: a fullscreen toggle and the reversed drag directions.
+ * The bar under the 3D room: a fullscreen toggle, the reversed drag directions and the vertical lock.
  *
  * Fullscreen covers the whole viewport (the room and this bar), so the HUD buttons, panels and
- * the bar stay usable. The two drag settings are the user preferences mod_vrroom_invertx and
- * mod_vrroom_inverty, so they apply in every VR room activity.
+ * the bar stay usable. The drag settings are the user preferences mod_vrroom_invertx,
+ * mod_vrroom_inverty and mod_vrroom_locky, so they apply in every VR room activity.
  *
  * @module     vrroomruntime_builtin/stagebar
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -34,6 +34,8 @@ import {region} from 'vrroomruntime_builtin/util';
 const PREFX = 'mod_vrroom_invertx';
 /** @var {string} Preference that reverses up/down dragging. */
 const PREFY = 'mod_vrroom_inverty';
+/** @var {string} Preference that stops up/down dragging. */
+const PREFLOCK = 'mod_vrroom_locky';
 
 /**
  * The element shown fullscreen right now, with the WebKit fallback.
@@ -75,7 +77,7 @@ const exitFullscreen = () => Promise.resolve(
  *
  * @param {HTMLElement} root The viewer root.
  * @param {Object} controls The controls from vrroomruntime_builtin/controls (setInvert()).
- * @param {Object} look {invertx, inverty} from the launch config (the user's preferences).
+ * @param {Object} look {invertx, inverty, locky} from the launch config (the user's preferences).
  * @returns {Object} {dispose()}
  */
 export const createStagebar = (root, controls, look) => {
@@ -87,26 +89,48 @@ export const createStagebar = (root, controls, look) => {
     const button = bar.querySelector('[data-action="vrroom-fullscreen"]');
     const boxx = bar.querySelector('[data-action="vrroom-invertx"]');
     const boxy = bar.querySelector('[data-action="vrroom-inverty"]');
+    const boxlock = bar.querySelector('[data-action="vrroom-locky"]');
     const labels = {enter: button ? button.textContent : '', exit: ''};
 
-    // Reversed dragging: start from the stored preferences.
+    // Reversed and locked dragging: start from the stored preferences.
     const invert = {x: !!(look && look.invertx), y: !!(look && look.inverty)};
+    let locky = !!(look && look.locky);
     controls.setInvert(invert.x, invert.y);
+    controls.setLockY(locky);
+    // Reversing up/down means nothing while up/down is locked.
+    const showLock = () => {
+        if (boxy) {
+            boxy.disabled = locky;
+        }
+    };
     if (boxx) {
         boxx.checked = invert.x;
     }
     if (boxy) {
         boxy.checked = invert.y;
     }
+    if (boxlock) {
+        boxlock.checked = locky;
+    }
+    showLock();
+    const save = (name, on) => {
+        Promise.resolve(setUserPreference(name, on ? 1 : 0)).catch((error) => Log.debug(error));
+    };
     const onChange = (e) => {
+        if (e.target === boxlock) {
+            locky = e.target.checked;
+            controls.setLockY(locky);
+            showLock();
+            save(PREFLOCK, locky);
+            return;
+        }
         if (e.target !== boxx && e.target !== boxy) {
             return;
         }
         const axisx = e.target === boxx;
         invert[axisx ? 'x' : 'y'] = e.target.checked;
         controls.setInvert(invert.x, invert.y);
-        Promise.resolve(setUserPreference(axisx ? PREFX : PREFY, e.target.checked ? 1 : 0))
-            .catch((error) => Log.debug(error));
+        save(axisx ? PREFX : PREFY, e.target.checked);
     };
     bar.addEventListener('change', onChange);
 
