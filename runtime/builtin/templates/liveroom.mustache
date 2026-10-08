@@ -1,0 +1,94 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mavrruntime_builtin/liveroom
+
+    The live room panel of the built-in viewer: the notice about what joining shares (IP address
+    included), the group room choice, join and leave, the voice controls and the people in the room.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * data-region: mavr-live-notice, mavr-live-group, mavr-live-status, mavr-live-voice, mavr-live-ptt,
+      mavr-live-insecure, mavr-live-people, mavr-live-participants, mavr-live-count
+    * data-action: mavr-live-join, mavr-live-leave, mavr-live-mic, mavr-live-mute, mavr-live-talk
+
+    Context variables required for this template:
+    * cmid - course module id
+    * canjoin - the user can join a room
+    * nogroup - the user is in no group of the activity, so there is no room for them
+    * secure - the page may use the microphone (a secure context)
+    * hasgroups - the activity has group rooms to choose from
+    * groups - [{id, name, selected}] the group rooms the user may join
+    * maxpeers - most people in one room
+    * count - people in the room shown in the heading (0 before joining)
+
+    Example context (json):
+    {
+        "cmid": 12,
+        "canjoin": true,
+        "nogroup": false,
+        "secure": true,
+        "hasgroups": true,
+        "groups": [{"id": 7, "name": "Group A", "selected": true}, {"id": 8, "name": "Group B", "selected": false}],
+        "maxpeers": 6,
+        "count": 0
+    }
+}}
+<h3 class="h5" id="mavr-liveroom-heading-{{cmid}}">{{#str}}liveroom, mavrruntime_builtin{{/str}}</h3>
+<p class="small" data-region="mavr-live-notice">{{#str}}livenotice, mavrruntime_builtin{{/str}}</p>
+{{#nogroup}}
+<p class="alert alert-info">{{#str}}livenogroup, mavrruntime_builtin{{/str}}</p>
+{{/nogroup}}
+{{#canjoin}}
+<div class="mavr-live-controls d-flex flex-wrap align-items-end gap-2 mb-2">
+    {{#hasgroups}}
+    <div class="mavr-live-groupchoice">
+        <label class="form-label mb-1" for="mavr-live-group-{{cmid}}">{{#str}}livegroupselect, mavrruntime_builtin{{/str}}</label>
+        <select id="mavr-live-group-{{cmid}}" class="form-select" data-region="mavr-live-group">
+            {{#groups}}
+            <option value="{{id}}"{{#selected}} selected{{/selected}}>{{name}}</option>
+            {{/groups}}
+        </select>
+    </div>
+    {{/hasgroups}}
+    <button type="button" class="btn btn-primary" data-action="mavr-live-join">{{#str}}livejoin, mavrruntime_builtin{{/str}}</button>
+    <button type="button" class="btn btn-secondary d-none" data-action="mavr-live-leave">{{#str}}liveleave, mavrruntime_builtin{{/str}}</button>
+</div>
+{{/canjoin}}
+<p class="mavr-live-status mb-2" data-region="mavr-live-status" role="status"></p>
+<div class="mavr-live-voice d-none mb-2" data-region="mavr-live-voice">
+    {{#secure}}
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-live-mic">{{#str}}livemicon, mavrruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-live-mute" aria-pressed="false" disabled>{{#str}}livemute, mavrruntime_builtin{{/str}}</button>
+        <div class="form-check mb-0">
+            <input type="checkbox" class="form-check-input" id="mavr-live-ptt-{{cmid}}" data-region="mavr-live-ptt">
+            <label class="form-check-label" for="mavr-live-ptt-{{cmid}}">{{#str}}livepushtotalk, mavrruntime_builtin{{/str}}</label>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" data-action="mavr-live-talk" aria-pressed="false">{{#str}}liveholdtotalk, mavrruntime_builtin{{/str}}</button>
+    </div>
+    {{/secure}}
+    {{^secure}}
+    <p class="small text-muted mb-0" data-region="mavr-live-insecure">{{#str}}livemicinsecure, mavrruntime_builtin{{/str}}</p>
+    {{/secure}}
+</div>
+<div class="mavr-live-people d-none" data-region="mavr-live-people">
+    <h4 class="h6" data-region="mavr-live-count">{{#str}}liveparticipants, mavrruntime_builtin, {{count}}{{/str}}</h4>
+    <ul class="list-unstyled mavr-live-participants mb-0" data-region="mavr-live-participants"></ul>
+</div>

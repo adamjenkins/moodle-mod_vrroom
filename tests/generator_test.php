@@ -55,6 +55,24 @@ final class generator_test extends \advanced_testcase {
         $this->assertCount(1, $scenes);
         $this->assertSame(['Station 1', 'Station 2'], array_column($scenes[0]['zones'], 'name'));
         $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+        $this->assertEquals(0, $record->livemode);
+        $this->assertEquals(6, $record->livemaxusers);
+    }
+
+    /**
+     * Live mode values given to the generator are stored.
+     */
+    public function test_create_instance_live_values(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+
+        $mavr = $this->getDataGenerator()->create_module('mavr',
+            ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4]);
+
+        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertEquals(1, $record->livemode);
+        $this->assertEquals(4, $record->livemaxusers);
     }
 
     /**

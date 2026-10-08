@@ -68,6 +68,8 @@ final class instance_manager {
         $mavr->grademethod = self::clean_grademethod($data->grademethod ?? grader::GRADE_HIGHEST);
         $mavr->maxattempts = max(0, (int)($data->maxattempts ?? 0));
         $mavr->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $mavr->livemode = empty($data->livemode) ? 0 : 1;
+        $mavr->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
         $mavr->customised = 0;
         $mavr->timecreated = $now;
         $mavr->timemodified = $now;
@@ -142,6 +144,11 @@ final class instance_manager {
             $mavr->maxattempts = max(0, (int)$data->maxattempts);
         }
         $mavr->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        if (property_exists($data, 'livemode')) {
+            // Without these fields (no run mode can run a live room) the stored values stay.
+            $mavr->livemode = empty($data->livemode) ? 0 : 1;
+            $mavr->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? ($mavr->livemaxusers ?? 6));
+        }
         $mavr->timemodified = time();
 
         $cmid = $data->coursemodule ?? get_coursemodule_from_instance('mavr', $mavr->id, $mavr->course, false, MUST_EXIST)->id;
@@ -161,6 +168,8 @@ final class instance_manager {
                     'grademethod' => $mavr->grademethod,
                     'maxattempts' => $mavr->maxattempts,
                     'completionobjectives' => $mavr->completionobjectives,
+                    'livemode' => $mavr->livemode,
+                    'livemaxusers' => $mavr->livemaxusers,
                     'timemodified' => $mavr->timemodified,
                 ]);
             } else {
@@ -463,6 +472,18 @@ final class instance_manager {
      */
     private static function clean_grade($grade): int {
         return max(0, (int)$grade);
+    }
+
+    /**
+     * Clean the maximum number of people in a live room (storage clamp).
+     *
+     * The run mode caps the value again when someone joins, at what it supports.
+     *
+     * @param mixed $value Submitted value.
+     * @return int Between 2 and 50.
+     */
+    private static function clean_livemaxusers($value): int {
+        return min(50, max(2, (int)$value));
     }
 
     /**

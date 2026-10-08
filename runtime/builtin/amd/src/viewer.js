@@ -36,6 +36,7 @@ import {createPanels} from 'mavrruntime_builtin/panels';
 import {detect, createXr, createWristPanel} from 'mavrruntime_builtin/xr';
 import {createXrInput} from 'mavrruntime_builtin/xrinput';
 import {createXrPanels} from 'mavrruntime_builtin/xrpanel';
+import {createAvatarLayer} from 'mavrruntime_builtin/live/avatars';
 import {region, plainText, announce, showMessage, clearMessage, startScene} from 'mavrruntime_builtin/util';
 
 /** Distance within which Enter activates the object in the middle of the screen (m). */
@@ -108,9 +109,11 @@ const clockText = (seconds) => {
  * @param {HTMLElement} root The MAVR root element (holding the shell).
  * @param {Object} session The session.
  * @param {Object} config Launch config.
+ * @param {Object} [options] {live: LiveController|null} — the live room, when there is one.
  * @returns {Promise<Object>} {stop()}
  */
-export const start = (root, session, config) => {
+export const start = (root, session, config, options = {}) => {
+    const live = options && options.live ? options.live : null;
     const pending = new Pending('mavrruntime_builtin/viewer:start');
     const stage = region(root, 'mavr-stage');
     const canvas = region(root, 'mavr-canvas');
@@ -169,7 +172,7 @@ export const start = (root, session, config) => {
             const doc = resumed || startScene(config);
             return buildScene(THREE, doc, roomOptions()).then((handle) => run({
                 root, session, config, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions,
-                doc, handle, resume: resumed ? resume : null, setStopped: () => {
+                doc, handle, resume: resumed ? resume : null, live: live, setStopped: () => {
                     stopped = true;
                 },
             }));
@@ -235,6 +238,20 @@ const run = (p) => {
     const zonesOf = (doc) => (Array.isArray(doc.zones) ? doc.zones : []);
 
     scene3.add(current.handle.root);
+
+    // The other people in a live room, as avatars in the current room.
+    const avatars = p.live ? createAvatarLayer(THREE, {
+        live: p.live,
+        camera: camera,
+        getRoomRoot: () => current.handle.root,
+        getSceneId: () => current.doc.id,
+        getGrip: (h) => (xrinput ? xrinput.getGrip(h) : null),
+        getHand: (i) => renderer.xr.getHand(i),
+    }) : null;
+    if (avatars) {
+        avatars.setRoom(current.handle.root, current.doc.id);
+        avatars.setMode('3d');
+    }
 
     const panels = createPanels(stage, session, {
         onClose: () => canvas.focus({preventScroll: true}),
@@ -545,11 +562,18 @@ const run = (p) => {
                 handle.dispose();
                 return undefined;
             }
+            if (avatars) {
+                // Move the avatars out before the old room releases everything under it.
+                avatars.setRoom(handle.root, doc.id);
+            }
             current.handle.dispose();
             current = {doc: doc, handle: handle};
             grabbed.clear();
             scene3.add(handle.root);
             session.setScene(doc.id);
+            if (avatars) {
+                p.live.setLocalMode(xrmode || '3d', doc.id);
+            }
             controls.setBounds(handle.environment.bounds);
             applyLook();
             applyState();
@@ -833,6 +857,9 @@ const run = (p) => {
                 rig.updateMatrixWorld(true);
             }
             ensureXrInput();
+            if (avatars) {
+                avatars.setMode(mode);
+            }
             if (mode === 'vr' || mode === 'mr') {
                 wrist = createWristPanel(THREE, {exitlabel: strings.exitxr});
                 const grip = xrinput.getGrip('left');
@@ -885,6 +912,9 @@ const run = (p) => {
                 controls.teleport([head.x, 0, head.z], headyaw);
             }
             session.setChannel('builtin-3d');
+            if (avatars) {
+                avatars.setMode('3d');
+            }
             resize();
             canvas.focus({preventScroll: true});
         },
@@ -1024,6 +1054,9 @@ const run = (p) => {
         }
         testZones();
         current.handle.update(dt, clock.elapsedTime);
+        if (avatars) {
+            avatars.update(dt, performance.now());
+        }
         renderer.render(scene3, camera);
     });
 
@@ -1094,6 +1127,9 @@ const run = (p) => {
                 wrist = null;
             }
             session.stop();
+            if (avatars) {
+                avatars.dispose();
+            }
             current.handle.dispose();
             reticle.geometry.dispose();
             reticle.material.dispose();

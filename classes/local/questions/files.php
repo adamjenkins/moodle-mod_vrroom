@@ -24,7 +24,8 @@ namespace mod_mavr\local\questions;
  * quiz_question_pluginfile(): the usage must belong to a MAVR attempt, the user
  * must be allowed into the activity, the attempt owner may fetch files while
  * the attempt is open, anyone else (or a closed attempt) needs the report
- * capability, and the question engine decides whether the file is visible under
+ * capability (and, in separate groups, a group shared with the attempt's owner),
+ * and the question engine decides whether the file is visible under
  * the display options in force.
  *
  * @package    mod_mavr
@@ -71,6 +72,10 @@ final class files {
             $reviewing = false;
         } else {
             require_capability('mod/mavr:viewreports', $modulecontext);
+            // Separate groups: a reviewer sees only attempts of people in their groups (as report.php).
+            if (!$isown && !groups_user_groups_visible($attemptcourse, (int)$attempt->userid, $cm)) {
+                send_file_not_found();
+            }
             $reviewing = true;
         }
 

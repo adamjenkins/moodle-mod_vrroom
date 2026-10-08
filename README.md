@@ -15,15 +15,19 @@ when a browser cannot show 3D.
 - Moodle 5.2 (`$plugin->supported = [502, 502]`).
 - A browser with WebGL for the 3D room. The list view needs nothing special.
 - No external services: the 3D viewer (three.js) is bundled in the plugin and makes no calls to
-  other sites.
+  other sites. Live mode (below) connects the participants' browsers directly to each other; STUN
+  and TURN servers are used only if an administrator adds them.
+- Voice in live mode needs HTTPS (browsers allow the microphone only on secure pages).
 
 ## Installation
 
 1. Copy this repository to `public/mod/mavr` in your Moodle code (Moodle 5.x keeps plugins under
    `public/`).
 2. Visit *Site administration > Notifications* to install it.
-3. Optionally review *Site administration > Plugins > Activity modules > MAVR*: maximum model file
-   size, statements per request, statements per attempt and the launch token lifetime.
+3. Optionally review *Site administration > Plugins > Activity modules > MAVR*. *General settings*:
+   maximum model file size, statements per request, statements per attempt and the launch token
+   lifetime. *Built-in viewer*: live mode on or off for the site (on by default), and optional
+   STUN and TURN servers (none by default).
 
 The plugin includes two sub-plugins that install with it:
 
@@ -71,6 +75,29 @@ Included:
 Not yet included (planned for later phases): scene editor, escape-chain template, WebXR
 (VR, AR and MR headsets), live multi-user rooms, the companion service and Hubs integration,
 spatial analytics and Moodle app support.
+
+## Live mode (in development, not in a release yet)
+
+A teacher can turn on **Live mode** in the activity settings (*Live mode* section). Then up to six
+people (the teacher chooses 2 to 6) who are working on the activity at the same time can join a
+live room: they see each other as simple avatars in the 3D room or in VR, AR and MR, and can talk
+to each other. Each person still makes their own attempt and gets their own grade; tasks and
+objects are not shared. In group mode each group has its own room, and students join only rooms
+of their own groups.
+
+How it works and what it discloses:
+
+- The browsers connect **directly to each other** (WebRTC). Moodle only passes the connection
+  messages between them, through web-service polling; no other service is contacted by default.
+  Because the connection is direct, **each participant can see the IP addresses of the others**.
+  The activity page says so next to the *Join the live room* button, and the privacy metadata
+  lists it.
+- Without STUN or TURN servers, live mode usually works only when everyone is on the same
+  network. An administrator can add STUN and TURN servers (with a TURN REST shared secret, for
+  example coturn's `static-auth-secret`) under *Site administration > Plugins > Activity modules
+  > MAVR > Built-in viewer*, or turn live mode off for the whole site there.
+- Nothing is recorded: presence rows go when a person leaves or stops responding for 20 seconds,
+  connection messages when delivered or after 60 seconds.
 
 ## Trust model
 

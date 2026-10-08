@@ -44,6 +44,14 @@ $context = context_module::instance($cm->id);
 require_capability('mod/mavr:viewreports', $context);
 $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
 
+// Group mode: the overview is filtered by the chosen group, and an attempt of someone outside the
+// teacher's groups (separate groups without "access all groups") can be neither opened nor deleted.
+$groupmode = groups_get_activity_groupmode($cm);
+$groupid = 0;
+if ($groupmode != NOGROUPS) {
+    $groupid = (int)groups_get_activity_group($cm, true);
+}
+
 $baseurl = new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
 $pageurl = new moodle_url($baseurl);
 if ($attemptid) {
@@ -62,6 +70,7 @@ if ($deleteid) {
     require_capability('mod/mavr:deleteattempts', $context);
     // The id comes from the request: it must name an attempt of THIS activity.
     $attempt = $DB->get_record('mavr_attempts', ['id' => $deleteid, 'mavrid' => $mavr->id], '*', MUST_EXIST);
+    report_overview::require_attempt_in_groups($course, $cm, $attempt);
 
     if ($confirm) {
         require_sesskey();
@@ -90,17 +99,26 @@ if ($deleteid) {
     exit;
 }
 
+$attempt = null;
+if ($attemptid) {
+    // The id comes from the request: it must name an attempt of THIS activity, and in separate
+    // groups one of a person the teacher shares a group with. Checked before any output.
+    $attempt = $DB->get_record('mavr_attempts', ['id' => $attemptid, 'mavrid' => $mavr->id], '*', MUST_EXIST);
+    report_overview::require_attempt_in_groups($course, $cm, $attempt);
+}
+
 echo $OUTPUT->header();
 echo $OUTPUT->heading(format_string($mavr->name) . ': ' . get_string('reports', 'mod_mavr'));
 
-if ($attemptid) {
-    // The id comes from the request: it must name an attempt of THIS activity.
-    $attempt = $DB->get_record('mavr_attempts', ['id' => $attemptid, 'mavrid' => $mavr->id], '*', MUST_EXIST);
+if ($attempt) {
     echo $OUTPUT->render_from_template('mod_mavr/report_attempt',
         (new report_attempt($mavr, $cm, $context, $attempt))->export_for_template($OUTPUT));
 } else {
+    if ($groupmode != NOGROUPS) {
+        echo groups_print_activity_menu($cm, $baseurl, true);
+    }
     echo $OUTPUT->render_from_template('mod_mavr/report_overview',
-        (new report_overview($mavr, $cm, $context))->export_for_template($OUTPUT));
+        (new report_overview($mavr, $cm, $context, $groupid))->export_for_template($OUTPUT));
 }
 
 echo $OUTPUT->footer();

@@ -24,6 +24,9 @@
 
 namespace mavrruntime_builtin;
 
+use mavrruntime_builtin\local\live\access;
+use mavrruntime_builtin\local\live\config;
+use mavrruntime_builtin\local\live\room_manager;
 use mod_mavr\local\launch\config_builder;
 use mod_mavr\local\runtime\base;
 use mod_mavr\local\runtime\cleanup_scope;
@@ -32,7 +35,11 @@ use mod_mavr\local\runtime\readiness_result;
 use mod_mavr\local\runtime\runtime_capabilities;
 
 /**
- * Built-in run mode: a three.js viewer inside the Moodle page, single user, browser statements.
+ * Built-in run mode: a three.js viewer inside the Moodle page, small live rooms, browser statements.
+ *
+ * Every person keeps their own attempt. With live mode on, up to six people can share a live
+ * room where their browsers connect directly to each other for avatars and voice; Moodle only
+ * relays the connection messages (\mavrruntime_builtin\local\live\room_manager).
  *
  * @package    mavrruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -55,16 +62,18 @@ class runtime extends base {
     }
 
     /**
-     * What the built-in viewer can do: one user, no voice or avatars, immersive VR, AR and mixed
-     * reality where the device supports them (the browser decides at run time), all objective types.
+     * What the built-in viewer can do: small live rooms with voice and avatars while live mode is on
+     * for the site (else one user), immersive VR, AR and mixed reality where the device supports
+     * them (the browser decides at run time), all objective types.
      *
      * @return runtime_capabilities
      */
     public function capabilities(): runtime_capabilities {
+        $live = config::is_enabled();
         return new runtime_capabilities(
-            1,
-            false,
-            false,
+            $live ? room_manager::MAX_PEERS : 1,
+            $live,
+            $live,
             ['vr', 'ar', 'mr'],
             ['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'],
         );
@@ -103,14 +112,31 @@ class runtime extends base {
     }
 
     /**
-     * Nothing to clean up: the built-in viewer keeps nothing outside the activity's own tables.
+     * Remove the live room presences and connection messages of the scope.
      *
      * @param cleanup_scope $scope What is being cleaned up.
      * @return void
      */
     public function cleanup(cleanup_scope $scope): void {
-        // The built-in viewer has no remote rooms, accounts or tables of its own.
-        return;
+        switch ($scope->type) {
+            case cleanup_scope::INSTANCE_DELETE:
+                if ($scope->mavrid > 0) {
+                    room_manager::purge_activity($scope->mavrid);
+                }
+                break;
+            case cleanup_scope::COURSE_RESET:
+                if ($scope->mavrid > 0) {
+                    room_manager::purge_activity($scope->mavrid);
+                } else if ($scope->courseid > 0) {
+                    room_manager::purge_course($scope->courseid);
+                }
+                break;
+            case cleanup_scope::USER_DELETE:
+                if ($scope->userid > 0) {
+                    room_manager::purge_user($scope->userid, $scope->mavrid);
+                }
+                break;
+        }
     }
 
     /**
@@ -134,9 +160,8 @@ class runtime extends base {
         global $DB;
         $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
         $context = \context_module::instance($cm->id);
-        return new launch_descriptor(
-            launch_descriptor::TYPE_INLINE,
-            config_builder::build($cm, $context, $mavr, $attempt, $user),
-        );
+        $config = config_builder::build($cm, $context, $mavr, $attempt, $user);
+        $config['live'] = access::launch_block($cm, $context, $mavr, $attempt, $user);
+        return new launch_descriptor(launch_descriptor::TYPE_INLINE, $config);
     }
 }

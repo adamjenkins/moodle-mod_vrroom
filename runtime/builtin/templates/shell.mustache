@@ -17,9 +17,10 @@
 {{!
     @template mavrruntime_builtin/shell
 
-    The frame of the built-in viewer: launch buttons, message region, 3D stage (with the VR, AR
-    and mixed reality buttons, which stay hidden until the device is known to support them),
-    list view, progress panel and the live region for screen readers.
+    The frame of the built-in viewer: launch buttons, message region, live room panel (filled by
+    mavrruntime_builtin/liveroom when live mode is on), 3D stage (with the VR, AR and mixed reality
+    buttons, which stay hidden until the device is known to support them), list view, progress
+    panel and the live region for screen readers.
 
     Classes required for JS:
     * none
@@ -53,6 +54,7 @@
         {{/canpreview}}
     </div>
     <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="mavr-message" role="status">{{#nolaunch}}{{#str}}nolaunch, mavrruntime_builtin{{/str}}{{/nolaunch}}</div>
+    <section class="mavr-liveroom d-none mb-3" data-region="mavr-liveroom" aria-labelledby="mavr-liveroom-heading-{{cmid}}"></section>
     <div class="mavr-stage d-none" data-region="mavr-stage">
         <canvas class="mavr-canvas" data-region="mavr-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, mavrruntime_builtin{{/str}}" aria-describedby="mavr-controlshelp-{{cmid}}"></canvas>
         <p class="visually-hidden" id="mavr-controlshelp-{{cmid}}">{{#str}}controlshelp, mavrruntime_builtin{{/str}}</p>

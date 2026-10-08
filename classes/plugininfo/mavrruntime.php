@@ -46,6 +46,45 @@ class mavrruntime extends base {
     }
 
     /**
+     * The admin tree node of a run mode's settings page.
+     *
+     * @return string
+     */
+    public function get_settings_section_name() {
+        return 'mavrruntimesetting' . $this->name;
+    }
+
+    /**
+     * Add the run mode's settings page (its settings.php) below the MAVR settings category.
+     *
+     * @param \part_of_admin_tree $adminroot The admin tree.
+     * @param string $parentnodename The category to add the page to.
+     * @param bool $hassiteconfig Whether the current user has moodle/site:config.
+     * @return void
+     */
+    public function load_settings(\part_of_admin_tree $adminroot, $parentnodename, $hassiteconfig) {
+        global $CFG, $USER, $DB, $OUTPUT, $PAGE; // In case settings.php wants to refer to them.
+        /** @var \admin_root $ADMIN */
+        $ADMIN = $adminroot; // May be used in settings.php.
+        $plugininfo = $this; // Also can be used inside settings.php.
+
+        if (!$this->is_installed_and_upgraded()) {
+            return;
+        }
+        if (!$hassiteconfig || !file_exists($this->full_path('settings.php'))) {
+            return;
+        }
+
+        $section = $this->get_settings_section_name();
+        $settings = new \admin_settingpage($section, $this->displayname, 'moodle/site:config', $this->is_enabled() === false);
+        include($this->full_path('settings.php')); // This may also set $settings to null.
+
+        if ($settings) {
+            $ADMIN->add($parentnodename, $settings);
+        }
+    }
+
+    /**
      * Pre-uninstall hook.
      */
     public function uninstall_cleanup() {

@@ -328,4 +328,82 @@ final class instance_manager_test extends \advanced_testcase {
         $this->assertInstanceOf(\stdClass::class, $config);
         $this->assertSame('a', $config->stations[0]->id);
     }
+
+    /**
+     * Live mode settings are saved on add, and the room size is clamped to 2..50.
+     */
+    public function test_live_settings_saved_on_add(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+
+        $module = $this->getDataGenerator()->create_module('mavr', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase',
+            'livemode' => 1,
+            'livemaxusers' => 4,
+        ]);
+        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $this->assertEquals(1, $mavr->livemode);
+        $this->assertEquals(4, $mavr->livemaxusers);
+
+        $module = $this->getDataGenerator()->create_module('mavr', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase',
+            'livemode' => 1,
+            'livemaxusers' => 1,
+        ]);
+        $this->assertEquals(2, $DB->get_field('mavr', 'livemaxusers', ['id' => $module->id]));
+
+        $module = $this->getDataGenerator()->create_module('mavr', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase',
+            'livemode' => 1,
+            'livemaxusers' => 500,
+        ]);
+        $this->assertEquals(50, $DB->get_field('mavr', 'livemaxusers', ['id' => $module->id]));
+    }
+
+    /**
+     * Live mode settings are saved on update, also for a room changed in the room editor; an update
+     * without the live fields keeps the stored values.
+     */
+    public function test_live_settings_saved_on_update(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [, $mavr, $cm] = $this->create_activity();
+
+        // A template room.
+        $data = self::form_data_for_update($mavr, $cm);
+        $data->livemode = 1;
+        $data->livemaxusers = 3;
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertEquals(1, $after->livemode);
+        $this->assertEquals(3, $after->livemaxusers);
+
+        // Without the fields (no run mode can run a live room): the stored values stay.
+        $data = self::form_data_for_update($after, $cm);
+        unset($data->livemode, $data->livemaxusers);
+        $data->name = 'Renamed';
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertSame('Renamed', $after->name);
+        $this->assertEquals(1, $after->livemode);
+        $this->assertEquals(3, $after->livemaxusers);
+
+        // A customised room saves the live fields too.
+        $DB->set_field('mavr', 'customised', 100, ['id' => $mavr->id]);
+        $after = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $data = self::form_data_for_update($after, $cm);
+        $data->livemode = 0;
+        $data->livemaxusers = 99;
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertEquals(100, $after->customised);
+        $this->assertEquals(0, $after->livemode);
+        $this->assertEquals(50, $after->livemaxusers);
+    }
 }

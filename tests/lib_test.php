@@ -54,8 +54,8 @@ final class lib_test extends \advanced_testcase {
         $this->assertTrue(mavr_supports(FEATURE_USES_QUESTIONS));
         $this->assertTrue(mavr_supports(FEATURE_SHOW_DESCRIPTION));
         $this->assertSame(MOD_PURPOSE_INTERACTIVECONTENT, mavr_supports(FEATURE_MOD_PURPOSE));
-        $this->assertFalse(mavr_supports(FEATURE_GROUPS));
-        $this->assertFalse(mavr_supports(FEATURE_GROUPINGS));
+        $this->assertTrue(mavr_supports(FEATURE_GROUPS));
+        $this->assertTrue(mavr_supports(FEATURE_GROUPINGS));
         $this->assertFalse(mavr_supports(FEATURE_GRADE_OUTCOMES));
         $this->assertNull(mavr_supports(FEATURE_RATE));
         $this->assertNull(mavr_supports('nosuchfeature'));

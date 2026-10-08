@@ -32,7 +32,7 @@ use mod_mavr\local\runtime\registry as runtime_registry;
 use mod_mavr\local\template\registry as template_registry;
 
 /**
- * Activity settings form: general settings, run mode, template fields, attempts and grading.
+ * Activity settings form: general settings, run mode, template fields, live mode, attempts and grading.
  *
  * @package    mod_mavr
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -105,6 +105,9 @@ class mod_mavr_mod_form extends moodleform_mod {
             $mform->addElement('submit', 'mavr_choosetemplate', get_string('choosetemplatebutton', 'mavr'));
         }
 
+        // Live mode.
+        $this->define_live_mode($mform);
+
         // Attempts and grading.
         $mform->addElement('header', 'attemptsandgrading', get_string('attemptsandgrading', 'mavr'));
 
@@ -164,6 +167,8 @@ class mod_mavr_mod_form extends moodleform_mod {
             $errors['grade'] = get_string('errorscalenotsupported', 'mavr');
         }
 
+        $errors = array_merge($errors, $this->validate_live_mode($data));
+
         $name = $this->resolve_template();
         if ($name === null && $this->_instance) {
             $errors['name'] = get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? '')));
@@ -179,6 +184,68 @@ class mod_mavr_mod_form extends moodleform_mod {
         }
         $template = template_registry::get($name);
         return array_merge($errors, $template->validation($data, $files, (int)$this->current->course));
+    }
+
+    /**
+     * Add the live mode settings, offered only when an installed run mode can run a live room.
+     *
+     * @param \MoodleQuickForm $mform The form.
+     */
+    protected function define_live_mode(\MoodleQuickForm $mform): void {
+        $livecapable = [];
+        $livemax = 0;
+        foreach (runtime_registry::get_all() as $runtimename => $runtime) {
+            $max = $runtime->capabilities()->maxusers;
+            if ($max >= 2) {
+                $livecapable[] = $runtimename;
+                $livemax = max($livemax, $max);
+            }
+        }
+        $mform->addElement('header', 'livemodeheader', get_string('livemodeheader', 'mavr'));
+        if (!$livecapable) {
+            $mform->addElement('static', 'livemodeunavailable', '', get_string('livemodeunavailable', 'mavr'));
+            return;
+        }
+        $mform->addElement('select', 'livemode', get_string('livemode', 'mavr'),
+            [0 => get_string('livemodeoff', 'mavr'), 1 => get_string('livemodeon', 'mavr')]);
+        $mform->setDefault('livemode', 0);
+        $mform->addHelpButton('livemode', 'livemode', 'mavr');
+        $options = [];
+        for ($i = 2; $i <= $livemax; $i++) {
+            $options[$i] = $i;
+        }
+        $mform->addElement('select', 'livemaxusers', get_string('livemaxusers', 'mavr'), $options);
+        $mform->setDefault('livemaxusers', min(6, $livemax));
+        $mform->addHelpButton('livemaxusers', 'livemaxusers', 'mavr');
+        $mform->hideIf('livemaxusers', 'livemode', 'eq', 0);
+        foreach (array_diff(array_keys(runtime_registry::get_all()), $livecapable) as $other) {
+            $mform->hideIf('livemode', 'runtime', 'eq', $other);
+            $mform->hideIf('livemaxusers', 'runtime', 'eq', $other);
+        }
+    }
+
+    /**
+     * Check the live mode settings against what the chosen run mode can do.
+     *
+     * @param array $data Submitted data.
+     * @return array element name => error
+     */
+    protected function validate_live_mode(array $data): array {
+        if (empty($data['livemode'])) {
+            return [];
+        }
+        $runtimename = (string)($data['runtime'] ?? ($this->current->runtime ?? 'builtin'));
+        $all = runtime_registry::get_all();
+        $max = isset($all[$runtimename]) ? $all[$runtimename]->capabilities()->maxusers : 0;
+        if ($max < 2) {
+            // The live fields are hidden for this run mode, so the error goes on the run mode select.
+            return ['runtime' => get_string('errorlivenotsupported', 'mavr')];
+        }
+        $users = (int)($data['livemaxusers'] ?? 0);
+        if ($users < 2 || $users > $max) {
+            return ['livemaxusers' => get_string('errorlivemaxusers', 'mavr', $max)];
+        }
+        return [];
     }
 
     /**

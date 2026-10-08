@@ -32,6 +32,7 @@ import {createSession} from 'mavrruntime_builtin/session';
 import * as Viewer from 'mavrruntime_builtin/viewer';
 import * as ListView from 'mavrruntime_builtin/listview';
 import {createProgress} from 'mavrruntime_builtin/panels';
+import {createLiveController} from 'mavrruntime_builtin/live/controller';
 import {region, announce, showMessage, clearMessage} from 'mavrruntime_builtin/util';
 
 /**
@@ -59,6 +60,7 @@ class Controller {
         this.boot = boot;
         this.strings = strings;
         this.session = null;
+        this.live = null;
         this.config = null;
         this.view = null;
         this.mode = null;
@@ -146,13 +148,16 @@ class Controller {
             this.config = descriptor.config || descriptor;
             this.session = createSession(this.config);
             this.session.on((message) => this.onSessionMessage(message));
+            this.live = createLiveController(this.root, this.config, this.session);
             region(this.root, 'mavr-launchbar').classList.add('d-none');
             if (this.config.preview) {
                 showMessage(this.root, this.strings.previewnotice, 'info');
             } else {
                 clearMessage(this.root);
             }
-            return mode === '3d' ? this.start3d() : this.startList();
+            // The live room panel is optional: a failure is reported and the launch goes on.
+            const rendering = this.live ? this.live.render().catch(Notification.exception) : Promise.resolve();
+            return rendering.then(() => (mode === '3d' ? this.start3d() : this.startList()));
         }).catch((error) => {
             this.setLaunchDisabled(false);
             Notification.exception(error);
@@ -201,7 +206,7 @@ class Controller {
         }
         this.mode = '3d';
         this.root.querySelector('[data-region="mavr-shell"]').classList.add('mavr-mode-3d');
-        return Viewer.start(this.root, this.session, this.config).then((handle) => {
+        return Viewer.start(this.root, this.session, this.config, {live: this.live}).then((handle) => {
             this.view = handle;
             const aside = region(this.root, 'mavr-progress');
             return createProgress(aside, this.session, {onFinish: () => this.finish()});
@@ -224,6 +229,9 @@ class Controller {
      */
     startList() {
         this.mode = 'list';
+        if (this.live) {
+            this.live.setLocalMode('list');
+        }
         this.root.querySelector('[data-region="mavr-shell"]').classList.remove('mavr-mode-3d');
         const listconfig = Object.assign({}, this.config, {
             canswitch3d: this.webgl,
@@ -301,13 +309,21 @@ class Controller {
     finish() {
         const mode = this.mode;
         this.stopView();
-        return this.session.finish().then((result) => {
+        // Leave the live room first; a failure to leave does not stop the finish.
+        const leaving = this.live ? this.live.destroy() : Promise.resolve();
+        return leaving.catch(() => undefined).then(() => {
+            this.live = null;
+            return this.session.finish();
+        }).then((result) => {
             window.location.href = (result && result.redirecturl) || this.config.finishurl;
             return undefined;
         }).catch((error) => {
-            // The attempt is still open: bring the view back, then report the error.
-            const restart = mode === '3d' ? this.start3d() : this.startList();
-            return restart.then(() => {
+            // The attempt is still open: bring the live room and the view back, then report the error.
+            if (!this.live) {
+                this.live = createLiveController(this.root, this.config, this.session);
+            }
+            const rendering = this.live ? this.live.render().catch(Notification.exception) : Promise.resolve();
+            return rendering.then(() => (mode === '3d' ? this.start3d() : this.startList())).then(() => {
                 throw error;
             });
         });

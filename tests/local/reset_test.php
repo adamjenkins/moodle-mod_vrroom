@@ -119,6 +119,35 @@ final class reset_test extends \advanced_testcase {
     }
 
     /**
+     * A course reset removes the live room presences and messages of the course's activities
+     * (through the built-in run mode's cleanup()); other courses keep theirs.
+     */
+    public function test_reset_removes_live_rows_of_the_course_only(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$course, $mavr, $student] = $this->create_graded_attempt();
+        $generator = $this->getDataGenerator();
+        $othercourse = $generator->create_course();
+        $otherstudent = $generator->create_and_enrol($othercourse, 'student');
+        $othermavr = $generator->create_module('mavr', ['course' => $othercourse->id, 'livemode' => 1]);
+
+        /** @var \mavrruntime_builtin_generator $livegen */
+        $livegen = $generator->get_plugin_generator('mavrruntime_builtin');
+        $peer = $livegen->create_peer(['mavrid' => $mavr->id, 'userid' => $student->id]);
+        $livegen->create_signal(['mavrid' => $mavr->id, 'frompeer' => $peer->peerid, 'topeer' => str_repeat('e', 32)]);
+        $otherpeer = $livegen->create_peer(['mavrid' => $othermavr->id, 'userid' => $otherstudent->id]);
+        $livegen->create_signal(['mavrid' => $othermavr->id, 'frompeer' => $otherpeer->peerid,
+            'topeer' => str_repeat('f', 32)]);
+
+        reset_course_userdata((object)['id' => $course->id, 'reset_mavr_attempts' => 1]);
+
+        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $mavr->id]));
+        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $mavr->id]));
+        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $othermavr->id]));
+        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $othermavr->id]));
+    }
+
+    /**
      * Without the MAVR option nothing is deleted.
      */
     public function test_reset_without_option_keeps_attempts(): void {

@@ -3,6 +3,24 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Live mode for the built-in run mode (activity setting *Live mode*, 2 to 6 people per room):
+  avatars with head and hand poses, positional voice with mute, push to talk and per-person mute,
+  and a participant list. Browser-to-browser WebRTC with signalling relayed by Moodle web services
+  (`mavrruntime_builtin_live_join`, `_live_poll`, `_live_send`, `_live_leave`), tables
+  `mavrruntime_builtin_peers` and `mavrruntime_builtin_signals`, and the scheduled task
+  *Remove expired live room data*.
+- Site settings of the built-in run mode: live mode on/off, STUN servers, TURN servers, TURN shared
+  secret and TURN credential lifetime (all servers empty by default).
+- Group and grouping support: one live room per group; reports filtered by group.
+
+### Changed
+
+- The MAVR site settings are a category with *General settings* and one page per run mode.
+
 ## [0.1.0] - 2026-10-08
 
 ALPHA. First release, Moodle 5.2 only.

@@ -261,6 +261,33 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
+     * The live mode settings come across; the live room presences and messages of the original
+     * activity are never backed up.
+     */
+    public function test_backup_restore_live_mode(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $mavr, $cm, , $student, $attempt] = $this->create_setup();
+
+        $DB->update_record('mavr', (object)['id' => $mavr->id, 'livemode' => 1, 'livemaxusers' => 4]);
+        /** @var \mavrruntime_builtin_generator $livegen */
+        $livegen = $this->getDataGenerator()->get_plugin_generator('mavrruntime_builtin');
+        $peer = $livegen->create_peer(['mavrid' => $mavr->id, 'userid' => $student->id, 'attemptid' => $attempt->id]);
+        $livegen->create_signal(['mavrid' => $mavr->id, 'frompeer' => $peer->peerid, 'topeer' => str_repeat('d', 32)]);
+
+        $newcourseid = $this->backup_and_restore($course, $cm, true);
+        [$new] = $this->get_restored($newcourseid);
+
+        $this->assertEquals(1, $new->livemode);
+        $this->assertEquals(4, $new->livemaxusers);
+        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $new->id]));
+        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $new->id]));
+        // The original room is untouched by the backup.
+        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $mavr->id]));
+    }
+
+    /**
      * An escape chain's config names the remapped question bank entry after a restore into a new
      * course (the template's remap_question_entries()).
      */

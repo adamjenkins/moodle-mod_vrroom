@@ -43,6 +43,7 @@ class report_overview implements renderable, templatable {
      * @param \stdClass $mavr mavr row
      * @param \cm_info $cm course module
      * @param \context_module $context module context
+     * @param int $groupid group to show (0 = all groups the viewer may see)
      */
     public function __construct(
         /** @var \stdClass mavr row */
@@ -51,6 +52,8 @@ class report_overview implements renderable, templatable {
         protected \cm_info $cm,
         /** @var \context_module module context */
         protected \context_module $context,
+        /** @var int group to show (0 = all groups the viewer may see) */
+        protected int $groupid = 0,
     ) {
     }
 
@@ -64,15 +67,29 @@ class report_overview implements renderable, templatable {
         global $DB;
 
         $candelete = has_capability('mod/mavr:deleteattempts', $this->context);
-        $userfields = \core_user\fields::for_name()->get_sql('u', true, '', '', true);
-        $sql = "SELECT a.id, a.userid, a.attempt, a.state, a.score, a.timestart, a.timefinish
-                       {$userfields->selects}
-                  FROM {mavr_attempts} a
-                  JOIN {user} u ON u.id = a.userid
-                       {$userfields->joins}
-                 WHERE a.mavrid = :mavrid
-              ORDER BY u.lastname ASC, u.firstname ASC, a.userid ASC, a.attempt ASC";
-        $records = $DB->get_records_sql($sql, ['mavrid' => $this->mavr->id] + $userfields->params);
+        $groupmode = groups_get_activity_groupmode($this->cm);
+        $records = [];
+        if ($this->groupid > 0 || $groupmode != SEPARATEGROUPS
+                || has_capability('moodle/site:accessallgroups', $this->context)) {
+            // In separate groups "all groups" is only for those who may access all groups; anyone
+            // else without a group of their own sees no attempts.
+            $userfields = \core_user\fields::for_name()->get_sql('u', true, '', '', true);
+            $groupjoin = '';
+            $params = ['mavrid' => $this->mavr->id];
+            if ($this->groupid > 0) {
+                $groupjoin = 'JOIN {groups_members} gm ON gm.userid = a.userid AND gm.groupid = :groupid';
+                $params['groupid'] = $this->groupid;
+            }
+            $sql = "SELECT a.id, a.userid, a.attempt, a.state, a.score, a.timestart, a.timefinish
+                           {$userfields->selects}
+                      FROM {mavr_attempts} a
+                      JOIN {user} u ON u.id = a.userid
+                           {$groupjoin}
+                           {$userfields->joins}
+                     WHERE a.mavrid = :mavrid
+                  ORDER BY u.lastname ASC, u.firstname ASC, a.userid ASC, a.attempt ASC";
+            $records = $DB->get_records_sql($sql, $params + $userfields->params);
+        }
 
         $baseurl = new \moodle_url('/mod/mavr/report.php', ['id' => $this->cm->id]);
         $rows = [];
@@ -101,6 +118,25 @@ class report_overview implements renderable, templatable {
             'hasattempts' => !empty($rows),
             'attempts' => $rows,
         ];
+    }
+
+    /**
+     * Refuse an attempt of someone the current user may not see in separate groups.
+     *
+     * Used by report.php before an attempt is shown or deleted: in separate groups without
+     * "access all groups" a teacher only reaches attempts of people sharing a group with them.
+     * Without groups, and in visible groups, every attempt of the activity is allowed.
+     *
+     * @param \stdClass $course the course
+     * @param \cm_info $cm course module
+     * @param \stdClass $attempt mavr_attempts row (already checked to belong to the activity)
+     * @return void
+     * @throws \moodle_exception errorattemptnotingroup
+     */
+    public static function require_attempt_in_groups(\stdClass $course, \cm_info $cm, \stdClass $attempt): void {
+        if (!groups_user_groups_visible($course, (int)$attempt->userid, $cm)) {
+            throw new \moodle_exception('errorattemptnotingroup', 'mod_mavr');
+        }
     }
 
     /**

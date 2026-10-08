@@ -21,6 +21,8 @@
         <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attempts allowed per user; 0 = unlimited."/>
         <FIELD NAME="completionobjectives" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: all required objectives completed in a finished attempt."/>
         <FIELD NAME="customised" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time of the first room editor save; 0 while the room is built by its template."/>
+        <FIELD NAME="livemode" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when people can meet in a live room (avatars, voice); every person keeps their own attempt."/>
+        <FIELD NAME="livemaxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="6" SEQUENCE="false" COMMENT="Maximum people in one live room, 2 upwards; the run mode caps it at what it supports."/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

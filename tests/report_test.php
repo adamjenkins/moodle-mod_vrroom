@@ -146,6 +146,117 @@ final class report_test extends \advanced_testcase {
     }
 
     /**
+     * An activity in a group mode with groups A and B, a student with an attempt in each, and a
+     * non-editing teacher (no "access all groups") in group A.
+     *
+     * @param int $groupmode SEPARATEGROUPS, VISIBLEGROUPS or NOGROUPS
+     * @return array [course, mavr row, cm_info, context, teacher, group A, group B, attempt A, attempt B]
+     */
+    private function create_group_setup(int $groupmode): array {
+        global $DB;
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $groupa = $generator->create_group(['courseid' => $course->id, 'name' => 'Group A']);
+        $groupb = $generator->create_group(['courseid' => $course->id, 'name' => 'Group B']);
+        $studenta = $generator->create_and_enrol($course, 'student');
+        $studentb = $generator->create_and_enrol($course, 'student');
+        $teacher = $generator->create_and_enrol($course, 'teacher');
+        $generator->create_group_member(['groupid' => $groupa->id, 'userid' => $studenta->id]);
+        $generator->create_group_member(['groupid' => $groupb->id, 'userid' => $studentb->id]);
+        $generator->create_group_member(['groupid' => $groupa->id, 'userid' => $teacher->id]);
+
+        $module = $generator->create_module('mavr', ['course' => $course->id, 'groupmode' => $groupmode]);
+        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        [$course, $cm] = get_course_and_cm_from_cmid($module->cmid, 'mavr');
+        $context = \context_module::instance($cm->id);
+
+        /** @var \mod_mavr_generator $mavrgen */
+        $mavrgen = $generator->get_plugin_generator('mod_mavr');
+        $attempta = $mavrgen->create_attempt((int)$mavr->id, (int)$studenta->id);
+        $attemptb = $mavrgen->create_attempt((int)$mavr->id, (int)$studentb->id);
+
+        return [$course, $mavr, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb];
+    }
+
+    /**
+     * The attempt ids of an overview.
+     *
+     * @param report_overview $overview the overview
+     * @return int[]
+     */
+    private function overview_attemptids(report_overview $overview): array {
+        global $PAGE;
+        $data = $overview->export_for_template($PAGE->get_renderer('core'));
+        $ids = array_column($data['attempts'], 'attemptid');
+        sort($ids);
+        $this->assertSame(!empty($ids), $data['hasattempts']);
+        return $ids;
+    }
+
+    /**
+     * Separate groups: a teacher without "access all groups" sees only the attempts of their own
+     * groups and cannot reach an attempt of another group; "all groups" shows them nothing.
+     */
+    public function test_separate_groups_limit_the_report(): void {
+        $this->resetAfterTest();
+        [$course, $mavr, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb] =
+            $this->create_group_setup(SEPARATEGROUPS);
+        $this->setUser($teacher);
+
+        $this->assertSame([(int)$attempta->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id)));
+        $this->assertSame([(int)$attemptb->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupb->id)));
+        $this->assertSame([], $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
+
+        // The detail page and the deletion both go through this check.
+        report_overview::require_attempt_in_groups($course, $cm, $attempta);
+        try {
+            report_overview::require_attempt_in_groups($course, $cm, $attemptb);
+            $this->fail('An attempt of another group must be refused.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorattemptnotingroup', $e->errorcode);
+            $this->assertSame(get_string('errorattemptnotingroup', 'mod_mavr'), $e->getMessage());
+        }
+    }
+
+    /**
+     * Separate groups: someone with "access all groups" sees every attempt under "all groups" and
+     * reaches every attempt.
+     */
+    public function test_separate_groups_with_access_all_groups(): void {
+        $this->resetAfterTest();
+        [$course, $mavr, $cm, $context, , $groupa, , $attempta, $attemptb] =
+            $this->create_group_setup(SEPARATEGROUPS);
+        $this->setAdminUser();
+
+        $expected = [(int)$attempta->id, (int)$attemptb->id];
+        sort($expected);
+        $this->assertSame($expected, $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
+        $this->assertSame([(int)$attempta->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id)));
+        report_overview::require_attempt_in_groups($course, $cm, $attemptb);
+    }
+
+    /**
+     * Visible groups and no groups: the teacher sees and reaches every attempt.
+     */
+    public function test_visible_groups_and_no_groups_unchanged(): void {
+        $this->resetAfterTest();
+        foreach ([VISIBLEGROUPS, NOGROUPS] as $groupmode) {
+            [$course, $mavr, $cm, $context, $teacher, , , $attempta, $attemptb] =
+                $this->create_group_setup($groupmode);
+            $this->setUser($teacher);
+
+            $expected = [(int)$attempta->id, (int)$attemptb->id];
+            sort($expected);
+            $this->assertSame($expected, $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)),
+                'group mode ' . $groupmode);
+            report_overview::require_attempt_in_groups($course, $cm, $attemptb);
+        }
+    }
+
+    /**
      * Scores and grades are formatted, and an attempt without score shows a dash.
      */
     public function test_format_score(): void {

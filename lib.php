@@ -45,8 +45,8 @@ function mavr_supports(string $feature) {
         FEATURE_USES_QUESTIONS => true,
         FEATURE_SHOW_DESCRIPTION => true,
         FEATURE_MOD_PURPOSE => MOD_PURPOSE_INTERACTIVECONTENT,
-        FEATURE_GROUPS => false,
-        FEATURE_GROUPINGS => false,
+        FEATURE_GROUPS => true,
+        FEATURE_GROUPINGS => true,
         FEATURE_GRADE_OUTCOMES => false,
         default => null,
     };

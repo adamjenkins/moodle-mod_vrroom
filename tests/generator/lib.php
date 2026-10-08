@@ -45,6 +45,8 @@ use mod_mavr\local\attempt\event_store;
  *
  * Empty room: blank_environment (default gallery-hall).
  *
+ * Live mode: livemode (default 0) and livemaxusers (default 6).
+ *
  * Everything is turned into the template's own form fields (gallery_*, escape_*, blank_*),
  * exactly as the activity form would submit them.
  */
@@ -67,6 +69,8 @@ class mod_mavr_generator extends testing_module_generator {
             'grademethod' => 1,
             'maxattempts' => 0,
             'completionobjectives' => 0,
+            'livemode' => 0,
+            'livemaxusers' => 6,
         ];
         foreach ($defaults as $name => $value) {
             if (!isset($record->$name)) {

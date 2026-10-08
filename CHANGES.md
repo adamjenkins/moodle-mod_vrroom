@@ -1,5 +1,17 @@
 # Changes
 
+## Unreleased
+
+- Live mode (Phase 3): people working on the same activity at the same time can join a live room
+  of up to six, see each other as avatars (3D, VR, AR and MR) and talk. Everyone keeps their own
+  attempt and grade. Browsers connect directly to each other (WebRTC); Moodle relays the connection
+  messages, and no other service is contacted unless an administrator adds STUN or TURN servers.
+  Participants can see each other's IP addresses; the activity page and the privacy metadata say
+  so. Administrators can turn live mode off for the site.
+- Group mode: the activity now supports groups and groupings. Live rooms are per group, and the
+  reports show only the attempts of the teacher's groups in separate groups mode.
+- Site settings are now a category: *General settings* and one page per run mode.
+
 ## 0.1.0 (2026-10-08) — ALPHA
 
 First release (Phase 1).

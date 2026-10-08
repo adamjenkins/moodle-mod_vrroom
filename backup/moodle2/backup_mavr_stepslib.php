@@ -43,7 +43,7 @@ class backup_mavr_activity_structure_step extends backup_questions_activity_stru
         $mavr = new backup_nested_element('mavr', ['id'], [
             'name', 'intro', 'introformat', 'runtime', 'template', 'templateconfig', 'graphjson',
             'graphversion', 'grade', 'grademethod', 'maxattempts', 'completionobjectives',
-            'customised', 'timecreated', 'timemodified',
+            'customised', 'livemode', 'livemaxusers', 'timecreated', 'timemodified',
         ]);
 
         $scenes = new backup_nested_element('scenes');
