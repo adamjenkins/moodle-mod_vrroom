@@ -26,6 +26,8 @@
     * answered - true once the question engine has graded it
     * locked - show the locked notice instead of the question
     * lockedmessage - plain-text notice for locked or preview questions
+    * retry - the answer fell short of what the objective needs; the question has been restarted
+      and Try again loads the fresh question
 
     Example context (json):
     {
@@ -33,7 +35,8 @@
         "html": "<div class=\"que multichoice\"><div class=\"qtext\">Which century?</div></div>",
         "answered": false,
         "locked": false,
-        "lockedmessage": ""
+        "lockedmessage": "",
+        "retry": false
     }
 }}
 {{#locked}}
@@ -44,4 +47,8 @@
     <div data-region="mavr-question-html">{{{html}}}</div>
     {{^answered}}<button type="submit" class="btn btn-primary mt-2" data-action="mavr-submit-question">{{#str}}submitanswer, mavrruntime_builtin{{/str}}</button>{{/answered}}
 </form>
+{{#retry}}
+<p class="alert alert-warning mt-2" data-region="mavr-retry-notice">{{#str}}retrynotice, mavrruntime_builtin{{/str}}</p>
+<button type="button" class="btn btn-secondary mt-2" data-action="mavr-retry-question">{{#str}}tryagain, mavrruntime_builtin{{/str}}</button>
+{{/retry}}
 {{/locked}}

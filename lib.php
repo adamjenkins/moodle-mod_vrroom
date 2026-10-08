@@ -258,7 +258,7 @@ function mavr_reset_userdata(stdClass $data): array {
 }
 
 /**
- * Serve the files of the models, media and environment areas.
+ * Serve the files of the models, media, environment and assets areas.
  *
  * GLB files and anything that is not a plain raster image are sent as attachments, so no
  * uploaded active content is ever rendered inline; fetch() from the viewer still works.
@@ -280,7 +280,7 @@ function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownloa
     require_login($course, true, $cm);
     require_capability('mod/mavr:view', $context);
 
-    if (!in_array($filearea, ['models', 'media', 'environment'], true)) {
+    if (!in_array($filearea, ['models', 'media', 'environment', 'assets'], true)) {
         return false;
     }
 
@@ -322,19 +322,26 @@ function mavr_question_pluginfile($course, $context, $component, $filearea, $qub
 }
 
 /**
- * Add the Reports link to the activity's settings navigation.
+ * Add the Room editor and Reports links to the activity's settings navigation.
  *
  * @param settings_navigation $settings The settings navigation.
  * @param navigation_node $node The activity's node.
  */
 function mavr_extend_settings_navigation(settings_navigation $settings, navigation_node $node): void {
     $cm = $settings->get_page()->cm;
-    if (!$cm || !has_capability('mod/mavr:viewreports', $cm->context)) {
+    if (!$cm) {
         return;
     }
-    $url = new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
-    $node->add_node(navigation_node::create(get_string('reports', 'mavr'), $url,
-        navigation_node::TYPE_SETTING, null, 'mod_mavr_reports', new pix_icon('i/report', '')));
+    if (has_capability('mod/mavr:manage', $cm->context)) {
+        $url = new moodle_url('/mod/mavr/edit.php', ['id' => $cm->id]);
+        $node->add_node(navigation_node::create(get_string('editor', 'mavr'), $url,
+            navigation_node::TYPE_SETTING, null, 'mod_mavr_editor', new pix_icon('t/edit', '')));
+    }
+    if (has_capability('mod/mavr:viewreports', $cm->context)) {
+        $url = new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
+        $node->add_node(navigation_node::create(get_string('reports', 'mavr'), $url,
+            navigation_node::TYPE_SETTING, null, 'mod_mavr_reports', new pix_icon('i/report', '')));
+    }
 }
 
 /**
@@ -350,5 +357,29 @@ function mavr_get_file_areas($course, $cm, $context): array {
         'models' => get_string('area_models', 'mavr'),
         'media' => get_string('area_media', 'mavr'),
         'environment' => get_string('area_environment', 'mavr'),
+        'assets' => get_string('area_assets', 'mavr'),
     ];
+}
+
+/**
+ * Activity chooser items for a course: one per installed template.
+ *
+ * @param \core_course\local\entity\content_item $defaultmodulecontentitem The module's default item.
+ * @param \stdClass $user The user the chooser is built for.
+ * @param \stdClass $course The course.
+ * @return \core_course\local\entity\content_item[]
+ */
+function mod_mavr_get_course_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem,
+        \stdClass $user, \stdClass $course): array {
+    return \mod_mavr\local\template\chooser::content_items($defaultmodulecontentitem);
+}
+
+/**
+ * Activity chooser items of the module for every course (admin "recommended activities" and favourites).
+ *
+ * @param \core_course\local\entity\content_item $defaultmodulecontentitem The module's default item.
+ * @return \core_course\local\entity\content_item[]
+ */
+function mod_mavr_get_all_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem): array {
+    return \mod_mavr\local\template\chooser::content_items($defaultmodulecontentitem);
 }

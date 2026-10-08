@@ -36,6 +36,7 @@
     * finalgrade - formatted final grade line, or empty
     * message - information message, or empty
     * reporturl - URL of the reports page, or empty
+    * editurl - URL of the room editor, or empty
 
     Example context (json):
     {
@@ -49,7 +50,8 @@
         ],
         "finalgrade": "Your final grade: 75.00 / 100.00",
         "message": "No more attempts are allowed.",
-        "reporturl": "https://example.com/mod/mavr/report.php?id=12"
+        "reporturl": "https://example.com/mod/mavr/report.php?id=12",
+        "editurl": "https://example.com/mod/mavr/edit.php?id=12"
     }
 }}
 <div class="mod-mavr-view">
@@ -86,6 +88,9 @@
     {{#message}}
     <div class="alert alert-info" role="status">{{message}}</div>
     {{/message}}
+    {{#editurl}}
+    <p><a class="btn btn-secondary" href="{{editurl}}" data-action="mavr-edit-room">{{#str}}editroom, mod_mavr{{/str}}</a></p>
+    {{/editurl}}
     {{#reporturl}}
     <p><a href="{{reporturl}}">{{#str}}reportlink, mod_mavr{{/str}}</a></p>
     {{/reporturl}}

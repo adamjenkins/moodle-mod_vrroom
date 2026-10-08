@@ -68,6 +68,7 @@ final class instance_manager {
         $mavr->grademethod = self::clean_grademethod($data->grademethod ?? grader::GRADE_HIGHEST);
         $mavr->maxattempts = max(0, (int)($data->maxattempts ?? 0));
         $mavr->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $mavr->customised = 0;
         $mavr->timecreated = $now;
         $mavr->timemodified = $now;
 
@@ -104,7 +105,10 @@ final class instance_manager {
     /**
      * Update an activity from the form (or generator) data.
      *
-     * The template never changes after creation.
+     * The template never changes after creation. While the room has been changed in the room
+     * editor (mavr.customised > 0), only the activity's own settings are saved and the room is
+     * not rebuilt, unless the form asks for it with mavr_rebuild, which recompiles the room from
+     * the template's settings and clears the customised flag.
      *
      * @param \stdClass $data Form data; $data->instance and $data->coursemodule are set by core.
      * @param \moodleform_mod|null $form The form, when there is one.
@@ -117,6 +121,8 @@ final class instance_manager {
         $template = template_registry::get($mavr->template);
         $runtimename = (string)($data->runtime ?? $mavr->runtime);
         runtime_registry::get($runtimename);
+        $rebuild = !empty($data->mavr_rebuild);
+        $keeproom = (int)($mavr->customised ?? 0) > 0 && !$rebuild;
 
         $oldgrade = (int)$mavr->grade;
 
@@ -143,14 +149,31 @@ final class instance_manager {
 
         $transaction = $DB->start_delegated_transaction();
         try {
-            $template->save_files($data, $context);
-            $mavr->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
-            $DB->update_record('mavr', $mavr);
-            $config = self::decode_config($mavr->templateconfig) ?? new \stdClass();
+            if ($keeproom) {
+                // The room editor owns the room: the template's settings are neither saved nor compiled.
+                $DB->update_record('mavr', (object)[
+                    'id' => $mavr->id,
+                    'name' => $mavr->name,
+                    'intro' => $mavr->intro,
+                    'introformat' => $mavr->introformat,
+                    'runtime' => $mavr->runtime,
+                    'grade' => $mavr->grade,
+                    'grademethod' => $mavr->grademethod,
+                    'maxattempts' => $mavr->maxattempts,
+                    'completionobjectives' => $mavr->completionobjectives,
+                    'timemodified' => $mavr->timemodified,
+                ]);
+            } else {
+                $template->save_files($data, $context);
+                $mavr->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
+                $mavr->customised = 0;
+                $DB->update_record('mavr', $mavr);
+                $config = self::decode_config($mavr->templateconfig) ?? new \stdClass();
 
-            $compiled = $template->compile($config, $context);
-            self::validate_compiled($compiled);
-            self::apply_compiled($mavr, $context, $compiled);
+                $compiled = $template->compile($config, $context);
+                self::validate_compiled($compiled);
+                self::apply_compiled($mavr, $context, $compiled);
+            }
 
             $mavr->coursemodule = $cmid;
             $mavr->cmidnumber = $data->cmidnumber ?? null;
@@ -267,7 +290,7 @@ final class instance_manager {
             array_values(slots::get_slots((int)$mavr->id, $context))
         ));
         $newbindings = self::normalise_bindings($compiled->slots);
-        $graphchanged = (int)$mavr->graphversion === 0 || $graphjson !== (string)$mavr->graphjson;
+        $graphchanged = (int)$mavr->graphversion === 0 || !self::same_json($graphjson, (string)$mavr->graphjson);
         $slotschanged = $currentbindings !== $newbindings;
 
         if ($graphchanged || $slotschanged) {
@@ -354,11 +377,10 @@ final class instance_manager {
         if (count($compiled->scenes) < 1) {
             throw new \moodle_exception('invalidscene', 'mod_mavr', '', 'the template produced no scene');
         }
-        foreach ($compiled->scenes as $scene) {
-            $errors = scene_validator::validate($scene);
-            if ($errors) {
-                throw new \moodle_exception('invalidscene', 'mod_mavr', '', reset($errors));
-            }
+        // Every room on its own, and the rooms together (ids unique across rooms, portal targets).
+        $errors = scene_validator::validate_set(array_values($compiled->scenes));
+        if ($errors) {
+            throw new \moodle_exception('invalidscene', 'mod_mavr', '', reset($errors));
         }
         $errors = graph_validator::validate($compiled->graph);
         if ($errors) {
@@ -373,6 +395,45 @@ final class instance_manager {
             }
             $seen[$slot] = true;
         }
+    }
+
+    /**
+     * Whether two JSON documents hold the same data.
+     *
+     * Whole floats and integers count as equal, because a document that went through a browser
+     * comes back with 1 where PHP wrote 1.0; everything else must match exactly, key order included.
+     *
+     * @param string $a JSON document.
+     * @param string $b JSON document.
+     * @return bool
+     */
+    private static function same_json(string $a, string $b): bool {
+        if ($a === $b) {
+            return true;
+        }
+        try {
+            $left = json_decode($a, true, 512, JSON_THROW_ON_ERROR);
+            $right = json_decode($b, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return false;
+        }
+        return self::canonical($left) === self::canonical($right);
+    }
+
+    /**
+     * A decoded JSON value with whole floats turned into integers.
+     *
+     * @param mixed $value Decoded JSON.
+     * @return mixed
+     */
+    private static function canonical($value) {
+        if (is_array($value)) {
+            return array_map(fn($item) => self::canonical($item), $value);
+        }
+        if (is_float($value) && is_finite($value) && floor($value) === $value && abs($value) < PHP_INT_MAX) {
+            return (int)$value;
+        }
+        return $value;
     }
 
     /**

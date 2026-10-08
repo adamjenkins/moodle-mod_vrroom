@@ -15,7 +15,9 @@
 
 /**
  * A question-bank question inside a panel or a list-view station: fetched from the server,
- * rendered by the question engine, submitted and shown with its feedback.
+ * rendered by the question engine, submitted and shown with its feedback. When the objective
+ * needs a better answer (pass fraction) the feedback comes with Try again, which loads the
+ * fresh question the server has started.
  *
  * @module     mavrruntime_builtin/question
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -54,7 +56,33 @@ const place = (host, context, javascript) => Templates.renderForPromise('mavrrun
  * @returns {Promise}
  */
 const notice = (host, slot, key) => getString(key, 'mavrruntime_builtin')
-    .then((text) => place(host, {slot: slot, html: '', answered: true, locked: true, lockedmessage: text}, ''));
+    .then((text) => place(host, {slot: slot, html: '', answered: true, locked: true, lockedmessage: text, retry: false}, ''));
+
+/**
+ * Wire the Try again button shown after an answer that fell short.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} session The session.
+ * @param {number} slot Slot.
+ */
+const wireRetry = (host, session, slot) => {
+    const button = host.querySelector('[data-action="mavr-retry-question"]');
+    if (!button) {
+        return;
+    }
+    button.addEventListener('click', (e) => {
+        e.preventDefault();
+        button.disabled = true;
+        renderQuestion(host, session, slot).then(() => {
+            const html = host.querySelector('[data-region="mavr-question-html"]');
+            if (html) {
+                html.setAttribute('tabindex', '-1');
+                html.focus({preventScroll: false});
+            }
+            return undefined;
+        }).catch(Notification.exception);
+    });
+};
 
 /**
  * Wire the submit handler of a rendered question form.
@@ -85,9 +113,13 @@ const wire = (host, session, slot) => {
                 answered: result.answered,
                 locked: false,
                 lockedmessage: '',
+                retry: !!result.retry,
             }, result.javascript).then(() => {
+                host.dataset.mavrQuestionState = result.retry ? 'retry' : (result.answered ? 'answered' : 'open');
                 if (!result.answered) {
                     wire(host, session, slot);
+                } else if (result.retry) {
+                    wireRetry(host, session, slot);
                 }
                 const heading = host.querySelector('[data-region="mavr-question-html"]');
                 if (heading) {
@@ -137,6 +169,7 @@ export const renderQuestion = (host, session, slot) => {
                 answered: !!result.answered,
                 locked: false,
                 lockedmessage: '',
+                retry: false,
             }, result.javascript).then(() => {
                 host.dataset.mavrQuestionState = result.answered ? 'answered' : 'open';
                 if (!result.answered) {

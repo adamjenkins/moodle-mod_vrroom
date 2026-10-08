@@ -35,6 +35,8 @@ use mod_mavr\local\xapi\iri;
 #[\PHPUnit\Framework\Attributes\CoversClass(attempt_finished::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(attempt_deleted::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(statement_recorded::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(scene_updated::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(graph_updated::class)]
 final class events_test extends \advanced_testcase {
 
     /**
@@ -169,5 +171,75 @@ final class events_test extends \advanced_testcase {
         $this->assertEquals($fx->context, $viewed[0]->get_context());
         $this->assertSame('mavr', $viewed[0]->objecttable);
         $this->assertCount(1, $this->only($events, course_module_instance_list_viewed::class));
+    }
+
+    /**
+     * The two room editor events: context, object, other data, URL and backup mappings.
+     *
+     * @return void
+     */
+    public function test_editor_events(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        $graphrow = $DB->get_record('mavr_graphs', ['mavrid' => $fx->mavr->id, 'version' => $fx->mavr->graphversion],
+            '*', MUST_EXIST);
+
+        $sink = $this->redirectEvents();
+        scene_updated::create([
+            'objectid' => (int)$fx->mavr->id,
+            'context' => $fx->context,
+            'other' => ['scenecount' => 1],
+        ])->trigger();
+        graph_updated::create([
+            'objectid' => (int)$graphrow->id,
+            'context' => $fx->context,
+            'other' => ['mavrid' => (int)$fx->mavr->id, 'version' => (int)$graphrow->version],
+        ])->trigger();
+        $events = $sink->get_events();
+        $sink->close();
+
+        $scene = $this->only($events, scene_updated::class);
+        $this->assertCount(1, $scene);
+        $this->assertEquals($fx->context, $scene[0]->get_context());
+        $this->assertSame('mavr', $scene[0]->objecttable);
+        $this->assertEquals($fx->mavr->id, $scene[0]->objectid);
+        $this->assertSame('u', $scene[0]->crud);
+        $this->assertSame(\core\event\base::LEVEL_TEACHING, $scene[0]->edulevel);
+        $this->assertSame(1, $scene[0]->other['scenecount']);
+        $this->assertStringEndsWith('/mod/mavr/edit.php', $scene[0]->get_url()->get_path(false));
+        $this->assertEquals($fx->cm->id, $scene[0]->get_url()->get_param('id'));
+        $this->assertNotEmpty($scene[0]->get_description());
+        $this->assertSame(get_string('eventsceneupdated', 'mod_mavr'), scene_updated::get_name());
+        $this->assertSame(['db' => 'mavr', 'restore' => 'mavr'], scene_updated::get_objectid_mapping());
+
+        $graph = $this->only($events, graph_updated::class);
+        $this->assertCount(1, $graph);
+        $this->assertEquals($fx->context, $graph[0]->get_context());
+        $this->assertSame('mavr_graphs', $graph[0]->objecttable);
+        $this->assertEquals($graphrow->id, $graph[0]->objectid);
+        $this->assertSame('u', $graph[0]->crud);
+        $this->assertSame(\core\event\base::LEVEL_TEACHING, $graph[0]->edulevel);
+        $this->assertSame((int)$graphrow->version, $graph[0]->other['version']);
+        $this->assertStringEndsWith('/mod/mavr/edit.php', $graph[0]->get_url()->get_path(false));
+        $this->assertSame(get_string('eventgraphupdated', 'mod_mavr'), graph_updated::get_name());
+        $this->assertSame(\core\event\base::NOT_MAPPED, graph_updated::get_objectid_mapping());
+        $this->assertSame(['mavrid' => ['db' => 'mavr', 'restore' => 'mavr']], graph_updated::get_other_mapping());
+    }
+
+    /**
+     * The editor events refuse to be created without their other data.
+     *
+     * @return void
+     */
+    public function test_editor_events_require_other_data(): void {
+        $fx = $this->setup_activity();
+        try {
+            scene_updated::create(['objectid' => (int)$fx->mavr->id, 'context' => $fx->context]);
+            $this->fail('scene_updated without scenecount was accepted');
+        } catch (\coding_exception $e) {
+            $this->assertStringContainsString('scenecount', $e->getMessage());
+        }
+        $this->expectException(\coding_exception::class);
+        graph_updated::create(['objectid' => 1, 'context' => $fx->context, 'other' => ['mavrid' => (int)$fx->mavr->id]]);
     }
 }

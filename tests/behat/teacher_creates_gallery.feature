@@ -26,7 +26,7 @@ Feature: A teacher builds a gallery walk with the form
 
   Scenario: Create a gallery walk with two stations and one question
     Given I log in as "teacher1"
-    When I add a "mavr" activity to course "Course 1" section "1" and I fill the form with:
+    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1" and I fill the form with:
       | Name                | Museum walk |
       | gallery_title[0]    | Vase        |
       | gallery_title[1]    | Portrait    |
@@ -41,7 +41,7 @@ Feature: A teacher builds a gallery walk with the form
 
   Scenario: Station titles are required
     Given I log in as "teacher1"
-    When I add a "mavr" activity to course "Course 1" section "1"
+    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1"
     And I set the following fields to these values:
       | Name | Empty walk |
     And I press "Save and return to course"

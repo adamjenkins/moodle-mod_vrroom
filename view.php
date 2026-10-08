@@ -113,6 +113,7 @@ $templatecontext = [
     'hasroot' => $runtime !== null,
     'reporturl' => has_capability('mod/mavr:viewreports', $context)
         ? (new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]))->out(false) : '',
+    'editurl' => $canpreview ? (new moodle_url('/mod/mavr/edit.php', ['id' => $cm->id]))->out(false) : '',
 ];
 
 if ($runtime !== null) {

@@ -16,7 +16,8 @@
 /**
  * One attempt (or preview) in the browser: local events evaluated with the client graph
  * evaluator for instant feedback, statements to the server, reconciliation with the server's
- * authoritative state, questions, resume position and finishing.
+ * authoritative state, questions (with retries), hints, the attempt's deadline, rooms, resume
+ * position and finishing.
  *
  * @module     mavrruntime_builtin/session
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -34,6 +35,32 @@ const RANK = {locked: 0, available: 1, completed: 2};
 
 /** Resume position is saved this often (ms). */
 const RESUME_INTERVAL = 10000;
+
+/** The deadline is checked this often (ms). */
+const TIMER_INTERVAL = 1000;
+
+/**
+ * The hints of the launch config as a Map objectiveid => {total, used: [{id, text}]}.
+ *
+ * The server sends an object keyed by objective id (an empty PHP array arrives as a list).
+ *
+ * @param {*} hints config.hints
+ * @returns {Map}
+ */
+const hintMap = (hints) => {
+    const map = new Map();
+    if (!hints || typeof hints !== 'object' || Array.isArray(hints)) {
+        return map;
+    }
+    Object.keys(hints).forEach((id) => {
+        const entry = hints[id] || {};
+        const used = (Array.isArray(entry.used) ? entry.used : [])
+            .filter((h) => h && h.id !== undefined)
+            .map((h) => ({id: String(h.id), text: String(h.text || '')}));
+        map.set(String(id), {total: Number(entry.total) || 0, used: used});
+    });
+    return map;
+};
 
 /**
  * Normalise an event to the evaluator's shape (contract §4.4.1).
@@ -92,8 +119,13 @@ class Session {
         this.sceneid = null;
         this.active = false;
         this.closed = false;
-        this.serverstate = config.state || null;
-        this.serverfresh = !!config.state;
+        this.serverstate = null;
+        this.serverfresh = false;
+        this.clockoffset = 0;
+        this.hints = hintMap(config.hints);
+        this.timer = null;
+        this.timeupsent = false;
+        this.setServerState(config.state || null, !!config.state);
         this.local = evaluate(this.graph, this.allEvents());
         this.effectsseen = this.local.effects.length;
         this.view = this.buildView();
@@ -116,6 +148,29 @@ class Session {
     }
 
     /**
+     * The launch config this session runs.
+     *
+     * @returns {Object}
+     */
+    getConfig() {
+        return this.config;
+    }
+
+    /**
+     * Take a server state; remember how far the browser clock is from the server's.
+     *
+     * @param {Object|null} state §4.6 attempt state.
+     * @param {boolean} fresh Whether it is newer than every local event.
+     */
+    setServerState(state, fresh) {
+        this.serverstate = state;
+        this.serverfresh = fresh;
+        if (state && Number(state.servertime) > 0) {
+            this.clockoffset = Number(state.servertime) * 1000 - Date.now();
+        }
+    }
+
+    /**
      * All events known locally, in server order (confirmed first, then unsent or in flight).
      *
      * @returns {Object[]}
@@ -127,8 +182,9 @@ class Session {
     /**
      * Subscribe to session changes.
      *
-     * Listeners receive {type: 'change', state, previous, unlocked, completed, effects} or
-     * {type: 'failure', failing}.
+     * Listeners receive {type: 'change', state, previous, unlocked, completed, effects},
+     * {type: 'failure', failing} or, once, {type: 'timeup'} when the attempt's time has run out.
+     * Listeners must ignore types they do not know.
      *
      * @param {Function} listener The listener.
      * @returns {Function} Unsubscribe.
@@ -189,6 +245,8 @@ class Session {
             }
             const points = Number(def.points) || 0;
             const required = !!def.required;
+            const hintdefs = Array.isArray(def.hints) ? def.hints.filter((h) => h && h.id !== undefined) : [];
+            const hintsused = Math.max(Number(loc.hintsused) || 0, srv ? Number(srv.hintsused) || 0 : 0);
             const objective = {
                 id: def.id,
                 type: def.type,
@@ -200,6 +258,9 @@ class Session {
                 zone: def.zone || null,
                 slot: def.slot === undefined ? null : Number(def.slot),
                 target: def.target || null,
+                hintsused: hintsused,
+                hintstotal: hintdefs.length,
+                nexthintpenalty: hintsused < hintdefs.length ? Number(hintdefs[hintsused].penalty) || 0 : 0,
             };
             objectives.push(objective);
             byid[def.id] = objective;
@@ -383,9 +444,9 @@ class Session {
         const pendingbefore = this.pendingevents.length;
         this.reconciling = call('mod_mavr_get_attempt_state', {attemptid: this.config.attemptid})
             .then((state) => {
-                this.serverstate = state;
-                this.serverfresh = this.pendingevents.length === 0 && pendingbefore === 0;
+                this.setServerState(state, this.pendingevents.length === 0 && pendingbefore === 0);
                 this.update(false);
+                this.startTimer();
                 return state;
             })
             .catch((e) => {
@@ -431,6 +492,101 @@ class Session {
         this.active = true;
         this.record('initialized', 'activity', null, null);
         this.record('entered', 'scene', sceneid, sceneid);
+        this.startTimer();
+    }
+
+    /**
+     * Move to another room of the activity: exited (old room), entered (new room).
+     *
+     * Does nothing while no view runs or when the room does not change.
+     *
+     * @param {string} sceneid Scene id of the new room.
+     */
+    setScene(sceneid) {
+        if (!this.active || !sceneid || sceneid === this.sceneid) {
+            return;
+        }
+        const old = this.sceneid;
+        if (old) {
+            this.record('exited', 'scene', old, old);
+        }
+        this.sceneid = sceneid;
+        this.record('entered', 'scene', sceneid, sceneid);
+    }
+
+    /**
+     * Set the channel later statements report (builtin-3d, builtin-list, builtin-vr, builtin-ar, builtin-mr).
+     *
+     * @param {string} channel Channel name.
+     */
+    setChannel(channel) {
+        if (channel) {
+            this.channel = String(channel);
+        }
+    }
+
+    /**
+     * When the attempt's time runs out, in browser-clock milliseconds.
+     *
+     * @returns {number|null} null when the attempt has no time limit (and always in a preview).
+     */
+    getDeadline() {
+        const timedue = this.serverstate ? Number(this.serverstate.timedue) || 0 : 0;
+        if (this.preview || timedue <= 0) {
+            return null;
+        }
+        return timedue * 1000 - this.clockoffset;
+    }
+
+    /**
+     * Whole seconds left until the deadline.
+     *
+     * @returns {number|null} null when there is no deadline; never below 0.
+     */
+    getTimeLeft() {
+        const deadline = this.getDeadline();
+        if (deadline === null) {
+            return null;
+        }
+        return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    }
+
+    /**
+     * Start the deadline timer when a view runs and the attempt has a deadline.
+     */
+    startTimer() {
+        if (this.timer || this.timeupsent || !this.active || this.closed || this.getDeadline() === null) {
+            return;
+        }
+        this.timer = window.setInterval(() => this.checkTime(), TIMER_INTERVAL);
+        this.checkTime();
+    }
+
+    /**
+     * Stop the deadline timer.
+     */
+    stopTimer() {
+        if (this.timer) {
+            window.clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+
+    /**
+     * Emit timeup once when the time left reaches 0.
+     */
+    checkTime() {
+        if (this.timeupsent || this.closed) {
+            this.stopTimer();
+            return;
+        }
+        const left = this.getTimeLeft();
+        if (left === null || left > 0) {
+            return;
+        }
+        this.timeupsent = true;
+        this.stopTimer();
+        this.emit({type: 'timeup'});
     }
 
     /**
@@ -444,6 +600,7 @@ class Session {
         this.record('terminated', 'activity', null, null);
         this.active = false;
         this.stopResume();
+        this.stopTimer();
         if (this.queue) {
             this.queue.flush();
         }
@@ -540,7 +697,7 @@ class Session {
      *
      * @param {number} slot Slot number.
      * @param {HTMLFormElement} form The question form.
-     * @returns {Promise<Object>} the web service result plus `answered`.
+     * @returns {Promise<Object>} the web service result plus `answered` and `retry`.
      */
     submitQuestion(slot, form) {
         const responses = [];
@@ -549,11 +706,29 @@ class Session {
                 responses.push({name: name, value: value});
             }
         });
+        return this.submitResponses(slot, responses);
+    }
+
+    /**
+     * Submit responses to a question (field names as the question engine posts them).
+     *
+     * A graded answer is added to the local events with the fraction the server returned; when
+     * it falls short of the objective's pass fraction the server has restarted the question
+     * (`retry` true) and the local evaluator keeps the objective available, as the server does.
+     *
+     * @param {number} slot Slot number.
+     * @param {Object[]} responses [{name, value}] with string values.
+     * @returns {Promise<Object>} the web service result plus `answered` and `retry`.
+     */
+    submitResponses(slot, responses) {
+        const list = (Array.isArray(responses) ? responses : [])
+            .filter((r) => r && typeof r.name === 'string')
+            .map((r) => ({name: r.name, value: r.value === undefined || r.value === null ? '' : String(r.value)}));
         return this.flush()
             .then(() => call('mod_mavr_submit_question', {
                 attemptid: this.config.attemptid,
                 slot: Number(slot),
-                responses: responses,
+                responses: list,
             }))
             .then((result) => {
                 const answered = result.fraction !== null && result.fraction !== undefined;
@@ -563,11 +738,66 @@ class Session {
                     }));
                 }
                 if (result.state) {
-                    this.serverstate = result.state;
-                    this.serverfresh = this.pendingevents.length === 0;
+                    this.setServerState(result.state, this.pendingevents.length === 0);
                 }
                 this.update(true);
-                return Object.assign({answered: answered}, result);
+                return Object.assign({}, result, {answered: answered, retry: !!result.retry});
+            });
+    }
+
+    /**
+     * The hints of an objective released so far.
+     *
+     * @param {string} objectiveid Objective id.
+     * @returns {Object|null} {total, used: [{id, text}]}, or null when the objective has no hints.
+     */
+    getHints(objectiveid) {
+        const id = String(objectiveid);
+        if (this.hints.has(id)) {
+            const entry = this.hints.get(id);
+            return {total: entry.total, used: entry.used.slice()};
+        }
+        const def = this.objectivedefs.find((o) => o && String(o.id) === id);
+        const total = def && Array.isArray(def.hints) ? def.hints.length : 0;
+        return total > 0 ? {total: total, used: []} : null;
+    }
+
+    /**
+     * Ask the server for the next hint of an objective (it costs the hint's penalty).
+     *
+     * Queued statements are sent first, so the server has seen what unlocked the objective.
+     *
+     * @param {string} objectiveid Objective id.
+     * @returns {Promise<Object>} {hintid, text, hintsused, hintstotal}; text is plain text (use textContent).
+     */
+    requestHint(objectiveid) {
+        if (this.preview || this.closed || !this.config.attemptid) {
+            return Promise.reject(new Error('Hints are only available in an attempt.'));
+        }
+        const id = String(objectiveid);
+        return this.flush()
+            .then(() => call('mod_mavr_request_hint', {attemptid: this.config.attemptid, objectiveid: id}))
+            .then((result) => {
+                const hintid = String(result.hintid);
+                this.confirmed.push(normaliseEvent({
+                    verb: 'requested', type: 'hint', id: hintid, scene: null, fraction: null,
+                }));
+                const entry = this.getHints(id) || {total: Number(result.hintstotal) || 0, used: []};
+                if (!entry.used.some((h) => h.id === hintid)) {
+                    entry.used.push({id: hintid, text: String(result.text || '')});
+                }
+                entry.total = Number(result.hintstotal) || entry.total;
+                this.hints.set(id, entry);
+                if (result.state) {
+                    this.setServerState(result.state, this.pendingevents.length === 0);
+                }
+                this.update(true);
+                return {
+                    hintid: hintid,
+                    text: String(result.text || ''),
+                    hintsused: Number(result.hintsused) || entry.used.length,
+                    hintstotal: entry.total,
+                };
             });
     }
 
@@ -663,6 +893,7 @@ class Session {
      */
     destroy() {
         this.stopResume();
+        this.stopTimer();
         window.removeEventListener('pagehide', this.onPageHide);
         if (this.queue) {
             this.queue.stop();

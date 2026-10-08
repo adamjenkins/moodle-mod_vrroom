@@ -70,4 +70,32 @@ $functions = [
         'ajax' => true,
         'capabilities' => 'mod/mavr:attempt',
     ],
+    'mod_mavr_editor_load' => [
+        'classname' => \mod_mavr\external\editor_load::class,
+        'description' => 'Load the room editor document of an activity.',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'mod/mavr:manage',
+    ],
+    'mod_mavr_editor_save' => [
+        'classname' => \mod_mavr\external\editor_save::class,
+        'description' => 'Validate and save the room editor document of an activity.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/mavr:manage',
+    ],
+    'mod_mavr_request_hint' => [
+        'classname' => \mod_mavr\external\request_hint::class,
+        'description' => 'Reveal the next hint of an objective in the current user\'s open attempt.',
+        'type' => 'write',
+        'ajax' => true,
+        'capabilities' => 'mod/mavr:attempt',
+    ],
+    'mod_mavr_get_question_view' => [
+        'classname' => \mod_mavr\external\get_question_view::class,
+        'description' => 'Return a plain-text view of a true/false or multiple-choice question for in-world panels.',
+        'type' => 'read',
+        'ajax' => true,
+        'capabilities' => 'mod/mavr:attempt',
+    ],
 ];

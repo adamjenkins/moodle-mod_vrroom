@@ -34,14 +34,22 @@ final class scene_validator {
     public const MAX_INTERACTABLES = 500;
     /** @var int Most zones in one scene. */
     public const MAX_ZONES = 200;
-    /** @var string[] Interactable kinds supported in Phase 1. */
-    public const KINDS = ['hotspot', 'model', 'image', 'text'];
+    /** @var string[] Interactable kinds. */
+    public const KINDS = ['hotspot', 'model', 'image', 'text', 'portal', 'grabbable', 'media'];
     /** @var string[] Prop shapes. */
-    public const PROP_SHAPES = ['box', 'cylinder'];
+    public const PROP_SHAPES = ['box', 'cylinder', 'sphere'];
+    /** @var string[] Shapes of a grabbable without a model file. */
+    public const GRAB_SHAPES = ['box', 'cylinder', 'sphere'];
+    /** @var string[] Media interactable types. */
+    public const MEDIA_TYPES = ['audio', 'video'];
     /** @var string[] Procedural environment shape kinds. */
     public const SHAPE_KINDS = ['hall', 'courtyard'];
     /** @var string[] File areas a scene may reference. */
-    public const FILE_AREAS = ['models', 'media', 'environment'];
+    public const FILE_AREAS = ['models', 'media', 'environment', 'assets'];
+    /** @var int Most rooms (scenes) in one activity. */
+    public const MAX_SCENES = 20;
+    /** @var int Longest scene id (mavr_scenes.idnumber and mavr_events.sceneid are char(36)). */
+    public const MAX_SCENE_ID_LENGTH = 36;
 
     /**
      * Validate a scene document.
@@ -57,9 +65,20 @@ final class scene_validator {
         }
         if (!self::is_id($scene['id'] ?? null)) {
             $errors[] = 'id is missing or invalid';
+        } else if (strlen($scene['id']) > self::MAX_SCENE_ID_LENGTH) {
+            $errors[] = 'id must be at most ' . self::MAX_SCENE_ID_LENGTH . ' characters';
         }
         if (!isset($scene['name']) || !is_string($scene['name']) || trim($scene['name']) === '') {
             $errors[] = 'name is missing';
+        }
+        if (array_key_exists('xr', $scene)) {
+            $xr = $scene['xr'];
+            if (!is_array($xr) || ($xr !== [] && array_is_list($xr))) {
+                $errors[] = 'xr must be an object';
+            } else if (array_key_exists('arscale', $xr) && $xr['arscale'] !== null
+                    && (!self::is_number($xr['arscale']) || $xr['arscale'] < 0.01 || $xr['arscale'] > 1)) {
+                $errors[] = 'xr.arscale must be null or a number from 0.01 to 1';
+            }
         }
 
         self::validate_environment($scene['environment'] ?? null, $errors);
@@ -90,6 +109,9 @@ final class scene_validator {
                 continue;
             }
             $checkid($spawn['id'] ?? null, $where);
+            if (isset($spawn['name']) && !is_string($spawn['name'])) {
+                $errors[] = "{$where}.name must be a string";
+            }
             self::check_vector($spawn['position'] ?? null, "{$where}.position", $errors);
             if (array_key_exists('yaw', $spawn) && !self::is_number($spawn['yaw'])) {
                 $errors[] = "{$where}.yaw must be a finite number";
@@ -143,6 +165,9 @@ final class scene_validator {
                 continue;
             }
             $checkid($prop['id'] ?? null, $where);
+            if (isset($prop['name']) && !is_string($prop['name'])) {
+                $errors[] = "{$where}.name must be a string";
+            }
             if (!in_array($prop['shape'] ?? null, self::PROP_SHAPES, true)) {
                 $errors[] = "{$where}.shape must be one of " . implode(', ', self::PROP_SHAPES);
             }
@@ -194,7 +219,7 @@ final class scene_validator {
                     self::check_vector($item[$key], "{$where}.{$key}", $errors);
                 }
             }
-            foreach (['width', 'fit'] as $key) {
+            foreach (['width', 'height', 'fit'] as $key) {
                 if (array_key_exists($key, $item) && (!self::is_number($item[$key]) || $item[$key] <= 0)) {
                     $errors[] = "{$where}.{$key} must be a number greater than 0";
                 }
@@ -211,10 +236,46 @@ final class scene_validator {
             }
             switch ($kind) {
                 case 'model':
-                    self::check_file($item['file'] ?? null, 'models', "{$where}.file", $errors);
+                    self::check_file($item['file'] ?? null, ['models', 'assets'], "{$where}.file", $errors);
                     break;
                 case 'image':
-                    self::check_file($item['file'] ?? null, 'media', "{$where}.file", $errors);
+                    self::check_file($item['file'] ?? null, ['media', 'assets'], "{$where}.file", $errors);
+                    break;
+                case 'portal':
+                    $target = $item['target'] ?? null;
+                    if (!is_array($target) || !self::is_id($target['scene'] ?? null)
+                            || strlen($target['scene']) > self::MAX_SCENE_ID_LENGTH || !self::is_id($target['spawn'] ?? null)) {
+                        $errors[] = "{$where}.target must name a room and a start point";
+                    }
+                    break;
+                case 'grabbable':
+                    if (array_key_exists('file', $item) && $item['file'] !== null) {
+                        self::check_file($item['file'], ['models', 'assets'], "{$where}.file", $errors);
+                    } else if (!in_array($item['shape'] ?? null, self::GRAB_SHAPES, true)) {
+                        $errors[] = "{$where}.shape must be one of " . implode(', ', self::GRAB_SHAPES);
+                    }
+                    if (array_key_exists('size', $item) && self::check_vector($item['size'], "{$where}.size", $errors)) {
+                        foreach ($item['size'] as $component) {
+                            if ($component <= 0) {
+                                $errors[] = "{$where}.size components must be greater than 0";
+                                break;
+                            }
+                        }
+                    }
+                    if (array_key_exists('color', $item) && !self::is_colour($item['color'])) {
+                        $errors[] = "{$where}.color must be a #rrggbb colour";
+                    }
+                    break;
+                case 'media':
+                    if (!in_array($item['media'] ?? null, self::MEDIA_TYPES, true)) {
+                        $errors[] = "{$where}.media must be one of " . implode(', ', self::MEDIA_TYPES);
+                    }
+                    self::check_file($item['file'] ?? null, ['media', 'assets'], "{$where}.file", $errors);
+                    foreach (['loop', 'autoplay'] as $key) {
+                        if (array_key_exists($key, $item) && !is_bool($item[$key])) {
+                            $errors[] = "{$where}.{$key} must be true or false";
+                        }
+                    }
                     break;
                 case 'text':
                     if (!isset($item['text']) || !is_string($item['text'])) {
@@ -224,6 +285,93 @@ final class scene_validator {
                 case 'hotspot':
                     self::validate_content($item['content'] ?? null, "{$where}.content", $errors);
                     break;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Validate every room of an activity together.
+     *
+     * Each room must be valid on its own; room ids must be unique; every spawn, zone, prop and
+     * interactable id must be unique across all rooms (objectives name them without a room); and
+     * every portal must lead to a start point of a room of the set.
+     *
+     * @param array $scenes Decoded scene documents in room order.
+     * @return string[] Errors; [] means valid.
+     */
+    public static function validate_set(array $scenes): array {
+        if (!array_is_list($scenes) || count($scenes) < 1 || count($scenes) > self::MAX_SCENES) {
+            return ['an activity needs between 1 and ' . self::MAX_SCENES . ' rooms'];
+        }
+
+        $errors = [];
+        $sceneids = [];
+        $spawnsbyscene = [];
+        $owners = [];
+        foreach ($scenes as $i => $scene) {
+            if (!is_array($scene)) {
+                $errors[] = "scenes[{$i}]: must be an object";
+                continue;
+            }
+            foreach (self::validate($scene) as $error) {
+                $errors[] = "scenes[{$i}]: {$error}";
+            }
+            $sceneid = $scene['id'] ?? null;
+            if (self::is_id($sceneid)) {
+                if (isset($sceneids[$sceneid])) {
+                    $errors[] = "room id \"{$sceneid}\" is used twice";
+                } else {
+                    $sceneids[$sceneid] = $i;
+                    $spawnsbyscene[$sceneid] = [];
+                }
+            }
+            foreach (['spawn', 'zones', 'props', 'interactables'] as $list) {
+                if (!isset($scene[$list]) || !is_array($scene[$list])) {
+                    continue;
+                }
+                $local = [];
+                foreach ($scene[$list] as $object) {
+                    if (!is_array($object) || !self::is_id($object['id'] ?? null)) {
+                        continue;
+                    }
+                    $id = $object['id'];
+                    if ($list === 'spawn' && self::is_id($sceneid) && $sceneids[$sceneid] === $i) {
+                        $spawnsbyscene[$sceneid][$id] = true;
+                    }
+                    if (isset($local[$id])) {
+                        // A duplicate inside one room is reported by validate().
+                        continue;
+                    }
+                    $local[$id] = true;
+                    $owners[$id][$i] = true;
+                }
+            }
+        }
+
+        foreach ($owners as $id => $rooms) {
+            if (count($rooms) > 1) {
+                $errors[] = "id \"{$id}\" is used in more than one room";
+            }
+        }
+
+        foreach ($scenes as $i => $scene) {
+            if (!is_array($scene) || !isset($scene['interactables']) || !is_array($scene['interactables'])) {
+                continue;
+            }
+            foreach ($scene['interactables'] as $j => $item) {
+                if (!is_array($item) || ($item['kind'] ?? null) !== 'portal') {
+                    continue;
+                }
+                $target = $item['target'] ?? null;
+                $targetscene = is_array($target) ? ($target['scene'] ?? null) : null;
+                $targetspawn = is_array($target) ? ($target['spawn'] ?? null) : null;
+                if (!is_string($targetscene) || !is_string($targetspawn)
+                        || !isset($spawnsbyscene[$targetscene][$targetspawn])) {
+                    $errors[] = "scenes[{$i}].interactables[{$j}].target does not name a start point of a room of " .
+                        "this activity";
+                }
             }
         }
 
@@ -251,7 +399,7 @@ final class scene_validator {
                 $errors[] = 'environment.shape.kind must be one of ' . implode(', ', self::SHAPE_KINDS);
             }
         } else if ($type === 'model') {
-            self::check_file($environment['file'] ?? null, 'environment', 'environment.file', $errors);
+            self::check_file($environment['file'] ?? null, ['environment', 'assets'], 'environment.file', $errors);
         } else {
             $errors[] = 'environment.type must be "preset" or "model"';
         }
@@ -323,7 +471,7 @@ final class scene_validator {
                 $errors[] = "{$where}.media must be a list";
             } else {
                 foreach ($content['media'] as $i => $file) {
-                    self::check_file($file, 'media', "{$where}.media[{$i}]", $errors);
+                    self::check_file($file, ['media', 'assets'], "{$where}.media[{$i}]", $errors);
                 }
             }
         }
@@ -333,19 +481,19 @@ final class scene_validator {
      * Check a file reference.
      *
      * @param mixed $file The file reference.
-     * @param string $area Required file area.
+     * @param string[] $areas File areas allowed here.
      * @param string $where Path for messages.
      * @param string[] $errors Errors, appended to.
      * @return bool True when valid.
      */
-    private static function check_file($file, string $area, string $where, array &$errors): bool {
+    private static function check_file($file, array $areas, string $where, array &$errors): bool {
         if (!is_array($file)) {
             $errors[] = "{$where} must be a file reference";
             return false;
         }
         $ok = true;
-        if (($file['area'] ?? null) !== $area) {
-            $errors[] = "{$where}.area must be \"{$area}\"";
+        if (!in_array($file['area'] ?? null, $areas, true)) {
+            $errors[] = "{$where}.area must be one of " . implode(', ', $areas);
             $ok = false;
         }
         if (!is_int($file['itemid'] ?? null) || $file['itemid'] < 0) {

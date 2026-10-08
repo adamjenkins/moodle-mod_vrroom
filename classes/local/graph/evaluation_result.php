@@ -41,7 +41,7 @@ final class evaluation_result {
      * @param string[] $eventstatus status of each input event, in input order
      *     (evaluator::STATUS_APPLIED, STATUS_IGNORED or STATUS_LOCKED)
      * @param array $objectives objective id => ['status' => string, 'earned' => float,
-     *     'points' => float, 'required' => bool], in graph order
+     *     'points' => float, 'required' => bool, 'hintsused' => int], in graph order
      * @param float $earnedpoints sum of earned points of completed objectives (rounded to 7 places)
      * @param float $maxpoints sum of points of all objectives (rounded to 7 places)
      * @param float $score attempt score 0..1 (rounded to 5 places)
@@ -56,7 +56,7 @@ final class evaluation_result {
     public function __construct(
         /** @var string[] status of each input event, in input order */
         public readonly array $eventstatus,
-        /** @var array objective id => status, earned, points, required; graph order */
+        /** @var array objective id => status, earned, points, required, hintsused; graph order */
         public readonly array $objectives,
         /** @var float sum of earned points of completed objectives */
         public readonly float $earnedpoints,

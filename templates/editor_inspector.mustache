@@ -1,0 +1,115 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_mavr/editor_inspector
+
+    The room editor's inspector: one labelled field per property of the selected object. A change
+    is committed when the field fires its change event.
+
+    Data attributes required for JS:
+    * data-path and data-type on every field
+    * data-action="mavr-insp-delete", "mavr-insp-duplicate"
+    * data-action="mavr-insp-upload" with data-kind and data-path
+
+    Context variables required for this template:
+    * hasselection - whether something is selected
+    * heading - what is selected
+    * fields - list of fields: id, label, path, type, value, step, min, max, checked, isnumber, istext, istextarea,
+      isselect, ischeckbox, iscolour, options (value, label, selected), optgroups (label, options), hint, hintid,
+      uploadkind
+    * canduplicate, candelete - which buttons to show
+
+    Example context (json):
+    {
+        "hasselection": true,
+        "heading": "Zone: Vase",
+        "fields": [
+            {"id": "name", "label": "Name", "path": "name", "type": "text", "istext": true, "value": "Vase"},
+            {"id": "center-0", "label": "Centre X", "path": "center.0", "type": "number", "isnumber": true,
+             "value": "-3", "step": "0.1"},
+            {"id": "zone", "label": "Zone", "path": "zone", "type": "select", "isselect": true,
+             "options": [{"value": "", "label": "No zone", "selected": true}]}
+        ],
+        "canduplicate": true,
+        "candelete": true
+    }
+}}
+{{^hasselection}}
+<p class="text-muted small">{{#str}}editornoselection, mod_mavr{{/str}}</p>
+{{/hasselection}}
+{{#hasselection}}
+<h3 class="h6">{{heading}}</h3>
+<div class="mavr-editor-fields">
+    {{#fields}}
+    <div class="mb-2">
+        {{#ischeckbox}}
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"{{#checked}} checked{{/checked}}>
+            <label class="form-check-label" for="mavr-insp-{{id}}">{{label}}</label>
+        </div>
+        {{/ischeckbox}}
+        {{^ischeckbox}}
+        <label class="form-label small mb-0" for="mavr-insp-{{id}}">{{label}}</label>
+        {{#isnumber}}
+        <input type="number" class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
+               value="{{value}}" step="{{step}}"{{#min}} min="{{min}}"{{/min}}{{#max}} max="{{max}}"{{/max}}{{#hintid}} aria-describedby="{{hintid}}"{{/hintid}}>
+        {{/isnumber}}
+        {{#istext}}
+        <input type="text" class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
+               value="{{value}}"{{#hintid}} aria-describedby="{{hintid}}"{{/hintid}}>
+        {{/istext}}
+        {{#iscolour}}
+        <input type="color" class="form-control form-control-sm form-control-color" id="mavr-insp-{{id}}" data-path="{{path}}"
+               data-type="{{type}}" value="{{value}}">
+        {{/iscolour}}
+        {{#istextarea}}
+        <textarea class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}" rows="4">{{value}}</textarea>
+        {{/istextarea}}
+        {{#isselect}}
+        <select class="form-select form-select-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}">
+            {{#options}}
+            <option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>
+            {{/options}}
+            {{#optgroups}}
+            <optgroup label="{{label}}">
+                {{#options}}
+                <option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>
+                {{/options}}
+            </optgroup>
+            {{/optgroups}}
+        </select>
+        {{/isselect}}
+        {{/ischeckbox}}
+        {{#hint}}
+        <p class="form-text small mb-0" id="{{hintid}}">{{hint}}</p>
+        {{/hint}}
+        {{#uploadkind}}
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-action="mavr-insp-upload" data-kind="{{uploadkind}}"
+                data-path="{{path}}">{{#str}}editorupload, mod_mavr{{/str}}</button>
+        {{/uploadkind}}
+    </div>
+    {{/fields}}
+</div>
+<div class="d-flex flex-wrap gap-2 mt-3">
+    {{#canduplicate}}
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-insp-duplicate">{{#str}}editorduplicate, mod_mavr{{/str}}</button>
+    {{/canduplicate}}
+    {{#candelete}}
+    <button type="button" class="btn btn-outline-danger btn-sm" data-action="mavr-insp-delete">{{#str}}editordelete, mod_mavr{{/str}}</button>
+    {{/candelete}}
+</div>
+{{/hasselection}}

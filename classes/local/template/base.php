@@ -62,15 +62,45 @@ abstract class base {
     }
 
     /**
+     * Help text for the activity chooser entry of this template.
+     *
+     * @return string The component's 'chooserhelp' string if it defines one, else ''.
+     */
+    public function get_chooser_help(): string {
+        $component = $this->get_component();
+        if (!get_string_manager()->string_exists('chooserhelp', $component)) {
+            return '';
+        }
+        return get_string('chooserhelp', $component);
+    }
+
+    /**
+     * Replace question bank entry ids in a stored config after a restore.
+     *
+     * The base implementation knows no config shape and changes nothing; templates that store
+     * question bank entry ids override it.
+     *
+     * @param \stdClass $config Decoded stored config, changed in place.
+     * @param callable $map fn(int $old): int, returns $old when there is no mapping.
+     * @return bool Whether $config changed.
+     */
+    public function remap_question_entries(\stdClass $config, callable $map): bool {
+        return false;
+    }
+
+    /**
      * Add this template's elements to the activity form.
      *
      * Every element name MUST start with "<name>_".
      *
      * @param \moodleform_mod $form The activity form.
      * @param \MoodleQuickForm $mform Its QuickForm.
+     * mod_form adds only the selected template's elements (the template is chosen before the
+     * form is shown, and fixed afterwards), so nothing needs hiding by template. The returned
+     * names are kept for callers that want to know which top-level elements were added.
+     *
      * @param int $courseid The course.
-     * @return string[] Names of the top-level elements or groups added; mod_form hides each one
-     *     unless this template is selected.
+     * @return string[] Names of the non-repeated top-level elements or groups added.
      */
     abstract public function define_form(\moodleform_mod $form, \MoodleQuickForm $mform, int $courseid): array;
 

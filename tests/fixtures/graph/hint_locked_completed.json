@@ -1,0 +1,102 @@
+{
+  "name": "hint_locked_completed",
+  "intent": "A hint requested while its objective is locked is 'locked' and costs nothing; a hint requested after completion is 'applied' and changes neither the earned points nor hintsused.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v-1",
+        "type": "visit_zone",
+        "title": "Search the desk",
+        "zone": "z-1",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "x-1",
+        "type": "interact",
+        "title": "Take the key",
+        "target": "g-1",
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-1"
+          ]
+        },
+        "hints": [
+          {
+            "id": "hn-1",
+            "text": "Look on the desk.",
+            "penalty": 0.5
+          },
+          {
+            "id": "hn-2",
+            "text": "It is under the lamp.",
+            "penalty": 0.5
+          }
+        ]
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "g-1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-2",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v-1": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 0
+      },
+      "x-1": {
+        "status": "completed",
+        "earned": 2,
+        "hintsused": 0
+      }
+    },
+    "earnedpoints": 2,
+    "maxpoints": 2,
+    "score": 1,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

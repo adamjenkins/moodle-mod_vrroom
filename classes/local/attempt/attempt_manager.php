@@ -47,8 +47,14 @@ final class attempt_manager {
     /** @var string Attempt abandoned (reserved). */
     public const STATE_ABANDONED = 'abandoned';
 
+    /** @var int Seconds after the deadline during which an attempt still counts as on time. */
+    public const DEADLINE_GRACE = 5;
+
     /**
      * Return the user's attempt in progress, or start a new one.
+     *
+     * An attempt in progress whose time ran out is finished first and no longer counts as open.
+     * A new attempt gets its deadline from the time limit of the current graph.
      *
      * @param \cm_info $cm course module
      * @param \stdClass $mavr mavr row
@@ -64,7 +70,10 @@ final class attempt_manager {
         $open = $DB->get_records('mavr_attempts',
             ['mavrid' => $mavr->id, 'userid' => $userid, 'state' => self::STATE_INPROGRESS], 'attempt DESC', '*', 0, 1);
         if ($open) {
-            return [reset($open), true];
+            $current = reset($open);
+            if (!self::close_if_overdue($current, $timenow)) {
+                return [$current, true];
+            }
         }
 
         $count = $DB->count_records('mavr_attempts', ['mavrid' => $mavr->id, 'userid' => $userid]);
@@ -74,6 +83,9 @@ final class attempt_manager {
         // Attempt numbers continue after the highest one, so a deleted attempt never causes a clash.
         $last = (int)$DB->get_field_sql('SELECT MAX(attempt) FROM {mavr_attempts} WHERE mavrid = :mavrid AND userid = :userid',
             ['mavrid' => $mavr->id, 'userid' => $userid]);
+
+        $graph = instance_manager::get_graph((int)$mavr->id, (int)$mavr->graphversion);
+        $timelimit = max(0, (int)($graph['timelimit'] ?? 0));
 
         $context = \context_module::instance($cm->id);
         $transaction = $DB->start_delegated_transaction();
@@ -90,6 +102,7 @@ final class attempt_manager {
             'requireddone' => 0,
             'timestart' => $timenow,
             'timefinish' => 0,
+            'timedue' => $timelimit > 0 ? $timenow + $timelimit : 0,
             'timemodified' => $timenow,
         ];
         $attempt->id = (int)$DB->insert_record('mavr_attempts', $attempt);
@@ -121,17 +134,24 @@ final class attempt_manager {
     }
 
     /**
-     * Load an attempt that must belong to $userid, be in progress, and be attemptable by them.
+     * Load an attempt that must belong to $userid, be in progress, within its time, and be
+     * attemptable by them.
+     *
+     * An attempt whose time ran out is finished here, and the call fails with errorattempttimeup.
      *
      * @param int $attemptid
      * @param int $userid
      * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, mavr, cm, context]
-     * @throws \moodle_exception errornotyourattempt, errorattemptclosed, or a missing capability
+     * @throws \moodle_exception errornotyourattempt, errorattempttimeup, errorattemptclosed, or a missing capability
      */
     public static function require_own_open_attempt(int $attemptid, int $userid): array {
         $attempt = self::get_attempt($attemptid);
         if ((int)$attempt->userid !== $userid) {
             throw new \moodle_exception('errornotyourattempt', 'mod_mavr');
+        }
+        if (self::is_overdue($attempt)) {
+            self::close_if_overdue($attempt);
+            throw new \moodle_exception('errorattempttimeup', 'mod_mavr');
         }
         if ($attempt->state !== self::STATE_INPROGRESS) {
             throw new \moodle_exception('errorattemptclosed', 'mod_mavr');
@@ -139,6 +159,47 @@ final class attempt_manager {
         [$mavr, $cm, $context] = self::load_activity($attempt);
         require_capability('mod/mavr:attempt', $context, $userid);
         return [$attempt, $mavr, $cm, $context];
+    }
+
+    /**
+     * Whether an attempt in progress has passed its deadline (plus the grace period).
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @param int|null $timenow current time
+     * @return bool
+     */
+    public static function is_overdue(\stdClass $attempt, ?int $timenow = null): bool {
+        $timenow = $timenow ?? time();
+        $timedue = (int)($attempt->timedue ?? 0);
+        return ($attempt->state ?? '') === self::STATE_INPROGRESS && $timedue > 0
+            && $timenow > $timedue + self::DEADLINE_GRACE;
+    }
+
+    /**
+     * Finish an attempt whose time ran out, as of its deadline.
+     *
+     * The row is read again first, so a stale copy never finishes an attempt twice.
+     *
+     * @param \stdClass $attempt mavr_attempts row (only the id is used)
+     * @param int|null $timenow current time
+     * @return bool true when this call finished the attempt
+     */
+    public static function close_if_overdue(\stdClass $attempt, ?int $timenow = null): bool {
+        global $DB;
+        $row = $DB->get_record('mavr_attempts', ['id' => (int)$attempt->id]);
+        if (!$row || !self::is_overdue($row, $timenow)) {
+            return false;
+        }
+        try {
+            self::finish($row, (int)$row->timedue, true);
+        } catch (\moodle_exception $e) {
+            if ($e->errorcode === 'errorattemptclosed') {
+                // Another request finished it in the meantime.
+                return false;
+            }
+            throw $e;
+        }
+        return true;
     }
 
     /**
@@ -215,7 +276,7 @@ final class attempt_manager {
         $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
         $result = (new evaluator($graph))->evaluate($events);
         return self::build_state((int)$attempt->id, (string)$attempt->state, (int)$attempt->graphversion, $result,
-            count($events));
+            count($events), (int)($attempt->timedue ?? 0));
     }
 
     /**
@@ -226,10 +287,11 @@ final class attempt_manager {
      * @param int $graphversion graph version evaluated
      * @param evaluation_result $result evaluation
      * @param int $eventcount number of events evaluated
+     * @param int $timedue deadline of the attempt (0 = none, and always 0 for a preview)
      * @return array
      */
     public static function build_state(int $attemptid, string $state, int $graphversion, evaluation_result $result,
-            int $eventcount): array {
+            int $eventcount, int $timedue = 0): array {
         $objectives = [];
         foreach ($result->objectives as $id => $objective) {
             $objectives[] = [
@@ -238,6 +300,7 @@ final class attempt_manager {
                 'earned' => (float)$objective['earned'],
                 'points' => (float)$objective['points'],
                 'required' => (bool)$objective['required'],
+                'hintsused' => (int)($objective['hintsused'] ?? 0),
             ];
         }
         return [
@@ -252,6 +315,8 @@ final class attempt_manager {
             'allrequiredcompleted' => (bool)$result->allrequiredcompleted,
             'objectives' => $objectives,
             'hidden' => array_values(array_map('strval', $result->hidden)),
+            'timedue' => max(0, $timedue),
+            'servertime' => time(),
         ];
     }
 
@@ -259,11 +324,12 @@ final class attempt_manager {
      * Finish an attempt: close the question usage, replay, grade and update completion.
      *
      * @param \stdClass $attempt mavr_attempts row
-     * @param int|null $timenow current time
+     * @param int|null $timenow current time (the deadline when the time ran out)
+     * @param bool $timeup whether the attempt is finished because its time ran out
      * @return \stdClass the updated row
      * @throws \moodle_exception errorattemptclosed when the attempt is not in progress
      */
-    public static function finish(\stdClass $attempt, ?int $timenow = null): \stdClass {
+    public static function finish(\stdClass $attempt, ?int $timenow = null, bool $timeup = false): \stdClass {
         global $CFG, $DB;
         require_once($CFG->libdir . '/completionlib.php');
         $timenow = $timenow ?? time();
@@ -287,7 +353,11 @@ final class attempt_manager {
 
         $score = (float)$result->score;
         $grade = round($score * (float)$mavr->grade, 5);
-        event_store::record_server($attempt, 'completed', 'activity', null, null, ['score' => $score, 'grade' => $grade]);
+        $completedresult = ['score' => $score, 'grade' => $grade];
+        if ($timeup) {
+            $completedresult['timeup'] = true;
+        }
+        event_store::record_server($attempt, 'completed', 'activity', null, null, $completedresult);
         if ((int)$mavr->grade > 0) {
             $gradepass = grader::get_gradepass($mavr);
             if ($gradepass > 0) {

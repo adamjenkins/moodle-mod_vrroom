@@ -53,12 +53,21 @@ final class graph_validator {
     /** @var string[] Rule action kinds. */
     public const ACTIONS = ['show', 'hide', 'unlock', 'finish', 'teleport', 'play_media', 'open_question'];
 
-    /** @var string[] Short verbs of the mavr-vocab/1 statement vocabulary (contract §4.3). */
+    /** @var string[] Short verbs of the mavr-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
     public const VERBS = ['launched', 'initialized', 'terminated', 'entered', 'exited', 'interacted', 'answered',
-        'completed', 'passed', 'failed'];
+        'completed', 'passed', 'failed', 'requested'];
 
-    /** @var string[] Object types of the mavr-vocab/1 statement vocabulary (contract §4.3). */
-    public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective'];
+    /** @var string[] Object types of the mavr-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
+    public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective', 'hint'];
+
+    /** @var int Longest time limit in seconds (seven days). */
+    public const MAX_TIMELIMIT = 604800;
+
+    /** @var int Most hints on one objective. */
+    public const MAX_HINTS = 5;
+
+    /** @var int Longest hint text, in Unicode code points. */
+    public const MAX_HINT_TEXT = 1000;
 
     /**
      * Validate a decoded graph.
@@ -85,6 +94,13 @@ final class graph_validator {
             }
         }
 
+        if (array_key_exists('timelimit', $graph)) {
+            $timelimit = $graph['timelimit'];
+            if (!self::is_integer($timelimit) || $timelimit < 0 || $timelimit > self::MAX_TIMELIMIT) {
+                $errors[] = 'timelimit must be an integer from 0 to ' . self::MAX_TIMELIMIT;
+            }
+        }
+
         $objectives = [];
         if (!array_key_exists('objectives', $graph) || !self::is_list($graph['objectives'])) {
             $errors[] = 'objectives must be an array';
@@ -104,6 +120,7 @@ final class graph_validator {
         // Pass 1: objective ids, types and fields.
         $types = [];
         $slots = [];
+        $hintids = [];
         foreach ($objectives as $k => $objective) {
             $where = "objectives[{$k}]";
             if (!self::is_object($objective)) {
@@ -113,6 +130,9 @@ final class graph_validator {
             $id = $objective['id'] ?? null;
             if (!self::is_id($id)) {
                 $errors[] = "{$where}.id is not a valid id";
+            } else if (preg_match('/^[0-9]+$/D', $id) === 1) {
+                // An all-digit id would turn the objectives map into a JSON list.
+                $errors[] = "{$where}.id must not be all digits";
             } else if (array_key_exists($id, $types)) {
                 $errors[] = "duplicate objective id \"{$id}\"";
             } else {
@@ -144,6 +164,17 @@ final class graph_validator {
                             && !self::is_number($unlock['score_at_least'])) {
                         $errors[] = "{$where}.unlock.score_at_least must be a number or null";
                     }
+                }
+            }
+            if (array_key_exists('hints', $objective)) {
+                self::validate_hints($objective['hints'], $type, $where, $hintids, $errors);
+            }
+            if (array_key_exists('pass_fraction', $objective) && $objective['pass_fraction'] !== null) {
+                $passfraction = $objective['pass_fraction'];
+                if ($type !== 'answer_question') {
+                    $errors[] = "{$where}.pass_fraction is only allowed on answer_question";
+                } else if (!self::is_number($passfraction) || $passfraction <= 0 || $passfraction > 1) {
+                    $errors[] = "{$where}.pass_fraction must be a number greater than 0 and at most 1";
                 }
             }
             switch ($type) {
@@ -262,6 +293,50 @@ final class graph_validator {
         }
 
         return $errors;
+    }
+
+    /**
+     * Validate an objective's hints list.
+     *
+     * @param mixed $hints the objective's hints value
+     * @param mixed $type the objective's type value
+     * @param string $where path for messages
+     * @param array $hintids hint id => true over all objectives seen so far, appended to
+     * @param string[] $errors errors, appended to
+     */
+    private static function validate_hints(mixed $hints, mixed $type, string $where, array &$hintids,
+            array &$errors): void {
+        if (!self::is_list($hints) || count($hints) > self::MAX_HINTS) {
+            $errors[] = "{$where}.hints must be an array of at most " . self::MAX_HINTS . ' hints';
+            return;
+        }
+        if ($type === 'sequence' && $hints) {
+            $errors[] = "{$where}.hints are not allowed on a sequence";
+            return;
+        }
+        foreach ($hints as $j => $hint) {
+            if (!self::is_object($hint)) {
+                $errors[] = "{$where}.hints[{$j}] must be an object";
+                continue;
+            }
+            $hintid = $hint['id'] ?? null;
+            if (!self::is_id($hintid)) {
+                $errors[] = "{$where}.hints[{$j}].id is not a valid id";
+            } else if (array_key_exists($hintid, $hintids)) {
+                $errors[] = "duplicate hint id \"{$hintid}\"";
+            } else {
+                $hintids[$hintid] = true;
+            }
+            $text = $hint['text'] ?? null;
+            if (!is_string($text) || $text === '' || mb_strlen($text, 'UTF-8') > self::MAX_HINT_TEXT) {
+                $errors[] = "{$where}.hints[{$j}].text must be a non-empty string of at most "
+                    . self::MAX_HINT_TEXT . ' characters';
+            }
+            if (array_key_exists('penalty', $hint)
+                    && (!self::is_number($hint['penalty']) || $hint['penalty'] < 0)) {
+                $errors[] = "{$where}.hints[{$j}].penalty must be a number >= 0";
+            }
+        }
     }
 
     /**

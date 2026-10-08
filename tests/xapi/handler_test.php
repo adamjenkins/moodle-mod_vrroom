@@ -491,4 +491,55 @@ final class handler_test extends \advanced_testcase {
         $this->expectException(xapi_exception::class);
         $handler->save_state($state);
     }
+
+    /**
+     * A statement that arrives after the attempt's deadline is refused, and the attempt is
+     * finished as of the deadline with a "timeup" completed statement.
+     *
+     * @return void
+     */
+    public function test_late_statement_is_refused_and_attempt_finished(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        $deadline = time() - attempt_manager::DEADLINE_GRACE - 60;
+        $DB->set_field('mavr_attempts', 'timedue', $deadline, ['id' => $attempt->id]);
+        $this->setUser($fx->student);
+
+        $result = handler::create('mod_mavr')->process_statements([
+            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
+            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Portrait'), (int)$attempt->id),
+        ]);
+
+        $this->assertSame([0 => false, 1 => false], $result);
+        $this->assertSame(0, $this->client_rows((int)$attempt->id));
+        $row = $DB->get_record('mavr_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
+        $this->assertSame(attempt_manager::STATE_FINISHED, $row->state);
+        $this->assertEquals($deadline, $row->timefinish);
+        $completed = $DB->get_records('mavr_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
+            'objecttype' => 'activity']);
+        $this->assertCount(1, $completed);
+        $this->assertTrue(json_decode(reset($completed)->resultjson)->timeup);
+    }
+
+    /**
+     * Within the grace period after the deadline a statement is still accepted.
+     *
+     * @return void
+     */
+    public function test_statement_within_grace_is_accepted(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        // Two seconds past the deadline is inside the grace period.
+        $DB->set_field('mavr_attempts', 'timedue', time() - 2, ['id' => $attempt->id]);
+        $this->setUser($fx->student);
+
+        $result = handler::create('mod_mavr')->process_statements([
+            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
+        ]);
+        $this->assertSame([0 => true], $result);
+        $this->assertSame(attempt_manager::STATE_INPROGRESS,
+            $DB->get_field('mavr_attempts', 'state', ['id' => $attempt->id]));
+    }
 }

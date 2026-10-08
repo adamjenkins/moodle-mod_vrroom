@@ -55,6 +55,7 @@ final class helper {
                     'earned' => new external_value(PARAM_FLOAT, 'Points earned'),
                     'points' => new external_value(PARAM_FLOAT, 'Points available'),
                     'required' => new external_value(PARAM_BOOL, 'Whether the objective is required'),
+                    'hintsused' => new external_value(PARAM_INT, 'Number of hints requested for the objective'),
                 ]),
                 'Objectives in graph order'
             ),
@@ -62,6 +63,8 @@ final class helper {
                 new external_value(PARAM_ALPHANUMEXT, 'Hidden scene item id'),
                 'Hidden scene item ids'
             ),
+            'timedue' => new external_value(PARAM_INT, 'When the time of the attempt runs out; 0 = no limit'),
+            'servertime' => new external_value(PARAM_INT, 'Server time when the state was built'),
         ], 'Attempt state', $required);
     }
 
@@ -81,6 +84,9 @@ final class helper {
     /**
      * Load an attempt of the user in any state, with the capability to attempt.
      *
+     * An attempt in progress whose time ran out is finished first, so the row returned shows it
+     * finished.
+     *
      * @param int $attemptid
      * @param int $userid
      * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, mavr, cm, context]
@@ -93,6 +99,9 @@ final class helper {
         }
         [$mavr, $cm, $context] = attempt_manager::load_activity($attempt);
         require_capability('mod/mavr:attempt', $context, $userid);
+        if (attempt_manager::close_if_overdue($attempt)) {
+            $attempt = attempt_manager::get_attempt($attemptid);
+        }
         return [$attempt, $mavr, $cm, $context];
     }
 

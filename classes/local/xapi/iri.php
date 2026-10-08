@@ -46,7 +46,7 @@ final class iri {
     /** @var string Vocabulary version. */
     public const VOCAB = 'mavr-vocab/1';
 
-    /** @var string[] Short verb => verb IRI, all ten verbs of mavr-vocab/1. */
+    /** @var string[] Short verb => verb IRI, all eleven verbs of mavr-vocab/1. */
     public const VERBS = [
         'launched' => 'http://adlnet.gov/expapi/verbs/launched',
         'initialized' => 'http://adlnet.gov/expapi/verbs/initialized',
@@ -58,9 +58,10 @@ final class iri {
         'completed' => 'http://adlnet.gov/expapi/verbs/completed',
         'passed' => 'http://adlnet.gov/expapi/verbs/passed',
         'failed' => 'http://adlnet.gov/expapi/verbs/failed',
+        'requested' => 'https://wisecat.net/xapi/mavr/verbs/requested',
     ];
 
-    /** @var array Verbs a client may send => object types allowed for that verb. */
+    /** @var array Verbs a client may send => object types allowed for that verb (hints are server-asserted). */
     public const CLIENT_VERBS = [
         'initialized' => ['activity'],
         'terminated' => ['activity'],
@@ -70,9 +71,9 @@ final class iri {
     ];
 
     /** @var string[] All object types of mavr-vocab/1. */
-    public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective'];
+    public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective', 'hint'];
 
-    /** @var string Pattern every scene, zone, object and objective id must match. */
+    /** @var string Pattern every scene, zone, object, objective and hint id must match. */
     public const ID_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/';
 
     /**
@@ -94,7 +95,7 @@ final class iri {
      * @param int $cmid course module id
      * @param string $type one of self::OBJECT_TYPES
      * @param string|null $sceneid scene id (scene, zone and object types)
-     * @param string|null $id zone, object or objective id, or the slot number for questions
+     * @param string|null $id zone, object, objective or hint id, or the slot number for questions
      * @return string
      * @throws \coding_exception for an unknown type or a missing id
      */
@@ -120,6 +121,9 @@ final class iri {
             case 'objective':
                 self::require_id($id);
                 return $act . '/objective/' . $id;
+            case 'hint':
+                self::require_id($id);
+                return $act . '/hint/' . $id;
         }
         throw new \coding_exception('Unknown MAVR object type: ' . $type);
     }
@@ -147,6 +151,7 @@ final class iri {
             'object' => '~^(\d+)/scene/' . $idp . '/object/' . $idp . '$~',
             'question' => '~^(\d+)/question/(\d+)$~',
             'objective' => '~^(\d+)/objective/' . $idp . '$~',
+            'hint' => '~^(\d+)/hint/' . $idp . '$~',
         ];
         foreach ($patterns as $type => $pattern) {
             if (!preg_match($pattern, $rest, $m)) {

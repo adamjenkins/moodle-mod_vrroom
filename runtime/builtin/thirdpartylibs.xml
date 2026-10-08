@@ -3,7 +3,7 @@
   <library>
     <location>amd/src/three.js</location>
     <name>three.js</name>
-    <description>JavaScript 3D library (core and GLTFLoader), bundled as one ES module.</description>
+    <description>three.js core, GLTFLoader, OrbitControls, TransformControls and XRHandModelFactory, bundled as one ES module.</description>
     <version>0.186.1</version>
     <license>MIT</license>
     <repository>https://github.com/mrdoob/three.js</repository>

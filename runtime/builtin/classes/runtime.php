@@ -55,7 +55,8 @@ class runtime extends base {
     }
 
     /**
-     * What the built-in viewer can do in Phase 1.
+     * What the built-in viewer can do: one user, no voice or avatars, immersive VR, AR and mixed
+     * reality where the device supports them (the browser decides at run time), all objective types.
      *
      * @return runtime_capabilities
      */
@@ -64,7 +65,7 @@ class runtime extends base {
             1,
             false,
             false,
-            [],
+            ['vr', 'ar', 'mr'],
             ['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'],
         );
     }

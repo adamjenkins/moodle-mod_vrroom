@@ -51,8 +51,18 @@ const OBJECTIVE_TYPES = ['visit_zone', 'interact', 'answer_question', 'collect',
 const TRIGGERS = ['start', 'event', 'objective_completed', 'objective_unlocked', 'all_required_completed'];
 const ACTIONS = ['show', 'hide', 'unlock', 'finish', 'teleport', 'play_media', 'open_question'];
 const VERBS = ['launched', 'initialized', 'terminated', 'entered', 'exited', 'interacted', 'answered',
-    'completed', 'passed', 'failed'];
-const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective'];
+    'completed', 'passed', 'failed', 'requested'];
+const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective', 'hint'];
+const DIGITS_PATTERN = /^[0-9]+$/;
+
+/** Longest time limit in seconds (seven days). */
+export const MAX_TIMELIMIT = 604800;
+
+/** Most hints on one objective. */
+export const MAX_HINTS = 5;
+
+/** Longest hint text, in Unicode code points. */
+export const MAX_HINT_TEXT = 1000;
 
 /**
  * Round half-up to 7 decimal places (PHP: round($x, 7)).
@@ -145,6 +155,19 @@ const normaliseEvent = (event) => {
 const normaliseObjective = (raw) => {
     const unlock = isObject(raw.unlock) ? raw.unlock : {};
     const scoreAtLeast = unlock.score_at_least;
+    const hints = [];
+    const penalties = new Map();
+    asList(raw.hints).forEach((hint) => {
+        if (!isObject(hint) || !has(hint, 'id')) {
+            return;
+        }
+        const hintId = str(hint.id);
+        if (penalties.has(hintId)) {
+            return;
+        }
+        hints.push(hintId);
+        penalties.set(hintId, isNum(hint.penalty) ? hint.penalty : 0);
+    });
     return {
         id: str(raw.id),
         type: str(raw.type),
@@ -158,8 +181,19 @@ const normaliseObjective = (raw) => {
         targets: asList(raw.targets).map(str),
         count: isNum(raw.count) ? Math.trunc(raw.count) : 0,
         steps: asList(raw.steps).map(str),
+        hints,
+        penalties,
+        passFraction: isNum(raw.pass_fraction) ? raw.pass_fraction : null,
     };
 };
+
+/**
+ * Whether an event is a hint request (verb requested, object type hint).
+ *
+ * @param {Object} event normalised event
+ * @returns {boolean}
+ */
+const isHintEvent = (event) => event.verb === 'requested' && event.type === 'hint';
 
 /**
  * Normalise a graph into objectives, an id index, rules and the initial hidden list.
@@ -215,6 +249,8 @@ class Run {
         this.earned = this.objectives.map(() => 0);
         this.collected = this.objectives.map(() => new Set());
         this.pointer = this.objectives.map(() => 0);
+        this.hintsUsed = this.objectives.map(() => new Set());
+        this.penalty = this.objectives.map(() => 0);
         this.hidden = new Set(compiled.hidden);
         this.finished = false;
         this.effects = [];
@@ -245,11 +281,21 @@ class Run {
         this.queue.push({on: 'event', event});
 
         if (status === STATUS.APPLIED) {
+            const hintEvent = isHintEvent(event);
             matches.forEach((pos) => {
                 if (this.status[pos] !== OBJECTIVE.AVAILABLE) {
                     return;
                 }
                 const objective = this.objectives[pos];
+                if (hintEvent) {
+                    // A hint only costs points; it never completes anything.
+                    if (!this.hintsUsed[pos].has(event.id)) {
+                        this.hintsUsed[pos].add(event.id);
+                        const cost = objective.penalties.has(event.id) ? objective.penalties.get(event.id) : 0;
+                        this.penalty[pos] = round7(this.penalty[pos] + cost);
+                    }
+                    return;
+                }
                 switch (objective.type) {
                     case 'visit_zone':
                     case 'interact':
@@ -257,6 +303,10 @@ class Run {
                         break;
                     case 'answer_question': {
                         const fraction = Math.max(0, Math.min(1, event.fraction === null ? 0 : event.fraction));
+                        if (objective.passFraction !== null && fraction < objective.passFraction - 1e-9) {
+                            // Not good enough: the objective stays available for another try.
+                            break;
+                        }
                         this.complete(pos, round7(objective.points * fraction));
                         break;
                     }
@@ -308,6 +358,9 @@ class Run {
                         && objective.targets.includes(event.id);
                     break;
             }
+            if (!match && objective.type !== 'sequence' && isHintEvent(event)) {
+                match = objective.hints.includes(event.id);
+            }
             if (match) {
                 matches.push(pos);
             }
@@ -336,12 +389,14 @@ class Run {
     /**
      * Complete an objective, then advance sequences that wait for it (depth-first).
      *
+     * The points earned are the base points less the hint penalty, never below zero.
+     *
      * @param {number} pos objective position
-     * @param {number} earned points earned
+     * @param {number} base points earned before hint penalties
      */
-    complete(pos, earned) {
+    complete(pos, base) {
         this.status[pos] = OBJECTIVE.COMPLETED;
-        this.earned[pos] = earned;
+        this.earned[pos] = Math.max(0, round7(base - this.penalty[pos]));
         const id = this.objectives[pos].id;
         this.queue.push({on: 'objective_completed', objective: id});
         this.objectives.forEach((sequence, spos) => {
@@ -518,6 +573,7 @@ class Run {
                 earned: this.status[pos] === OBJECTIVE.COMPLETED ? this.earned[pos] : 0,
                 points: objective.points,
                 required: objective.required,
+                hintsused: this.hintsUsed[pos].size,
             };
         });
         maxPoints = round7(maxPoints);
@@ -657,6 +713,47 @@ const isFiniteNumber = (value) => isNum(value) && Number.isFinite(value);
  * @returns {boolean}
  */
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
+/**
+ * Validate an objective's hints list.
+ *
+ * @param {*} hints the objective's hints value
+ * @param {*} type the objective's type value
+ * @param {string} where path for messages
+ * @param {Set} hintIds hint ids over all objectives seen so far, added to
+ * @param {string[]} errors errors, appended to
+ */
+const validateHints = (hints, type, where, hintIds, errors) => {
+    if (!Array.isArray(hints) || hints.length > MAX_HINTS) {
+        errors.push(`${where}.hints must be an array of at most ${MAX_HINTS} hints`);
+        return;
+    }
+    if (type === 'sequence' && hints.length > 0) {
+        errors.push(`${where}.hints are not allowed on a sequence`);
+        return;
+    }
+    hints.forEach((hint, j) => {
+        if (!isObject(hint)) {
+            errors.push(`${where}.hints[${j}] must be an object`);
+            return;
+        }
+        const hintId = hint.id;
+        if (!isId(hintId)) {
+            errors.push(`${where}.hints[${j}].id is not a valid id`);
+        } else if (hintIds.has(hintId)) {
+            errors.push(`duplicate hint id "${hintId}"`);
+        } else {
+            hintIds.add(hintId);
+        }
+        const text = hint.text;
+        if (typeof text !== 'string' || text === '' || [...text].length > MAX_HINT_TEXT) {
+            errors.push(`${where}.hints[${j}].text must be a non-empty string of at most ${MAX_HINT_TEXT} characters`);
+        }
+        if (has(hint, 'penalty') && (!isFiniteNumber(hint.penalty) || hint.penalty < 0)) {
+            errors.push(`${where}.hints[${j}].penalty must be a number >= 0`);
+        }
+    });
+};
 
 /**
  * Validate a rule trigger.
@@ -803,6 +900,13 @@ export const validate = (graph) => {
         }
     }
 
+    if (has(graph, 'timelimit')) {
+        const timelimit = graph.timelimit;
+        if (!Number.isInteger(timelimit) || timelimit < 0 || timelimit > MAX_TIMELIMIT) {
+            errors.push(`timelimit must be an integer from 0 to ${MAX_TIMELIMIT}`);
+        }
+    }
+
     let objectives = [];
     if (!Array.isArray(graph.objectives)) {
         errors.push('objectives must be an array');
@@ -822,6 +926,7 @@ export const validate = (graph) => {
     // Pass 1: objective ids, types and fields.
     const types = new Map();
     const slots = new Set();
+    const hintIds = new Set();
     objectives.forEach((objective, k) => {
         const where = `objectives[${k}]`;
         if (!isObject(objective)) {
@@ -831,6 +936,9 @@ export const validate = (graph) => {
         const id = objective.id;
         if (!isId(id)) {
             errors.push(`${where}.id is not a valid id`);
+        } else if (DIGITS_PATTERN.test(id)) {
+            // An all-digit id would turn the objectives map into a JSON list in PHP.
+            errors.push(`${where}.id must not be all digits`);
         } else if (types.has(id)) {
             errors.push(`duplicate objective id "${id}"`);
         } else {
@@ -861,6 +969,17 @@ export const validate = (graph) => {
                         && !isFiniteNumber(unlock.score_at_least)) {
                     errors.push(`${where}.unlock.score_at_least must be a number or null`);
                 }
+            }
+        }
+        if (has(objective, 'hints')) {
+            validateHints(objective.hints, type, where, hintIds, errors);
+        }
+        if (has(objective, 'pass_fraction') && objective.pass_fraction !== null) {
+            const passFraction = objective.pass_fraction;
+            if (type !== 'answer_question') {
+                errors.push(`${where}.pass_fraction is only allowed on answer_question`);
+            } else if (!isFiniteNumber(passFraction) || passFraction <= 0 || passFraction > 1) {
+                errors.push(`${where}.pass_fraction must be a number greater than 0 and at most 1`);
             }
         }
         switch (type) {

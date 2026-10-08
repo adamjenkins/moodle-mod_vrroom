@@ -1,0 +1,57 @@
+{
+  "name": "pass_fraction_invalid",
+  "intent": "pass_fraction only on answer_question, and only a number in (0, 1]; null is allowed anywhere.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v-1",
+        "type": "visit_zone",
+        "title": "A",
+        "zone": "z-1",
+        "pass_fraction": 1
+      },
+      {
+        "id": "q-1",
+        "type": "answer_question",
+        "title": "Q1",
+        "slot": 1,
+        "pass_fraction": 0
+      },
+      {
+        "id": "q-2",
+        "type": "answer_question",
+        "title": "Q2",
+        "slot": 2,
+        "pass_fraction": 1.5
+      },
+      {
+        "id": "q-3",
+        "type": "answer_question",
+        "title": "Q3",
+        "slot": 3,
+        "pass_fraction": null
+      },
+      {
+        "id": "q-4",
+        "type": "answer_question",
+        "title": "Q4",
+        "slot": 4,
+        "pass_fraction": 0.5
+      },
+      {
+        "id": "v-5",
+        "type": "visit_zone",
+        "title": "E",
+        "zone": "z-5",
+        "pass_fraction": null
+      }
+    ],
+    "rules": []
+  },
+  "errors": [
+    "objectives[0].pass_fraction is only allowed on answer_question",
+    "objectives[1].pass_fraction must be a number greater than 0 and at most 1",
+    "objectives[2].pass_fraction must be a number greater than 0 and at most 1"
+  ]
+}

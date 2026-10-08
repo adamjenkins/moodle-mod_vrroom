@@ -1,0 +1,109 @@
+{
+  "name": "valid_extensions",
+  "intent": "Every Phase 2 extension used correctly: time limit, hints with and without a penalty, pass_fraction 1 and null, empty hints on a sequence, a requested/hint event trigger.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "timelimit": 900,
+    "hidden": [
+      "g-key"
+    ],
+    "objectives": [
+      {
+        "id": "v-desk",
+        "type": "visit_zone",
+        "title": "Search Desk",
+        "zone": "z-desk",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "x-desk",
+        "type": "interact",
+        "title": "Take the Brass key",
+        "target": "g-key",
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-desk"
+          ]
+        },
+        "hints": [
+          {
+            "id": "hn-desk-1",
+            "text": "Look on the desk.",
+            "penalty": 0.5
+          },
+          {
+            "id": "hn-desk-2",
+            "text": "Unter der Lampe – ganz sicher."
+          }
+        ]
+      },
+      {
+        "id": "x-safe",
+        "type": "answer_question",
+        "title": "Open the safe",
+        "slot": 1,
+        "points": 3,
+        "required": true,
+        "pass_fraction": 1,
+        "unlock": {
+          "after": [
+            "x-desk"
+          ]
+        }
+      },
+      {
+        "id": "x-note",
+        "type": "answer_question",
+        "title": "Read the note",
+        "slot": 2,
+        "points": 1,
+        "pass_fraction": null,
+        "hints": []
+      },
+      {
+        "id": "s-all",
+        "type": "sequence",
+        "title": "In order",
+        "steps": [
+          "v-desk",
+          "x-desk"
+        ],
+        "hints": []
+      }
+    ],
+    "rules": [
+      {
+        "id": "r-show",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-desk"
+        },
+        "actions": [
+          {
+            "do": "show",
+            "target": "g-key"
+          }
+        ]
+      },
+      {
+        "id": "r-hint",
+        "on": {
+          "on": "event",
+          "verb": "requested",
+          "type": "hint"
+        },
+        "once": false,
+        "actions": [
+          {
+            "do": "play_media",
+            "target": "a-tape"
+          }
+        ]
+      }
+    ]
+  },
+  "errors": []
+}

@@ -62,6 +62,75 @@ final class graph_validator_test extends \advanced_testcase {
     }
 
     /**
+     * Every validator fixture (tests/fixtures/graphvalidate), shared with the node tests.
+     *
+     * @return array fixture name => [absolute path]
+     */
+    public static function validate_fixture_provider(): array {
+        $cases = [];
+        $files = glob(__DIR__ . '/../../fixtures/graphvalidate/*.json');
+        sort($files);
+        foreach ($files as $file) {
+            $cases[basename($file, '.json')] = [$file];
+        }
+        return $cases;
+    }
+
+    /**
+     * There are exactly the 7 validator fixtures the Phase 2 contract names (guards against a vacuous provider).
+     */
+    public function test_validate_fixture_set_is_complete(): void {
+        $this->resetAfterTest();
+        $expected = ['digit_objective_id', 'duplicate_hint_id', 'hints_invalid', 'hints_on_sequence',
+            'pass_fraction_invalid', 'timelimit_invalid', 'valid_extensions'];
+        $this->assertSame($expected, array_keys(self::validate_fixture_provider()));
+    }
+
+    /**
+     * Each validator fixture produces exactly its expected messages, in order (the node twin checks the same).
+     *
+     * @param string $file absolute path of the fixture
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('validate_fixture_provider')]
+    public function test_validate_fixture(string $file): void {
+        $this->resetAfterTest();
+        $fixture = json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(basename($file, '.json'), $fixture['name']);
+        $this->assertSame($fixture['errors'], graph_validator::validate($fixture['graph']));
+    }
+
+    /**
+     * Time limits at the edges of the allowed range.
+     */
+    public function test_timelimit_bounds(): void {
+        $this->resetAfterTest();
+        $message = 'timelimit must be an integer from 0 to 604800';
+        foreach ([0, 1, 604800, 900.0] as $ok) {
+            $graph = self::example();
+            $graph['timelimit'] = $ok;
+            $this->assertSame([], graph_validator::validate($graph), (string)$ok);
+        }
+        foreach ([-1, 604801, '900', true, null] as $bad) {
+            $graph = self::example();
+            $graph['timelimit'] = $bad;
+            $this->assertSame([$message], graph_validator::validate($graph), var_export($bad, true));
+        }
+    }
+
+    /**
+     * Hint texts are counted in characters, not bytes, and penalties default to none.
+     */
+    public function test_hint_text_length(): void {
+        $this->resetAfterTest();
+        $graph = self::example();
+        $graph['objectives'][5]['hints'] = [['id' => 'hn-1', 'text' => str_repeat('é', 1000)]];
+        $this->assertSame([], graph_validator::validate($graph));
+        $graph['objectives'][5]['hints'][0]['text'] = str_repeat('é', 1001);
+        $this->assertSame(['objectives[5].hints[0].text must be a non-empty string of at most 1000 characters'],
+            graph_validator::validate($graph));
+    }
+
+    /**
      * The contract example and a minimal graph are valid.
      */
     public function test_valid_graphs(): void {

@@ -1,0 +1,213 @@
+{{!
+    This file is part of Moodle - https://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_mavr/editor_logic_objective
+
+    One objective card of the logic editor. Every select lists names from the document; only the
+    title and the hint texts are free text. All texts are plain text.
+
+    Context variables required for this template:
+    * uid, index, heading, title, typeoptions, points, required, isfirst, islast
+    * isvisit + zonegroups; isinteract + targetgroups; iscollect + targetsgroups, count, countmax
+    * isquestion + questionoptions, passfraction; issequence + steps, canaddstep
+    * aftergroups (options), score, unlockalways
+    * canhints, hints ({index, objectiveindex, number, text, penalty}), canaddhint
+    * steps ({index, objectiveindex, number, options})
+    Option lists are {value, label, selected}; groups are {label, options}.
+
+    Example context (json):
+    {
+        "uid": "12", "index": 0, "heading": "Objective 1", "title": "Take the Brass key",
+        "typeoptions": [{"value": "interact", "label": "Use an object", "selected": true}],
+        "points": 2, "required": true, "isfirst": true, "islast": true,
+        "isvisit": false, "isinteract": true, "iscollect": false, "isquestion": false, "issequence": false,
+        "targetgroups": [{"label": "", "options": [{"value": "g-key", "label": "Brass key", "selected": true}]}],
+        "aftergroups": [{"label": "", "options": [{"value": "v-desk", "label": "Search Desk", "selected": true}]}],
+        "score": "", "unlockalways": false,
+        "canhints": true, "canaddhint": true,
+        "hints": [{"index": 0, "objectiveindex": 0, "number": 1, "text": "Look on the desk.", "penalty": 0.5}]
+    }
+}}
+<li class="card mb-3" data-region="mavr-logic-objective" data-objective-index="{{index}}">
+    <fieldset class="card-body">
+        <legend class="h6">{{heading}}</legend>
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-title">{{#str}}logictitle, mod_mavr{{/str}}</label>
+                <input type="text" class="form-control" id="mavr-logic-{{uid}}-o{{index}}-title" maxlength="255"
+                       value="{{title}}" data-field="title">
+            </div>
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-type">{{#str}}logictype, mod_mavr{{/str}}</label>
+                <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-type" data-field="type">
+                    {{#typeoptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/typeoptions}}
+                </select>
+            </div>
+
+            {{#isvisit}}
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-zone">{{#str}}logiczone, mod_mavr{{/str}}</label>
+                <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-zone" data-field="zone">
+                    {{#zonegroups}}
+                    {{#label}}<optgroup label="{{label}}">{{/label}}
+                    {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
+                    {{#label}}</optgroup>{{/label}}
+                    {{/zonegroups}}
+                </select>
+            </div>
+            {{/isvisit}}
+
+            {{#isinteract}}
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-target">{{#str}}logictarget, mod_mavr{{/str}}</label>
+                <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-target" data-field="target">
+                    {{#targetgroups}}
+                    {{#label}}<optgroup label="{{label}}">{{/label}}
+                    {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
+                    {{#label}}</optgroup>{{/label}}
+                    {{/targetgroups}}
+                </select>
+            </div>
+            {{/isinteract}}
+
+            {{#iscollect}}
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-targets">{{#str}}logictargets, mod_mavr{{/str}}</label>
+                <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-targets" multiple size="5" data-field="targets">
+                    {{#targetsgroups}}
+                    {{#label}}<optgroup label="{{label}}">{{/label}}
+                    {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
+                    {{#label}}</optgroup>{{/label}}
+                    {{/targetsgroups}}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-count">{{#str}}logiccount, mod_mavr{{/str}}</label>
+                <input type="number" class="form-control" id="mavr-logic-{{uid}}-o{{index}}-count" min="1" max="{{countmax}}" step="1"
+                       value="{{count}}" data-field="count">
+            </div>
+            {{/iscollect}}
+
+            {{#isquestion}}
+            <div class="col-12 col-md-6">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-question">{{#str}}logicquestion, mod_mavr{{/str}}</label>
+                <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-question" data-field="question">
+                    {{#questionoptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/questionoptions}}
+                </select>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="form-check mt-md-4">
+                    <input type="checkbox" class="form-check-input" id="mavr-logic-{{uid}}-o{{index}}-passfraction"
+                           data-field="passfraction" aria-describedby="mavr-logic-{{uid}}-o{{index}}-passfractionhint"{{#passfraction}} checked{{/passfraction}}>
+                    <label class="form-check-label" for="mavr-logic-{{uid}}-o{{index}}-passfraction">{{#str}}logicpassfraction, mod_mavr{{/str}}</label>
+                    <p class="form-text mb-0" id="mavr-logic-{{uid}}-o{{index}}-passfractionhint">{{#str}}logicpassfractionhint, mod_mavr{{/str}}</p>
+                </div>
+            </div>
+            {{/isquestion}}
+
+            {{#issequence}}
+            <div class="col-12">
+                <fieldset>
+                    <legend class="form-label fs-6">{{#str}}logicsteps, mod_mavr{{/str}}</legend>
+                    <ol class="ps-3">
+                        {{#steps}}
+                        <li class="d-flex flex-wrap align-items-center gap-2 mb-2" data-step-index="{{index}}">
+                            <label class="visually-hidden" for="mavr-logic-{{uid}}-o{{objectiveindex}}-step{{number}}">{{#str}}logicstep, mod_mavr, {{number}}{{/str}}</label>
+                            <select class="form-select w-auto" id="mavr-logic-{{uid}}-o{{objectiveindex}}-step{{number}}" data-field="step">
+                                {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-remove-step">{{#str}}logicremove, mod_mavr{{/str}}</button>
+                        </li>
+                        {{/steps}}
+                    </ol>
+                    {{#canaddstep}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-add-step">{{#str}}logicaddstep, mod_mavr{{/str}}</button>{{/canaddstep}}
+                </fieldset>
+            </div>
+            {{/issequence}}
+
+            <div class="col-6 col-md-3">
+                <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-points">{{#str}}logicpoints, mod_mavr{{/str}}</label>
+                <input type="number" class="form-control" id="mavr-logic-{{uid}}-o{{index}}-points" min="0" step="0.1"
+                       value="{{points}}" data-field="points">
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="form-check mt-4">
+                    <input type="checkbox" class="form-check-input" id="mavr-logic-{{uid}}-o{{index}}-required"
+                           data-field="required"{{#required}} checked{{/required}}>
+                    <label class="form-check-label" for="mavr-logic-{{uid}}-o{{index}}-required">{{#str}}logicrequired, mod_mavr{{/str}}</label>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <fieldset>
+                    <legend class="form-label fs-6">{{#str}}logicunlock, mod_mavr{{/str}}</legend>
+                    {{#unlockalways}}<p class="form-text">{{#str}}logicunlockalways, mod_mavr{{/str}}</p>{{/unlockalways}}
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-after">{{#str}}logicafter, mod_mavr{{/str}}</label>
+                            <select class="form-select" id="mavr-logic-{{uid}}-o{{index}}-after" multiple size="4" data-field="after">
+                                {{#aftergroups}}
+                                {{#label}}<optgroup label="{{label}}">{{/label}}
+                                {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
+                                {{#label}}</optgroup>{{/label}}
+                                {{/aftergroups}}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="mavr-logic-{{uid}}-o{{index}}-score">{{#str}}logicscoreatleast, mod_mavr{{/str}}</label>
+                            <input type="number" class="form-control" id="mavr-logic-{{uid}}-o{{index}}-score" min="0" step="0.1"
+                                   value="{{score}}" data-field="score">
+                        </div>
+                    </div>
+                </fieldset>
+            </div>
+
+            {{#canhints}}
+            <div class="col-12">
+                <fieldset>
+                    <legend class="form-label fs-6">{{#str}}logichints, mod_mavr{{/str}}</legend>
+                    {{#hints}}
+                    <fieldset class="row g-2 align-items-end mb-2" data-hint-index="{{index}}">
+                        <legend class="col-12 fs-6 mb-0">{{#str}}logichint, mod_mavr, {{number}}{{/str}}</legend>
+                        <div class="col-12 col-md-7">
+                            <label class="form-label" for="mavr-logic-{{uid}}-o{{objectiveindex}}-h{{index}}-text">{{#str}}logichinttext, mod_mavr{{/str}}</label>
+                            <textarea class="form-control" id="mavr-logic-{{uid}}-o{{objectiveindex}}-h{{index}}-text" rows="2" maxlength="1000"
+                                      data-field="hinttext">{{text}}</textarea>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label" for="mavr-logic-{{uid}}-o{{objectiveindex}}-h{{index}}-penalty">{{#str}}logichintpenalty, mod_mavr{{/str}}</label>
+                            <input type="number" class="form-control" id="mavr-logic-{{uid}}-o{{objectiveindex}}-h{{index}}-penalty" min="0" step="0.1"
+                                   value="{{penalty}}" data-field="hintpenalty">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-remove-hint">{{#str}}logicremove, mod_mavr{{/str}}</button>
+                        </div>
+                    </fieldset>
+                    {{/hints}}
+                    {{#canaddhint}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-add-hint">{{#str}}logicaddhint, mod_mavr{{/str}}</button>{{/canaddhint}}
+                </fieldset>
+            </div>
+            {{/canhints}}
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            {{^isfirst}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-objective-up">{{#str}}logicmoveup, mod_mavr{{/str}}</button>{{/isfirst}}
+            {{^islast}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-objective-down">{{#str}}logicmovedown, mod_mavr{{/str}}</button>{{/islast}}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-action="mavr-logic-remove-objective">{{#str}}logicremove, mod_mavr{{/str}}</button>
+        </div>
+    </fieldset>
+</li>

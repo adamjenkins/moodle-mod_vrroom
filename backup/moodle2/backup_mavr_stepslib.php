@@ -43,7 +43,7 @@ class backup_mavr_activity_structure_step extends backup_questions_activity_stru
         $mavr = new backup_nested_element('mavr', ['id'], [
             'name', 'intro', 'introformat', 'runtime', 'template', 'templateconfig', 'graphjson',
             'graphversion', 'grade', 'grademethod', 'maxattempts', 'completionobjectives',
-            'timecreated', 'timemodified',
+            'customised', 'timecreated', 'timemodified',
         ]);
 
         $scenes = new backup_nested_element('scenes');
@@ -66,7 +66,7 @@ class backup_mavr_activity_structure_step extends backup_questions_activity_stru
         $attempts = new backup_nested_element('attempts');
         $attempt = new backup_nested_element('attempt', ['id'], [
             'userid', 'attemptnum', 'state', 'uniqueid', 'slotmap', 'graphversion', 'score',
-            'requireddone', 'timestart', 'timefinish', 'timemodified',
+            'requireddone', 'timestart', 'timefinish', 'timedue', 'timemodified',
         ]);
         // Added before the statements, so each usage precedes its attempt's events in the XML
         // and the restored attempt exists (it is inserted with its new usage id) before them.
@@ -111,6 +111,7 @@ class backup_mavr_activity_structure_step extends backup_questions_activity_stru
         $mavr->annotate_files('mod_mavr', 'models', null);
         $mavr->annotate_files('mod_mavr', 'media', null);
         $mavr->annotate_files('mod_mavr', 'environment', null);
+        $mavr->annotate_files('mod_mavr', 'assets', null);
 
         return $this->prepare_activity_structure($mavr);
     }

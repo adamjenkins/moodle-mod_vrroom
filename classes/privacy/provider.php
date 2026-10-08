@@ -60,6 +60,7 @@ class provider implements
             'score' => 'privacy:metadata:mavr_attempts:score',
             'timestart' => 'privacy:metadata:mavr_attempts:timestart',
             'timefinish' => 'privacy:metadata:mavr_attempts:timefinish',
+            'timedue' => 'privacy:metadata:mavr_attempts:timedue',
             'timemodified' => 'privacy:metadata:mavr_attempts:timemodified',
         ], 'privacy:metadata:mavr_attempts');
 
@@ -178,6 +179,7 @@ class provider implements
             'score' => $attempt->score === null ? null : (float)$attempt->score,
             'timestart' => transform::datetime($attempt->timestart),
             'timefinish' => empty($attempt->timefinish) ? null : transform::datetime($attempt->timefinish),
+            'timedue' => empty($attempt->timedue) ? null : transform::datetime($attempt->timedue),
             'timemodified' => empty($attempt->timemodified) ? null : transform::datetime($attempt->timemodified),
         ];
         writer::with_context($context)->export_data($subcontext, $data);

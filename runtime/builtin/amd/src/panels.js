@@ -15,7 +15,7 @@
 
 /**
  * Overlay panels of the 3D room (hotspot content and in-world questions) and the progress panel
- * with the finish button.
+ * with hints, the time left and the finish button.
  *
  * The hotspot panel follows the idea of mod_gear's hotspot popup (a Mustache-rendered card over
  * the scene, opened by clicking a hotspot, closed with a close button).
@@ -31,10 +31,44 @@ import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
 import {renderQuestion} from 'mavrruntime_builtin/question';
-import {BADGES, plainText, formatPoints, startScene} from 'mavrruntime_builtin/util';
+import {BADGES, plainText, formatPoints, startScene, announce, showMessage} from 'mavrruntime_builtin/util';
 
 /** Counter for unique heading ids. */
 let uidcounter = 0;
+
+/** Seconds left at which the time left is announced to screen readers. */
+const TIME_WARNINGS = [300, 60];
+
+/** Per session: {lastleft, timeuphandled}, shared by every progress panel of the session. */
+const timerstate = new WeakMap();
+
+/**
+ * Format seconds as m:ss, or h:mm:ss from one hour.
+ *
+ * @param {number} seconds Whole seconds.
+ * @returns {string}
+ */
+export const formatTimeLeft = (seconds) => {
+    const total = Math.max(0, Math.floor(Number(seconds) || 0));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const ss = String(s).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+};
+
+/**
+ * The shared timer state of a session.
+ *
+ * @param {Object} session The session.
+ * @returns {Object} {lastleft, timeuphandled}
+ */
+const timerFor = (session) => {
+    if (!timerstate.has(session)) {
+        timerstate.set(session, {lastleft: Infinity, timeuphandled: false});
+    }
+    return timerstate.get(session);
+};
 
 /**
  * Create the overlay panels of a 3D stage.
@@ -176,10 +210,55 @@ export const createPanels = (stageroot, session, options = {}) => {
 };
 
 /**
- * Create the progress panel (objectives, points, finish button) inside a host element.
+ * Template context of one objective, with its hints.
  *
- * Options: root (the MAVR root, for the live and message regions); onFinish() → Promise that
- * finishes the attempt; announce(text); message(text).
+ * @param {Object} o Objective of the session view.
+ * @param {Object} session The session.
+ * @param {Object} labels Status labels.
+ * @returns {Promise<Object>}
+ */
+const objectiveContext = (o, session, labels) => {
+    const context = {
+        id: o.id,
+        status: o.status,
+        badgeclass: BADGES[o.status] || BADGES.locked,
+        statuslabel: labels[o.status] || o.status,
+        title: o.title,
+        hashints: false,
+        canhint: false,
+        hintsusedtext: '',
+        hintcosttext: '',
+        hints: [],
+    };
+    const hints = session.getHints(o.id);
+    const total = hints ? hints.total : 0;
+    if (total <= 0 || o.status === 'locked') {
+        return Promise.resolve(context);
+    }
+    const used = Math.max(o.hintsused || 0, hints.used.length);
+    context.hashints = true;
+    context.canhint = !session.preview && !session.closed && o.status === 'available' && used < total;
+    context.hints = hints.used.map((h) => ({text: h.text}));
+    const requests = [getString('hintsused', 'mavrruntime_builtin', {used: used, total: total})];
+    if (context.canhint && o.nexthintpenalty > 0) {
+        requests.push(getString('hintcost', 'mavrruntime_builtin', formatPoints(o.nexthintpenalty)));
+    }
+    return Promise.all(requests).then(([usedtext, costtext]) => {
+        context.hintsusedtext = usedtext;
+        context.hintcosttext = costtext || '';
+        return context;
+    });
+};
+
+/**
+ * Create the progress panel (objectives, hints, points, time left, finish button) inside a host
+ * element.
+ *
+ * Options: root (the element holding the mavr-live and mavr-message regions; default the shell
+ * around the host); onFinish() → Promise that finishes the attempt and leaves the page.
+ *
+ * When the attempt's time runs out the panel says so and finishes the attempt (once per session,
+ * whichever panel is showing).
  *
  * @param {HTMLElement} host Where the progress is rendered.
  * @param {Object} session The session.
@@ -193,10 +272,45 @@ export const createProgress = (host, session, options = {}) => getStrings([
     {key: 'finishconfirmtitle', component: 'mavrruntime_builtin'},
     {key: 'finishconfirm', component: 'mavrruntime_builtin'},
     {key: 'finishattempt', component: 'mavrruntime_builtin'},
-]).then(([locked, available, completed, confirmtitle, confirmtext, finishlabel]) => {
+    {key: 'timeup', component: 'mavrruntime_builtin'},
+    {key: 'nomorehints', component: 'mavrruntime_builtin'},
+]).then(([locked, available, completed, confirmtitle, confirmtext, finishlabel, timeuptext, nomorehints]) => {
     const labels = {locked: locked, available: available, completed: completed};
+    const root = options.root || host.closest('[data-region="mavr-shell"]') || host;
+    const shared = timerFor(session);
     let destroyed = false;
     let sequence = 0;
+    let ticker = null;
+
+    /**
+     * Show the time left in the timer region and announce the warnings.
+     */
+    const tick = () => {
+        const timer = host.querySelector('[data-region="mavr-timer"]');
+        const left = session.getTimeLeft();
+        if (!timer) {
+            return;
+        }
+        if (left === null) {
+            timer.hidden = true;
+            return;
+        }
+        const formatted = formatTimeLeft(left);
+        getString('timeleft', 'mavrruntime_builtin', formatted).then((text) => {
+            if (!destroyed) {
+                timer.textContent = text;
+                timer.hidden = false;
+            }
+            return undefined;
+        }).catch(() => null);
+        const crossed = TIME_WARNINGS.filter((t) => shared.lastleft > t && left <= t && left > 0);
+        shared.lastleft = left;
+        if (crossed.length > 0) {
+            getString('timewarning', 'mavrruntime_builtin', formatted)
+                .then((text) => announce(root, text))
+                .catch(() => null);
+        }
+    };
 
     const render = () => {
         sequence++;
@@ -205,31 +319,81 @@ export const createProgress = (host, session, options = {}) => getStrings([
         return getString('scoreprogress', 'mavrruntime_builtin', {
             earned: formatPoints(state.earnedpoints),
             max: formatPoints(state.maxpoints),
-        }).then((scoretext) => {
-            const context = {
-                scoretext: scoretext,
-                objectives: state.objectives
-                    .filter((o) => !state.hidden.has(o.id))
-                    .map((o) => ({
-                        id: o.id,
-                        status: o.status,
-                        badgeclass: BADGES[o.status] || BADGES.locked,
-                        statuslabel: labels[o.status] || o.status,
-                        title: o.title,
-                    })),
-                canfinish: !session.preview && !session.closed,
-                preview: session.preview,
-            };
-            return Templates.renderForPromise('mavrruntime_builtin/progress', context);
-        }).then(({html, js}) => {
+        }).then((scoretext) => Promise.all(state.objectives
+            .filter((o) => !state.hidden.has(o.id))
+            .map((o) => objectiveContext(o, session, labels))
+        ).then((objectives) => Templates.renderForPromise('mavrruntime_builtin/progress', {
+            scoretext: scoretext,
+            objectives: objectives,
+            canfinish: !session.preview && !session.closed,
+            preview: session.preview,
+        }))).then(({html, js}) => {
             if (!destroyed && mine === sequence) {
                 Templates.replaceNodeContents(host, html, js);
+                tick();
             }
             return undefined;
         }).catch(Notification.exception);
     };
 
+    /**
+     * The time is up: say so, finish the attempt and leave the room.
+     */
+    const onTimeUp = () => {
+        if (shared.timeuphandled) {
+            return;
+        }
+        shared.timeuphandled = true;
+        showMessage(root, timeuptext, 'warning');
+        announce(root, timeuptext);
+        const finishurl = session.getConfig().finishurl;
+        const pending = new Pending('mavrruntime_builtin/panels:timeup');
+        const finishing = options.onFinish
+            ? Promise.resolve(options.onFinish()).then(() => null)
+            : session.finish().then((result) => (result && result.redirecturl) || finishurl);
+        finishing.catch(() => finishurl).then((url) => {
+            pending.resolve();
+            if (url) {
+                window.location.href = url;
+            }
+            return undefined;
+        }).catch(() => null);
+    };
+
+    /**
+     * Ask for the next hint of an objective.
+     *
+     * @param {HTMLElement} button The hint button.
+     */
+    const getHint = (button) => {
+        button.disabled = true;
+        const pending = new Pending('mavrruntime_builtin/panels:hint');
+        session.requestHint(button.dataset.objective)
+            .then((hint) => {
+                announce(root, hint.text);
+                return undefined;
+            })
+            .catch((error) => {
+                button.disabled = false;
+                if (error && error.errorcode === 'errornomorehints') {
+                    announce(root, nomorehints);
+                    return render();
+                }
+                return Notification.exception(error);
+            })
+            .then(() => pending.resolve())
+            .catch(() => pending.resolve());
+    };
+
     const onClick = (e) => {
+        const hintbutton = e.target.closest('[data-action="mavr-get-hint"]');
+        if (hintbutton) {
+            e.preventDefault();
+            if (!hintbutton.disabled) {
+                getHint(hintbutton);
+            }
+            return;
+        }
         const button = e.target.closest('[data-action="mavr-finish-attempt"]');
         if (!button || button.disabled) {
             return;
@@ -253,16 +417,29 @@ export const createProgress = (host, session, options = {}) => getStrings([
     host.addEventListener('click', onClick);
 
     const unsubscribe = session.on((message) => {
+        if (destroyed) {
+            return;
+        }
         if (message.type === 'change') {
             render();
+        } else if (message.type === 'timeup') {
+            onTimeUp();
         }
     });
+
+    if (session.getDeadline() !== null) {
+        ticker = window.setInterval(tick, 1000);
+    }
 
     return render().then(() => ({
         refresh: render,
         destroy: () => {
             destroyed = true;
             unsubscribe();
+            if (ticker) {
+                window.clearInterval(ticker);
+                ticker = null;
+            }
             host.removeEventListener('click', onClick);
             host.replaceChildren();
         },

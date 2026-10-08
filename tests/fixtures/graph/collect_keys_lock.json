@@ -1,0 +1,180 @@
+{
+  "name": "collect_keys_lock",
+  "intent": "Two hidden keys are shown when the room is searched; collecting both (2 of 2, interacted objects) unlocks the lock. Each key is hidden again when taken; using the lock early is locked.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "hidden": [
+      "k-1",
+      "k-2"
+    ],
+    "objectives": [
+      {
+        "id": "v-1",
+        "type": "visit_zone",
+        "title": "Search the room",
+        "zone": "z-1",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "c-keys",
+        "type": "collect",
+        "title": "Find both keys",
+        "targets": [
+          "k-1",
+          "k-2"
+        ],
+        "count": 2,
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-1"
+          ]
+        }
+      },
+      {
+        "id": "x-lock",
+        "type": "interact",
+        "title": "Open the lock",
+        "target": "d-lock",
+        "points": 1,
+        "required": true,
+        "unlock": {
+          "after": [
+            "c-keys"
+          ]
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r-show",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-1"
+        },
+        "actions": [
+          {
+            "do": "show",
+            "target": "k-1"
+          },
+          {
+            "do": "show",
+            "target": "k-2"
+          }
+        ]
+      },
+      {
+        "id": "r-take-1",
+        "on": {
+          "on": "event",
+          "verb": "interacted",
+          "type": "object",
+          "id": "k-1"
+        },
+        "actions": [
+          {
+            "do": "hide",
+            "target": "k-1"
+          }
+        ]
+      },
+      {
+        "id": "r-take-2",
+        "on": {
+          "on": "event",
+          "verb": "interacted",
+          "type": "object",
+          "id": "k-2"
+        },
+        "actions": [
+          {
+            "do": "hide",
+            "target": "k-2"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "k-1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "k-1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "d-lock",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "k-2",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "d-lock",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "applied",
+      "applied",
+      "locked",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v-1": {
+        "status": "completed",
+        "earned": 0
+      },
+      "c-keys": {
+        "status": "completed",
+        "earned": 2
+      },
+      "x-lock": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 3,
+    "maxpoints": 3,
+    "score": 1,
+    "requireddone": 3,
+    "requiredtotal": 3,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [
+      "k-1",
+      "k-2"
+    ],
+    "effects": []
+  }
+}

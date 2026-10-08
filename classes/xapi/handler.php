@@ -35,7 +35,8 @@ use mod_mavr\local\xapi\iri;
  * must be theirs); the object must belong to the attempt's activity and exist in its scenes;
  * the attempt must be open; only client verbs are accepted; an event whose objective is still
  * locked on the server is rejected; a resent statement id is accepted once and ignored after;
- * batch size and per-attempt volume are limited. Accepted statements are labelled
+ * batch size and per-attempt volume are limited; a statement for an attempt whose time ran out
+ * is refused and the attempt is finished. Accepted statements are labelled
  * client-asserted. Results sent by a client are ignored.
  *
  * @package    mod_mavr
@@ -168,6 +169,12 @@ class handler extends \core_xapi\handler {
 
         $attempt = $this->get_attempt($attemptid);
         if (!$attempt || $attempt->state !== attempt_manager::STATE_INPROGRESS || (int)$attempt->userid !== $userid) {
+            return false;
+        }
+        if (attempt_manager::is_overdue($attempt)) {
+            // Nothing is accepted after the deadline; the attempt is finished instead.
+            attempt_manager::close_if_overdue($attempt);
+            unset($this->attempts[$attemptid], $this->events[$attemptid], $this->counts[$attemptid], $touched[$attemptid]);
             return false;
         }
         $activity = $this->get_activity($attempt);

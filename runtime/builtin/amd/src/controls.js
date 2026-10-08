@@ -17,6 +17,10 @@
  * First-person controls for desktop and touch: keyboard walking, drag to look, click or tap to
  * walk to a floor point, a virtual stick on touch screens, and Enter to activate.
  *
+ * With a rig (a group holding the camera) the controls move and turn the rig and only pitch the
+ * camera inside it, so an immersive WebXR session can take over the camera's pose while teleport
+ * and snap turn keep moving the rig.
+ *
  * @module     mavrruntime_builtin/controls
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -57,17 +61,20 @@ const MOVES = {
  * Attach controls to a camera and canvas.
  *
  * Options: bounds {min, max}; eyeHeight (default 1.6); stick (HTMLElement of the virtual stick);
- * onClick(ndc {x, y}) → true when the click hit something (no walking then);
- * onActivate() (Enter); onTouch() (first touch input seen).
+ * rig (THREE.Object3D that holds the camera; optional); onClick(ndc {x, y}) → true when the click
+ * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen).
  *
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
  * @param {Object} options Options.
- * @returns {Object} {update(dt), teleport(position, yaw), getPosition(), getYaw(), detach()}
+ * @returns {Object} {update(dt), teleport(position, yaw), getPosition(), getYaw(), setBounds(bounds),
+ *     setEnabled(enabled), detach()}
  */
 export const attach = (camera, canvas, options = {}) => {
     const eye = Number.isFinite(options.eyeHeight) ? options.eyeHeight : 1.6;
-    const bounds = options.bounds || null;
+    const rig = options.rig || null;
+    let bounds = options.bounds || null;
+    let enabled = true;
     const position = new THREE.Vector3(0, 0, 0);
     let yaw = 0;
     let pitch = 0;
@@ -104,8 +111,17 @@ export const attach = (camera, canvas, options = {}) => {
     };
 
     const apply = () => {
-        camera.position.set(position.x, position.y + eye, position.z);
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        if (rig) {
+            rig.position.set(position.x, 0, position.z);
+            rig.rotation.set(0, yaw, 0);
+            camera.position.set(0, eye, 0);
+            camera.rotation.set(pitch, 0, 0, 'YXZ');
+            rig.updateMatrixWorld(true);
+        } else {
+            camera.position.set(position.x, position.y + eye, position.z);
+            camera.rotation.set(pitch, yaw, 0, 'YXZ');
+            camera.updateMatrixWorld(true);
+        }
     };
 
     const ndc = (clientx, clienty) => {
@@ -117,10 +133,11 @@ export const attach = (camera, canvas, options = {}) => {
     };
 
     const walkToFloor = (point) => {
+        camera.updateMatrixWorld(true);
         raycaster.setFromCamera(new THREE.Vector2(point.x, point.y), camera);
         const hit = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(floor, hit)) {
-            if (hit.distanceTo(camera.position) < 60) {
+            if (hit.distanceTo(camera.getWorldPosition(new THREE.Vector3())) < 60) {
                 target = clamp(hit);
             }
         }
@@ -128,7 +145,7 @@ export const attach = (camera, canvas, options = {}) => {
 
     // Keyboard (only while the canvas has focus).
     listen(canvas, 'keydown', (e) => {
-        if (e.altKey || e.ctrlKey || e.metaKey) {
+        if (!enabled || e.altKey || e.ctrlKey || e.metaKey) {
             return;
         }
         shift = e.shiftKey;
@@ -164,6 +181,9 @@ export const attach = (camera, canvas, options = {}) => {
 
     // Pointer on the canvas: drag to look, click or tap to act or walk.
     listen(canvas, 'pointerdown', (e) => {
+        if (!enabled) {
+            return;
+        }
         if (e.pointerType === 'touch' && options.onTouch) {
             options.onTouch();
         }
@@ -236,6 +256,9 @@ export const attach = (camera, canvas, options = {}) => {
     };
     if (stick) {
         listen(stick, 'pointerdown', (e) => {
+            if (!enabled) {
+                return;
+            }
             if (options.onTouch && e.pointerType === 'touch') {
                 options.onTouch();
             }
@@ -276,6 +299,9 @@ export const attach = (camera, canvas, options = {}) => {
          * @param {number} dt Seconds since the last frame.
          */
         update(dt) {
+            if (!enabled) {
+                return;
+            }
             const step = Math.min(0.1, Math.max(0, dt));
             yaw += turn * TURN * step;
             let forward = 0;
@@ -352,6 +378,39 @@ export const attach = (camera, canvas, options = {}) => {
             let deg = yaw * 180 / Math.PI;
             deg = ((deg % 360) + 360) % 360;
             return deg > 180 ? deg - 360 : deg;
+        },
+
+        /**
+         * Replace the walking bounds (another room) and keep the position inside them.
+         *
+         * @param {Object|null} newbounds {min, max} or null for none.
+         */
+        setBounds(newbounds) {
+            bounds = newbounds || null;
+            clamp(position);
+            target = null;
+            apply();
+        },
+
+        /**
+         * Suspend or resume the controls (an immersive session drives the camera meanwhile).
+         *
+         * Resuming puts the camera back at eye height above the current position.
+         *
+         * @param {boolean} on Whether the controls react to input.
+         */
+        setEnabled(on) {
+            enabled = !!on;
+            keys.clear();
+            turn = 0;
+            target = null;
+            drag = null;
+            stickinput.x = 0;
+            stickinput.y = 0;
+            setKnob(0, 0);
+            if (enabled) {
+                apply();
+            }
         },
 
         /** Remove every listener. */

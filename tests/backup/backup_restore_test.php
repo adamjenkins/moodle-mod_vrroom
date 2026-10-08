@@ -223,6 +223,85 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
+     * The room editor mark (customised), the attempt deadline (timedue) and the room editor
+     * files (area assets) come across unchanged.
+     */
+    public function test_backup_restore_customised_timedue_and_assets(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $mavr, $cm, , , $attempt] = $this->create_setup();
+
+        $customised = time() - 3600;
+        $timedue = (int)$attempt->timestart + 900;
+        $DB->set_field('mavr', 'customised', $customised, ['id' => $mavr->id]);
+        $DB->set_field('mavr_attempts', 'timedue', $timedue, ['id' => $attempt->id]);
+        $context = \context_module::instance($cm->id);
+        get_file_storage()->create_file_from_string([
+            'contextid' => $context->id,
+            'component' => 'mod_mavr',
+            'filearea' => 'assets',
+            'itemid' => 4,
+            'filepath' => '/',
+            'filename' => 'tape.mp3',
+        ], 'not really audio');
+
+        $newcourseid = $this->backup_and_restore($course, $cm, true);
+        [$new, $newcm] = $this->get_restored($newcourseid);
+        $newcontext = \context_module::instance($newcm->id);
+
+        $this->assertEquals($customised, $new->customised);
+        $newattempt = $DB->get_record('mavr_attempts', ['mavrid' => $new->id], '*', MUST_EXIST);
+        $this->assertEquals($timedue, $newattempt->timedue);
+        $this->assertEquals($attempt->timestart, $newattempt->timestart);
+
+        $file = get_file_storage()->get_file($newcontext->id, 'mod_mavr', 'assets', 4, '/', 'tape.mp3');
+        $this->assertNotFalse($file);
+        $this->assertSame('not really audio', $file->get_content());
+    }
+
+    /**
+     * An escape chain's config names the remapped question bank entry after a restore into a new
+     * course (the template's remap_question_entries()).
+     */
+    public function test_backup_restore_escape_config_is_remapped(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $qbank = $generator->create_module('qbank', ['course' => $course->id]);
+        $qgen = $generator->get_plugin_generator('core_question');
+        $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
+        $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
+
+        $module = $generator->create_module('mavr', [
+            'course' => $course->id,
+            'name' => 'Escape',
+            'template' => 'escape',
+            'puzzletitles' => 'Desk|Safe',
+            'puzzlelocks' => 'key|question',
+            'puzzlequestions' => '|Q1',
+        ]);
+        $cm = get_coursemodule_from_id('mavr', $module->cmid, 0, false, MUST_EXIST);
+        $config = json_decode($DB->get_field('mavr', 'templateconfig', ['id' => $module->id]));
+        $this->assertEquals($question->questionbankentryid, $config->puzzles[1]->questionbankentryid);
+
+        $newcourseid = $this->backup_and_restore($course, $cm, false);
+        [$new] = $this->get_restored($newcourseid);
+
+        $slot = $DB->get_record('mavr_slots', ['mavrid' => $new->id], '*', MUST_EXIST);
+        $reference = $DB->get_record('question_references',
+            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id], '*', MUST_EXIST);
+        $this->assertNotEquals($question->questionbankentryid, $reference->questionbankentryid);
+
+        $newconfig = json_decode($new->templateconfig);
+        $this->assertSame('mavrtemplate_escape/1', $newconfig->schema);
+        $this->assertEquals($reference->questionbankentryid, $newconfig->puzzles[1]->questionbankentryid);
+        $this->assertEquals(0, $newconfig->puzzles[0]->questionbankentryid);
+    }
+
+    /**
      * Content links in the intro are encoded on backup.
      */
     public function test_encode_content_links(): void {

@@ -1,0 +1,99 @@
+{
+  "name": "pass_fraction_retry",
+  "intent": "pass_fraction 1: answers of 0 and 0.5 are applied but leave the objective available and unlock nothing; the answer with fraction 1 completes it with full points, and only then does the dependent objective unlock.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "q-1",
+        "type": "answer_question",
+        "title": "Open the safe",
+        "slot": 1,
+        "points": 3,
+        "required": true,
+        "pass_fraction": 1
+      },
+      {
+        "id": "v-2",
+        "type": "visit_zone",
+        "title": "Go through the door",
+        "zone": "z-2",
+        "points": 1,
+        "required": true,
+        "unlock": {
+          "after": [
+            "q-1"
+          ]
+        }
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-2",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0.5
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-2",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "locked",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "q-1": {
+        "status": "completed",
+        "earned": 3,
+        "hintsused": 0
+      },
+      "v-2": {
+        "status": "completed",
+        "earned": 1,
+        "hintsused": 0
+      }
+    },
+    "earnedpoints": 4,
+    "maxpoints": 4,
+    "score": 1,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

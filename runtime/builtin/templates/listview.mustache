@@ -17,17 +17,19 @@
 {{!
     @template mavrruntime_builtin/listview
 
-    The accessible list view: every station of the room as a section that can be opened with the
-    keyboard, with its texts, images and questions.
+    The accessible list view: every station of every room as a section that can be opened with
+    the keyboard, with its texts, images, audio, video, questions and the objects to use.
 
     Context variables required for this template:
-    * stations - list of stations (zones) with their items and question slots
+    * stations - list of stations (zones) with their items and question slots; roomlabel is
+      plain text, empty with a single room
     * hasothers - whether items outside any station exist
     * others - those items
     * canswitch - show the button that switches to the 3D room
 
-    Item fields: id, title (plain text), html (server-formatted), text (plain text),
-    imageurl, ismodel, hidden.
+    Item fields: id, sceneid, title (plain text), html (server-formatted), text (plain text),
+    imageurl, ismodel, isaudio, isvideo, mediaurl, portaltext (plain text), uselabel (plain text,
+    empty when the item has no use button), hidden, slot; others also roomlabel.
 
     Example context (json):
     {
@@ -35,20 +37,29 @@
         "stations": [
             {
                 "zoneid": "z-1",
+                "sceneid": "s-1",
                 "name": "The Vase",
+                "roomlabel": "Room: Hall",
                 "statuslabel": "To do",
                 "badgeclass": "bg-info text-dark",
                 "hidden": false,
                 "items": [
-                    {"id": "h-1", "title": "The Vase", "html": "<p>Made in 1720.</p>", "text": "", "imageurl": "", "ismodel": false, "hidden": false},
-                    {"id": "m-1", "title": "The Vase", "html": "", "text": "", "imageurl": "", "ismodel": true, "hidden": false}
+                    {"id": "h-1", "sceneid": "s-1", "title": "The Vase", "html": "<p>Made in 1720.</p>", "text": "", "imageurl": "",
+                     "ismodel": false, "isaudio": false, "isvideo": false, "mediaurl": "", "portaltext": "", "uselabel": "", "hidden": false},
+                    {"id": "g-1", "sceneid": "s-1", "title": "Brass key", "html": "", "text": "", "imageurl": "",
+                     "ismodel": false, "isaudio": false, "isvideo": false, "mediaurl": "", "portaltext": "", "uselabel": "Take Brass key", "hidden": false},
+                    {"id": "a-1", "sceneid": "s-1", "title": "Tape", "html": "", "text": "", "imageurl": "",
+                     "ismodel": false, "isaudio": true, "isvideo": false, "mediaurl": "https://example.com/tape.mp3", "portaltext": "", "uselabel": "", "hidden": false}
                 ],
                 "slots": [{"slot": 1}]
             }
         ],
         "hasothers": true,
         "others": [
-            {"id": "t-3", "title": "Notice", "html": "", "text": "Welcome", "imageurl": "", "ismodel": false, "hidden": false}
+            {"id": "t-3", "sceneid": "s-1", "title": "Notice", "html": "", "text": "Welcome", "imageurl": "", "ismodel": false,
+             "isaudio": false, "isvideo": false, "mediaurl": "", "portaltext": "", "uselabel": "", "roomlabel": "", "hidden": false},
+            {"id": "pt-1", "sceneid": "s-1", "title": "Cellar door", "html": "", "text": "", "imageurl": "", "ismodel": false,
+             "isaudio": false, "isvideo": false, "mediaurl": "", "portaltext": "Leads to Cellar", "uselabel": "", "roomlabel": "", "hidden": false}
         ]
     }
 }}
@@ -60,22 +71,27 @@
     <ol class="list-unstyled">
         {{#stations}}
         <li{{#hidden}} hidden{{/hidden}} data-region="mavr-station-item" data-zone="{{zoneid}}">
-            <section class="mavr-station card mb-3" data-region="mavr-station" data-zone="{{zoneid}}" aria-labelledby="mavr-station-{{zoneid}}">
+            <section class="mavr-station card mb-3" data-region="mavr-station" data-zone="{{zoneid}}" data-scene="{{sceneid}}" aria-labelledby="mavr-station-{{zoneid}}">
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <h3 class="h5 mb-0" id="mavr-station-{{zoneid}}">{{name}}</h3>
                         <span class="badge {{badgeclass}}" data-region="mavr-station-status">{{statuslabel}}</span>
+                        {{#roomlabel}}<span class="badge bg-light text-dark" data-region="mavr-station-room">{{roomlabel}}</span>{{/roomlabel}}
                     </div>
                     <button type="button" class="btn btn-secondary btn-sm mt-2" data-action="mavr-open-station" data-zone="{{zoneid}}" aria-expanded="false" aria-controls="mavr-station-body-{{zoneid}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
                     <p class="text-muted mt-2 mb-0" data-region="mavr-station-locked" hidden>{{#str}}stationlocked, mavrruntime_builtin{{/str}}</p>
                     <div class="mavr-station-body mt-2" id="mavr-station-body-{{zoneid}}" data-region="mavr-station-body" hidden>
                         {{#items}}
-                        <div class="mb-2" data-interactable="{{id}}"{{#hidden}} hidden{{/hidden}}>
+                        <div class="mb-2" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
                             <h4 class="h6">{{title}}</h4>
                             {{{html}}}
                             {{#text}}<p>{{text}}</p>{{/text}}
                             {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
                             {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
+                            {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
+                            {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
+                            {{#portaltext}}<p>{{portaltext}}</p>{{/portaltext}}
+                            {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
                         </div>
                         {{/items}}
                         {{#slots}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slots}}
@@ -89,15 +105,24 @@
     <h3 class="h5">{{#str}}otheritems, mavrruntime_builtin{{/str}}</h3>
     <ul class="list-unstyled">
         {{#others}}
-        <li class="mavr-otheritem card mb-3" data-interactable="{{id}}"{{#hidden}} hidden{{/hidden}}>
+        <li class="mavr-otheritem card mb-3" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
             <div class="card-body">
-                <h4 class="h6" id="mavr-item-{{id}}">{{title}}</h4>
-                <button type="button" class="btn btn-secondary btn-sm" data-action="mavr-open-item" data-item="{{id}}" aria-expanded="false" aria-controls="mavr-item-body-{{id}}" aria-describedby="mavr-item-{{id}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <h4 class="h6 mb-0" id="mavr-item-{{id}}">{{title}}</h4>
+                    {{#roomlabel}}<span class="badge bg-light text-dark" data-region="mavr-station-room">{{roomlabel}}</span>{{/roomlabel}}
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="mavr-open-item" data-item="{{id}}" aria-expanded="false" aria-controls="mavr-item-body-{{id}}" aria-describedby="mavr-item-{{id}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
+                    {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
+                </div>
+                {{#portaltext}}<p class="mt-2 mb-0">{{portaltext}}</p>{{/portaltext}}
                 <div class="mt-2" id="mavr-item-body-{{id}}" data-region="mavr-item-body" hidden>
                     {{{html}}}
                     {{#text}}<p>{{text}}</p>{{/text}}
                     {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
                     {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
+                    {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
+                    {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
                     {{#slot}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slot}}
                 </div>
             </div>

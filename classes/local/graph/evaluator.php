@@ -83,6 +83,12 @@ final class evaluator {
     /** @var int[] Run state: objective position => next step index for sequence objectives. */
     private array $pointer = [];
 
+    /** @var array Run state: objective position => [hint id => true] in request order. */
+    private array $hintsused = [];
+
+    /** @var float[] Run state: objective position => points taken off by requested hints. */
+    private array $penalty = [];
+
     /** @var array Run state: hidden id => true. */
     private array $hidden = [];
 
@@ -245,6 +251,21 @@ final class evaluator {
         $unlock = is_array($raw['unlock'] ?? null) ? $raw['unlock'] : [];
         $scoreatleast = $unlock['score_at_least'] ?? null;
         $points = $raw['points'] ?? 0;
+        $hints = [];
+        $penalties = [];
+        foreach (self::as_list($raw['hints'] ?? []) as $hint) {
+            if (!is_array($hint) || !array_key_exists('id', $hint)) {
+                continue;
+            }
+            $hintid = self::str($hint['id']);
+            if (array_key_exists($hintid, $penalties)) {
+                continue;
+            }
+            $penalty = $hint['penalty'] ?? 0;
+            $hints[] = $hintid;
+            $penalties[$hintid] = (is_int($penalty) || is_float($penalty)) ? (float) $penalty : 0.0;
+        }
+        $passfraction = $raw['pass_fraction'] ?? null;
         return [
             'id' => self::str($raw['id']),
             'type' => self::str($raw['type'] ?? ''),
@@ -258,6 +279,9 @@ final class evaluator {
             'targets' => array_map([self::class, 'str'], self::as_list($raw['targets'] ?? [])),
             'count' => (is_int($raw['count'] ?? null) || is_float($raw['count'] ?? null)) ? (int) $raw['count'] : 0,
             'steps' => array_map([self::class, 'str'], self::as_list($raw['steps'] ?? [])),
+            'hints' => $hints,
+            'penalties' => $penalties,
+            'pass_fraction' => (is_int($passfraction) || is_float($passfraction)) ? (float) $passfraction : null,
         ];
     }
 
@@ -269,11 +293,15 @@ final class evaluator {
         $this->earned = [];
         $this->collected = [];
         $this->pointer = [];
+        $this->hintsused = [];
+        $this->penalty = [];
         foreach ($this->objectives as $pos => $objective) {
             $this->status[$pos] = self::OBJECTIVE_LOCKED;
             $this->earned[$pos] = 0.0;
             $this->collected[$pos] = [];
             $this->pointer[$pos] = 0;
+            $this->hintsused[$pos] = [];
+            $this->penalty[$pos] = 0.0;
         }
         $this->hidden = [];
         foreach ($this->initialhidden as $id) {
@@ -308,11 +336,21 @@ final class evaluator {
         $this->queue[] = ['on' => 'event', 'event' => $event];
 
         if ($status === self::STATUS_APPLIED) {
+            $hintevent = self::is_hint_event($event);
             foreach ($matches as $pos) {
                 if ($this->status[$pos] !== self::OBJECTIVE_AVAILABLE) {
                     continue;
                 }
                 $objective = $this->objectives[$pos];
+                if ($hintevent) {
+                    // A hint only costs points; it never completes anything.
+                    if (!array_key_exists($event['id'], $this->hintsused[$pos])) {
+                        $this->hintsused[$pos][$event['id']] = true;
+                        $this->penalty[$pos] = self::round7($this->penalty[$pos]
+                            + ($objective['penalties'][$event['id']] ?? 0.0));
+                    }
+                    continue;
+                }
                 switch ($objective['type']) {
                     case 'visit_zone':
                     case 'interact':
@@ -321,6 +359,10 @@ final class evaluator {
                     case 'answer_question':
                         $fraction = $event['fraction'] ?? 0.0;
                         $fraction = max(0.0, min(1.0, $fraction));
+                        if ($objective['pass_fraction'] !== null && $fraction < $objective['pass_fraction'] - 1e-9) {
+                            // Not good enough: the objective stays available for another try.
+                            break;
+                        }
                         $this->complete($pos, self::round7($objective['points'] * $fraction));
                         break;
                     case 'collect':
@@ -371,11 +413,24 @@ final class evaluator {
                         && in_array($event['id'], $objective['targets'], true);
                     break;
             }
+            if (!$match && $objective['type'] !== 'sequence' && self::is_hint_event($event)) {
+                $match = in_array($event['id'], $objective['hints'], true);
+            }
             if ($match) {
                 $matches[] = $pos;
             }
         }
         return $matches;
+    }
+
+    /**
+     * Whether an event is a hint request (verb requested, object type hint).
+     *
+     * @param array $event normalised event
+     * @return bool
+     */
+    private static function is_hint_event(array $event): bool {
+        return $event['verb'] === 'requested' && $event['type'] === 'hint';
     }
 
     /**
@@ -399,12 +454,14 @@ final class evaluator {
     /**
      * Complete an objective, then advance sequences that wait for it (depth-first).
      *
+     * The points earned are the base points less the hint penalty, never below zero.
+     *
      * @param int $pos objective position
-     * @param float $earned points earned
+     * @param float $base points earned before hint penalties
      */
-    private function complete(int $pos, float $earned): void {
+    private function complete(int $pos, float $base): void {
         $this->status[$pos] = self::OBJECTIVE_COMPLETED;
-        $this->earned[$pos] = $earned;
+        $this->earned[$pos] = max(0.0, self::round7($base - $this->penalty[$pos]));
         $id = $this->objectives[$pos]['id'];
         $this->queue[] = ['on' => 'objective_completed', 'objective' => $id];
         foreach ($this->objectives as $spos => $sequence) {
@@ -614,6 +671,7 @@ final class evaluator {
                 'earned' => $this->status[$pos] === self::OBJECTIVE_COMPLETED ? (float) $this->earned[$pos] : 0.0,
                 'points' => $objective['points'],
                 'required' => $objective['required'],
+                'hintsused' => count($this->hintsused[$pos]),
             ];
         }
         $maxpoints = self::round7($maxpoints);

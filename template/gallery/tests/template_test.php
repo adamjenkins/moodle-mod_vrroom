@@ -632,6 +632,35 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
+     * Restore remapping replaces the stations' question bank entry ids and reports whether anything changed.
+     */
+    public function test_remap_question_entries(): void {
+        $template = new template();
+        $config = $this->make_config([
+            ['questionbankentryid' => 101],
+            ['questionbankentryid' => 0],
+            ['questionbankentryid' => 102],
+        ]);
+        $map = fn (int $old): int => [101 => 501][$old] ?? $old;
+
+        $this->assertTrue($template->remap_question_entries($config, $map));
+        $this->assertSame(501, $config->stations[0]->questionbankentryid);
+        $this->assertSame(0, $config->stations[1]->questionbankentryid);
+        $this->assertSame(102, $config->stations[2]->questionbankentryid);
+
+        // Nothing left to map: unchanged.
+        $this->assertFalse($template->remap_question_entries($config, $map));
+        $this->assertFalse($template->remap_question_entries((object)['schema' => template::SCHEMA], $map));
+    }
+
+    /**
+     * The chooser help comes from the template's own string.
+     */
+    public function test_chooser_help(): void {
+        $this->assertSame(get_string('chooserhelp', 'mavrtemplate_gallery'), (new template())->get_chooser_help());
+    }
+
+    /**
      * Create a short-answer question in a question bank of the course.
      *
      * @param \stdClass $course

@@ -47,14 +47,16 @@ final class evaluator_test extends \advanced_testcase {
     }
 
     /**
-     * There are exactly the 14 fixtures the contract names (guards against a vacuous provider).
+     * There are exactly the 19 fixtures the contracts name (guards against a vacuous provider).
      */
     public function test_fixture_set_is_complete(): void {
         $this->resetAfterTest();
         $expected = [
-            'answer_while_locked', 'collect_n_of_set', 'empty_graph', 'finish_on_all_required', 'gallery_ordered',
-            'interacted_zone_counts', 'locked_until_after', 'rules_show_hide', 'score_at_least', 'sequence_strict',
-            'single_visit', 'unlock_action_cascade', 'visit_then_question', 'zero_points_required_ratio',
+            'answer_while_locked', 'collect_keys_lock', 'collect_n_of_set', 'empty_graph', 'escape_chain',
+            'finish_on_all_required', 'gallery_ordered', 'hint_locked_completed', 'hint_penalty',
+            'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'rules_show_hide', 'score_at_least',
+            'sequence_strict', 'single_visit', 'unlock_action_cascade', 'visit_then_question',
+            'zero_points_required_ratio',
         ];
         $this->assertSame($expected, array_keys(self::fixture_provider()));
     }
@@ -156,6 +158,34 @@ final class evaluator_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(2.0, $result->earnedpoints, self::DELTA);
         $this->assertEqualsWithDelta(6.0, $result->maxpoints, self::DELTA);
         $this->assertSame(['q1', 'q2', 'q3'], $result->completed_ids());
+    }
+
+    /**
+     * Every objective entry reports hintsused, right after required; a hint event matches only
+     * the objective owning the hint and never a sequence.
+     */
+    public function test_hintsused_and_matching(): void {
+        $this->resetAfterTest();
+        $graph = [
+            'schema' => 'mavr-graph/1',
+            'objectives' => [
+                ['id' => 'x-1', 'type' => 'interact', 'title' => 'One', 'target' => 'g-1', 'points' => 1,
+                    'hints' => [['id' => 'hn-1', 'text' => 'A', 'penalty' => 0.25]]],
+                ['id' => 'x-2', 'type' => 'interact', 'title' => 'Two', 'target' => 'g-2', 'points' => 1],
+            ],
+        ];
+        $evaluator = new evaluator($graph);
+        $hint = ['verb' => 'requested', 'type' => 'hint', 'id' => 'hn-1', 'scene' => null, 'fraction' => null];
+        $other = ['verb' => 'requested', 'type' => 'hint', 'id' => 'hn-9', 'scene' => null, 'fraction' => null];
+        $this->assertSame(evaluator::STATUS_APPLIED, $evaluator->classify([], $hint));
+        $this->assertSame(evaluator::STATUS_IGNORED, $evaluator->classify([], $other));
+
+        $use = ['verb' => 'interacted', 'type' => 'object', 'id' => 'g-1', 'scene' => null, 'fraction' => null];
+        $result = $evaluator->evaluate([$hint, $use]);
+        $this->assertSame(['status', 'earned', 'points', 'required', 'hintsused'], array_keys($result->objectives['x-1']));
+        $this->assertSame(1, $result->objectives['x-1']['hintsused']);
+        $this->assertSame(0, $result->objectives['x-2']['hintsused']);
+        $this->assertEqualsWithDelta(0.75, $result->objectives['x-1']['earned'], self::DELTA);
     }
 
     /**

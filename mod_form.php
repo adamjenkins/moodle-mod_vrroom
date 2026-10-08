@@ -39,6 +39,9 @@ use mod_mavr\local\template\registry as template_registry;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mod_mavr_mod_form extends moodleform_mod {
+    /** @var string|null|false Resolved template name, null for none, false until resolved. */
+    private string|null|false $resolvedtemplate = false;
+
     /**
      * Define the form.
      */
@@ -62,22 +65,44 @@ class mod_mavr_mod_form extends moodleform_mod {
         $mform->setDefault('runtime', 'builtin');
         $mform->addHelpButton('runtime', 'runtime', 'mavr');
 
-        $mform->addElement('select', 'template', get_string('template', 'mavr'), template_registry::get_choices());
-        $mform->setDefault('template', 'gallery');
-        $mform->addHelpButton('template', 'template', 'mavr');
-        if ($this->_instance) {
-            $mform->hardFreeze('template');
-            $mform->addElement('static', 'templatelocked', '', get_string('templatelocked', 'mavr'));
-        }
+        // Registered on every request, so the reload that follows a press still counts as a
+        // no-submit press although the select has become a hidden field by then.
+        $mform->registerNoSubmitButton('mavr_choosetemplate');
 
-        foreach (template_registry::get_all() as $name => $template) {
-            if ($this->_instance && $name !== $this->current->template) {
-                // The template is fixed after creation; other templates' fields are never needed.
-                continue;
+        $name = $this->resolve_template();
+        if ($name === null && $this->_instance) {
+            // The activity's template is no longer installed: nothing to show or change.
+            $mform->addElement('static', 'templatemissing', get_string('template', 'mavr'),
+                get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? ''))));
+        } else if ($name !== null) {
+            $template = template_registry::get($name);
+            $mform->addElement('hidden', 'template', $name);
+            $mform->setType('template', PARAM_PLUGIN);
+            $mform->setDefault('template', $name);
+            $mform->addElement('static', 'templatename', get_string('template', 'mavr'), s($template->get_display_name()));
+            if ($this->_instance) {
+                $mform->addElement('static', 'templatelocked', '', get_string('templatelocked', 'mavr'));
+            } else if (count(template_registry::get_all()) > 1) {
+                $mform->addElement('static', 'templatechosen', '', get_string('templatechosen', 'mavr'));
             }
-            foreach ($template->define_form($this, $mform, $courseid) as $elementname) {
-                $mform->hideIf($elementname, 'template', 'neq', $name);
+
+            if ($this->is_customised()) {
+                // The room editor owns the room now: the template's fields would not be used.
+                $mform->addElement('static', 'customisednotice', '', get_string('customisednotice', 'mavr'));
+                $mform->addElement('advcheckbox', 'mavr_rebuild', get_string('rebuild', 'mavr'));
+                $mform->addHelpButton('mavr_rebuild', 'rebuild', 'mavr');
+                $mform->setDefault('mavr_rebuild', 0);
+            } else {
+                $template->define_form($this, $mform, $courseid);
             }
+        } else {
+            // Reached without a template (e.g. a bare modedit.php?add=mavr link): choose one first.
+            // The no-submit button reloads the form with the template's fields, as the course
+            // format select does (course/edit_form.php).
+            $mform->addElement('select', 'template', get_string('template', 'mavr'), template_registry::get_choices());
+            $mform->setType('template', PARAM_PLUGIN);
+            $mform->addHelpButton('template', 'template', 'mavr');
+            $mform->addElement('submit', 'mavr_choosetemplate', get_string('choosetemplatebutton', 'mavr'));
         }
 
         // Attempts and grading.
@@ -103,26 +128,26 @@ class mod_mavr_mod_form extends moodleform_mod {
     /**
      * Prepare the defaults: the stored template config fills the template's fields.
      *
+     * Only the resolved template is asked, and only when its fields are on the form (not for a
+     * customised room, whose template fields are not shown).
+     *
      * @param array $defaultvalues Form defaults, changed in place.
      */
     public function data_preprocessing(&$defaultvalues) {
         parent::data_preprocessing($defaultvalues);
 
+        $name = $this->resolve_template();
+        if ($name === null || $this->is_customised()) {
+            return;
+        }
+        $template = template_registry::get($name);
+
         if ($this->_instance && !empty($this->_cm)) {
-            $templatename = $defaultvalues['template'] ?? $this->current->template ?? '';
-            try {
-                $template = template_registry::get((string)$templatename);
-            } catch (\moodle_exception $e) {
-                return;
-            }
             $config = instance_manager::decode_config($defaultvalues['templateconfig'] ?? null);
             $template->data_preprocessing($defaultvalues, $config, context_module::instance($this->_cm->id));
             return;
         }
-
-        foreach (template_registry::get_all() as $template) {
-            $template->data_preprocessing($defaultvalues, null, null);
-        }
+        $template->data_preprocessing($defaultvalues, null, null);
     }
 
     /**
@@ -139,13 +164,20 @@ class mod_mavr_mod_form extends moodleform_mod {
             $errors['grade'] = get_string('errorscalenotsupported', 'mavr');
         }
 
-        $templatename = $this->_instance ? ($this->current->template ?? '') : ($data['template'] ?? '');
-        try {
-            $template = template_registry::get((string)$templatename);
-        } catch (\moodle_exception $e) {
-            $errors['template'] = get_string('errorunknowntemplate', 'mavr', s((string)$templatename));
+        $name = $this->resolve_template();
+        if ($name === null && $this->_instance) {
+            $errors['name'] = get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? '')));
             return $errors;
         }
+        if ($name === null) {
+            $errors['template'] = get_string('choosetemplatefirst', 'mavr');
+            return $errors;
+        }
+        if ($this->is_customised()) {
+            // The template's fields are not on the form, so there is nothing of it to validate.
+            return $errors;
+        }
+        $template = template_registry::get($name);
         return array_merge($errors, $template->validation($data, $files, (int)$this->current->course));
     }
 
@@ -179,11 +211,81 @@ class mod_mavr_mod_form extends moodleform_mod {
      */
     public function data_postprocessing($data) {
         parent::data_postprocessing($data);
+        $this->add_stored_template_values($data);
         if (!empty($data->completionunlocked)) {
             $suffix = $this->get_suffix();
             $completion = $data->{'completion' . $suffix} ?? COMPLETION_TRACKING_NONE;
             if ($completion != COMPLETION_TRACKING_AUTOMATIC) {
                 $data->{'completionobjectives' . $suffix} = 0;
+            }
+        }
+    }
+
+    /**
+     * The template this form is for.
+     *
+     * An existing activity keeps its template. A new one takes the template parameter (from the
+     * activity chooser link, the hidden field, or the template select on a reload) when that
+     * template is installed, else the only installed template, else none.
+     *
+     * @return string|null Template short name, or null when the teacher has to choose one first.
+     */
+    protected function resolve_template(): ?string {
+        if ($this->resolvedtemplate !== false) {
+            return $this->resolvedtemplate;
+        }
+        $all = template_registry::get_all();
+        $name = null;
+        if ($this->_instance) {
+            $current = (string)($this->current->template ?? '');
+            $name = isset($all[$current]) ? $current : null;
+        } else {
+            $requested = optional_param('template', '', PARAM_PLUGIN);
+            if ($requested !== '' && isset($all[$requested])) {
+                $name = $requested;
+            } else if (count($all) === 1) {
+                $name = (string)array_key_first($all);
+            }
+        }
+        $this->resolvedtemplate = $name;
+        return $name;
+    }
+
+    /**
+     * Whether the room of the activity being edited was changed in the room editor.
+     *
+     * @return bool
+     */
+    protected function is_customised(): bool {
+        return $this->_instance && (int)($this->current->customised ?? 0) > 0;
+    }
+
+    /**
+     * For "Rebuild from the template" on a customised room, add the stored template settings.
+     *
+     * A customised room's form does not show the template's fields, so a rebuild would otherwise
+     * compile from empty fields. The template's own data_preprocessing() turns the stored config
+     * back into form values (draft file areas included), exactly as if the unchanged fields had
+     * been submitted. Only absent "<template>_" keys are added.
+     *
+     * @param stdClass $data Submitted data, changed in place.
+     */
+    protected function add_stored_template_values(stdClass $data): void {
+        if (!$this->is_customised() || empty($data->mavr_rebuild) || empty($this->_cm)) {
+            return;
+        }
+        $name = $this->resolve_template();
+        if ($name === null) {
+            return;
+        }
+        $template = template_registry::get($name);
+        $values = [];
+        $config = instance_manager::decode_config($this->current->templateconfig ?? null);
+        $template->data_preprocessing($values, $config, context_module::instance($this->_cm->id));
+        $prefix = $name . '_';
+        foreach ($values as $key => $value) {
+            if (str_starts_with((string)$key, $prefix) && !property_exists($data, $key)) {
+                $data->{$key} = $value;
             }
         }
     }

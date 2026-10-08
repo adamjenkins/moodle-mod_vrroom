@@ -14,8 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 #
-# Builds runtime/builtin/amd/src/three.js: three.js core plus GLTFLoader as one ES module, which
-# Moodle's grunt then turns into an AMD module like any other file in amd/src.
+# Builds runtime/builtin/amd/src/three.js: three.js core plus the addons GLTFLoader, OrbitControls,
+# TransformControls and XRHandModelFactory as one ES module, which Moodle's grunt then turns into an
+# AMD module like any other file in amd/src.
+#
+# XRControllerModelFactory is deliberately NOT bundled: it downloads controller models from a CDN
+# by default, and MAVR makes no external calls. Controllers are drawn procedurally and hands use
+# XRHandModelFactory's 'spheres' profile, which fetches nothing.
 #
 # Usage: runtime/builtin/tools/build-three.sh
 #   The npm work happens in a temporary directory (mktemp -d under ${TMPDIR:-/tmp}) that is
@@ -41,11 +46,14 @@ trap cleanup EXIT
 
 cd "${WORK}"
 npm init -y >/dev/null
-npm install --no-audit --no-fund --save-exact "three@${THREE_VERSION}" "esbuild@${ESBUILD_VERSION}" >/dev/null
+npm install --prefer-offline --no-audit --no-fund --save-exact "three@${THREE_VERSION}" "esbuild@${ESBUILD_VERSION}" >/dev/null
 
 cat > "${WORK}/entry.js" <<'EOF'
 export * from 'three';
 export {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+export {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
+export {TransformControls} from 'three/examples/jsm/controls/TransformControls.js';
+export {XRHandModelFactory} from 'three/examples/jsm/webxr/XRHandModelFactory.js';
 EOF
 
 npx --no-install esbuild "${WORK}/entry.js" --bundle --format=esm --target=es2020 \
@@ -56,7 +64,8 @@ LICENSELINE="$(grep -m1 -i 'copyright' "${WORK}/node_modules/three/LICENSE" || t
 {
     echo "/* eslint-disable */"
     echo "/**"
-    echo " * three.js ${THREE_VERSION} (core and GLTFLoader) bundled as one ES module."
+    echo " * three.js ${THREE_VERSION} bundled as one ES module: core, GLTFLoader, OrbitControls,"
+    echo " * TransformControls and XRHandModelFactory."
     echo " *"
     echo " * GENERATED FILE - do not edit. Rebuild with runtime/builtin/tools/build-three.sh"
     echo " * (esbuild ${ESBUILD_VERSION}, --format=esm --target=es2020)."

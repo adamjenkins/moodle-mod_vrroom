@@ -1,0 +1,84 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_mavr/editor_outline
+
+    The room editor's outline: the rooms, then the objects of the chosen room grouped by kind.
+    Every entry is a button, so the whole room can be edited with the keyboard.
+
+    Data attributes required for JS:
+    * data-action="mavr-editor-scene" with data-scene
+    * data-action="mavr-editor-addscene", "mavr-editor-scene-up", "mavr-editor-scene-down", "mavr-editor-scene-delete"
+    * data-action="mavr-editor-select" with data-kind and data-id
+    * data-group on each section
+
+    Context variables required for this template:
+    * scenes - list of rooms: id, name, active, start
+    * canaddscene - whether another room may be added
+    * canmoveup, canmovedown, candelete - what the chosen room allows
+    * groups - list of groups: group, heading, items (kind, id, name, selected)
+
+    Example context (json):
+    {
+        "scenes": [
+            {"id": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11", "name": "Gallery", "active": true, "start": true}
+        ],
+        "canaddscene": true,
+        "canmoveup": false,
+        "canmovedown": false,
+        "candelete": false,
+        "groups": [
+            {"group": "environment", "heading": "Surroundings", "items": [
+                {"kind": "environment", "id": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11", "name": "Surroundings", "selected": false}
+            ]},
+            {"group": "zone", "heading": "Zone", "items": [
+                {"kind": "zone", "id": "z-1", "name": "Vase", "selected": true}
+            ]}
+        ]
+    }
+}}
+<section class="mavr-editor-scenes mb-3" data-group="scenes">
+    <h3 class="h6">{{#str}}editorscenes, mod_mavr{{/str}}</h3>
+    <ul class="list-unstyled mb-2">
+        {{#scenes}}
+        <li>
+            <button type="button" class="btn btn-link btn-sm text-start{{#active}} fw-bold{{/active}}" data-action="mavr-editor-scene"
+                    data-scene="{{id}}" aria-pressed="{{#active}}true{{/active}}{{^active}}false{{/active}}">{{name}}</button>
+            {{#start}}<span class="badge bg-secondary">{{#str}}editorstartscene, mod_mavr{{/str}}</span>{{/start}}
+        </li>
+        {{/scenes}}
+    </ul>
+    <div class="d-flex flex-wrap gap-1">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-editor-addscene"{{^canaddscene}} disabled{{/canaddscene}}>{{#str}}editoraddscene, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-editor-scene-up"{{^canmoveup}} disabled{{/canmoveup}}>{{#str}}editormovesceneup, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-editor-scene-down"{{^canmovedown}} disabled{{/canmovedown}}>{{#str}}editormovescenedown, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-outline-danger btn-sm" data-action="mavr-editor-scene-delete"{{^candelete}} disabled{{/candelete}}>{{#str}}editordeletescene, mod_mavr{{/str}}</button>
+    </div>
+</section>
+{{#groups}}
+<section class="mavr-editor-group mb-2" data-group="{{group}}">
+    <h3 class="h6">{{heading}}</h3>
+    <ul class="list-unstyled mb-0">
+        {{#items}}
+        <li>
+            <button type="button" class="btn btn-link btn-sm text-start{{#selected}} fw-bold{{/selected}}" data-action="mavr-editor-select"
+                    data-kind="{{kind}}" data-id="{{id}}" aria-pressed="{{#selected}}true{{/selected}}{{^selected}}false{{/selected}}">{{name}}</button>
+        </li>
+        {{/items}}
+    </ul>
+</section>
+{{/groups}}

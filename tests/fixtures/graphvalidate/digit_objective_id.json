@@ -1,0 +1,37 @@
+{
+  "name": "digit_objective_id",
+  "intent": "An all-digit objective id is rejected and not entered into the id table, so a reference to it is unknown.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "123",
+        "type": "visit_zone",
+        "title": "A",
+        "zone": "z-1"
+      },
+      {
+        "id": "v-2",
+        "type": "visit_zone",
+        "title": "B",
+        "zone": "z-2",
+        "unlock": {
+          "after": [
+            "123"
+          ]
+        }
+      },
+      {
+        "id": "v3",
+        "type": "visit_zone",
+        "title": "C",
+        "zone": "z-3"
+      }
+    ],
+    "rules": []
+  },
+  "errors": [
+    "objectives[0].id must not be all digits",
+    "objectives[1].unlock.after refers to unknown objective \"123\""
+  ]
+}

@@ -27,23 +27,29 @@
 
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
+use Behat\Gherkin\Node\TableNode;
 use Behat\Mink\Exception\ExpectationException;
 
 /**
- * Steps that drive the MAVR room through the test hooks the built-in viewer exposes.
+ * Steps that drive the MAVR room through the test hooks the built-in viewer exposes, open the
+ * activity form with a chosen template, and wait for the room editor.
  *
  * When a room has started, its root element carries data-mavr-ready ("3d" or "list") and, in the
- * 3D view, a mavrTest object with enterZone(name) and clickObject(name).
+ * 3D view, a mavrTest object with enterZone(name) and clickObject(name). The room editor's root
+ * carries data-mavr-editor-ready once its document has loaded.
  */
 class behat_mod_mavr extends behat_base {
 
     /** @var string CSS selector of a started room. */
     private const READY_SELECTOR = '[data-region="mavr-root"][data-mavr-ready]';
 
+    /** @var string CSS selector of a loaded room editor. */
+    private const EDITOR_READY_SELECTOR = '[data-region="mavr-editor"][data-mavr-editor-ready]';
+
     /**
      * Resolve MAVR page types for "I am on the ... page".
      *
-     * Recognised page types: "Report" (identifier: the activity name).
+     * Recognised page types: "Report" and "Room editor" (identifier: the activity name).
      *
      * @param string $type page type
      * @param string $identifier activity name
@@ -54,9 +60,62 @@ class behat_mod_mavr extends behat_base {
             case 'report':
                 $cm = $this->get_cm_by_activity_name('mavr', $identifier);
                 return new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
+            case 'room editor':
+                $cm = $this->get_cm_by_activity_name('mavr', $identifier);
+                return new moodle_url('/mod/mavr/edit.php', ['id' => $cm->id]);
             default:
                 throw new Exception('Unrecognised mod_mavr page type "' . $type . '."');
         }
+    }
+
+    /**
+     * Open the form that adds a MAVR activity built by one template, as its activity chooser
+     * entry does.
+     *
+     * @Given I add a MAVR activity using the :template template to course :coursefullname section :sectionnum
+     * @param string $template template short name, e.g. gallery or escape
+     * @param string $coursefullname course full name
+     * @param string $sectionnum section number
+     */
+    public function i_add_a_mavr_activity_using_the_template(string $template, string $coursefullname,
+            string $sectionnum): void {
+        $courseid = $this->get_course_id($coursefullname);
+        if (!$courseid) {
+            throw new ExpectationException('There is no course "' . $coursefullname . '".', $this->getSession());
+        }
+        $addurl = new moodle_url('/course/modedit.php', [
+            'add' => 'mavr',
+            'course' => $courseid,
+            'section' => intval($sectionnum),
+            'template' => $template,
+        ]);
+        $this->execute('behat_general::i_visit', [$addurl]);
+    }
+
+    /**
+     * Add a MAVR activity built by one template, fill the form and save it.
+     *
+     * @Given I add a MAVR activity using the :template template to course :coursefullname section :sectionnum and I fill the form with:
+     * @param string $template template short name
+     * @param string $coursefullname course full name
+     * @param string $sectionnum section number
+     * @param TableNode $data the form fields and values
+     */
+    public function i_add_a_mavr_activity_using_the_template_and_fill_the_form(string $template, string $coursefullname,
+            string $sectionnum, TableNode $data): void {
+        $this->i_add_a_mavr_activity_using_the_template($template, $coursefullname, $sectionnum);
+        $this->execute('behat_general::wait_until_the_page_is_ready');
+        $this->execute('behat_forms::i_set_the_following_fields_to_these_values', $data);
+        $this->execute('behat_forms::press_button', get_string('savechangesandreturntocourse'));
+    }
+
+    /**
+     * Wait until the MAVR room editor has loaded its document.
+     *
+     * @Given /^the MAVR room editor is ready$/
+     */
+    public function the_mavr_room_editor_is_ready(): void {
+        $this->ensure_element_exists(self::EDITOR_READY_SELECTOR, 'css_element');
     }
 
     /**

@@ -1,0 +1,13 @@
+{
+  "name": "timelimit_invalid",
+  "intent": "The time limit must be a whole number of seconds from 0 to 604800 (seven days).",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "timelimit": 90.5,
+    "objectives": [],
+    "rules": []
+  },
+  "errors": [
+    "timelimit must be an integer from 0 to 604800"
+  ]
+}

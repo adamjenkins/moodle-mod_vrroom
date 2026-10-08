@@ -26,13 +26,27 @@ use mod_mavr\local\attempt\attempt_manager;
 use mod_mavr\local\attempt\event_store;
 
 /**
- * Creates MAVR activities (gallery walks), attempts and statements for tests.
+ * Creates MAVR activities, attempts and statements for tests.
  *
- * Stations come from $record->stations (an array of station arrays) or, for Behat tables,
- * from pipe-separated strings: stationtitles ("Vase|Portrait"), stationquestions ("Q1|", question
- * names, empty = none), and optionally stationpoints ("1|2"), stationrequired ("1|0") and
- * stationtexts. Without either, two text-only stations are made. They are turned into the
- * gallery template's form fields (gallery_*), exactly as the activity form would submit them.
+ * The template is $record->template: 'gallery' (the default), 'escape' or 'blank'. Any other
+ * template gets the record as given.
+ *
+ * Gallery: stations come from $record->stations (an array of station arrays) or, for Behat
+ * tables, from pipe-separated strings: stationtitles ("Vase|Portrait"), stationquestions ("Q1|",
+ * question names, empty = none), and optionally stationpoints ("1|2"), stationrequired ("1|0")
+ * and stationtexts. Without either, two text-only stations are made.
+ *
+ * Escape chain: puzzles come from $record->puzzles (an array of puzzle arrays with the keys
+ * title, clue, locktype, keyname, questionbankentryid, hints and points) or from pipe-separated
+ * strings: puzzletitles ("Desk|Safe"), puzzlelocks ("key|question", also "none"),
+ * puzzlequestions ("|Q1", question names), puzzlehints ("Look on the desk.|", one hint per
+ * puzzle) and puzzlepoints ("1|1"). Without either, puzzle "Desk" (key) and "Safe" (no lock)
+ * are made. timelimit (seconds), hintpenalty and story set the activity-wide fields.
+ *
+ * Empty room: blank_environment (default gallery-hall).
+ *
+ * Everything is turned into the template's own form fields (gallery_*, escape_*, blank_*),
+ * exactly as the activity form would submit them.
  */
 class mod_mavr_generator extends testing_module_generator {
 
@@ -53,10 +67,38 @@ class mod_mavr_generator extends testing_module_generator {
             'grademethod' => 1,
             'maxattempts' => 0,
             'completionobjectives' => 0,
-            'gallery_environment' => 'gallery-hall',
-            'gallery_ordered' => 0,
         ];
         foreach ($defaults as $name => $value) {
+            if (!isset($record->$name)) {
+                $record->$name = $value;
+            }
+        }
+
+        switch ((string)$record->template) {
+            case 'gallery':
+                $this->prepare_gallery($record);
+                break;
+            case 'escape':
+                $this->prepare_escape($record);
+                break;
+            case 'blank':
+                if (!isset($record->blank_environment)) {
+                    $record->blank_environment = 'gallery-hall';
+                }
+                break;
+        }
+
+        return parent::create_instance($record, (array)$options);
+    }
+
+    /**
+     * Turn the gallery parts of a record into the gallery template's form fields.
+     *
+     * @param stdClass $record the generator record, changed in place
+     * @return void
+     */
+    private function prepare_gallery(stdClass $record): void {
+        foreach (['gallery_environment' => 'gallery-hall', 'gallery_ordered' => 0] as $name => $value) {
             if (!isset($record->$name)) {
                 $record->$name = $value;
             }
@@ -83,8 +125,121 @@ class mod_mavr_generator extends testing_module_generator {
             $record->gallery_points[$i] = (float)$station['points'];
         }
         $record->gallery_stationcount = count($stations);
+    }
 
-        return parent::create_instance($record, (array)$options);
+    /**
+     * Turn the escape chain parts of a record into the escape template's form fields.
+     *
+     * @param stdClass $record the generator record, changed in place
+     * @return void
+     */
+    private function prepare_escape(stdClass $record): void {
+        $puzzles = $this->build_puzzles($record);
+
+        $record->escape_environment = (string)($record->escape_environment ?? 'escape-room');
+        $record->escape_story = (string)($record->escape_story ?? ($record->story ?? ''));
+        $record->escape_timelimit = (int)($record->escape_timelimit ?? ($record->timelimit ?? 0));
+        $record->escape_hintpenalty = (float)($record->escape_hintpenalty ?? ($record->hintpenalty ?? 0));
+        unset($record->puzzles, $record->puzzletitles, $record->puzzlelocks, $record->puzzlequestions,
+            $record->puzzlehints, $record->puzzlepoints, $record->timelimit, $record->hintpenalty, $record->story);
+
+        $fields = ['puzzleid', 'title', 'clue', 'cluemedia', 'clueimage', 'cluemodel', 'locktype', 'keyname',
+            'question', 'hint1', 'hint2', 'points'];
+        foreach ($fields as $field) {
+            $record->{'escape_' . $field} = [];
+        }
+        foreach (array_values($puzzles) as $i => $puzzle) {
+            $hints = array_values($puzzle['hints']);
+            $record->escape_puzzleid[$i] = '';
+            $record->escape_title[$i] = (string)$puzzle['title'];
+            $record->escape_clue[$i] = ['text' => (string)$puzzle['clue'], 'format' => FORMAT_HTML];
+            $record->escape_cluemedia[$i] = 'none';
+            $record->escape_clueimage[$i] = 0;
+            $record->escape_cluemodel[$i] = 0;
+            $record->escape_locktype[$i] = (string)$puzzle['locktype'];
+            $record->escape_keyname[$i] = (string)$puzzle['keyname'];
+            $record->escape_question[$i] = (int)$puzzle['questionbankentryid'];
+            $record->escape_hint1[$i] = (string)($hints[0] ?? '');
+            $record->escape_hint2[$i] = (string)($hints[1] ?? '');
+            $record->escape_points[$i] = (float)$puzzle['points'];
+        }
+        $record->escape_puzzlecount = count($puzzles);
+    }
+
+    /**
+     * The puzzles of an escape record as arrays with every key set.
+     *
+     * @param stdClass $record the generator record
+     * @return array[]
+     */
+    private function build_puzzles(stdClass $record): array {
+        $puzzles = [];
+        if (!empty($record->puzzles) && is_array($record->puzzles)) {
+            foreach ($record->puzzles as $i => $puzzle) {
+                $puzzles[] = $this->complete_puzzle((array)$puzzle, (int)$i);
+            }
+            return $puzzles;
+        }
+
+        if (isset($record->puzzletitles) && trim((string)$record->puzzletitles) !== '') {
+            $titles = self::split((string)$record->puzzletitles);
+            $locks = self::split((string)($record->puzzlelocks ?? ''));
+            $questions = self::split((string)($record->puzzlequestions ?? ''));
+            $hints = self::split((string)($record->puzzlehints ?? ''));
+            $points = self::split((string)($record->puzzlepoints ?? ''));
+            foreach ($titles as $i => $title) {
+                $puzzle = ['title' => $title];
+                if (($locks[$i] ?? '') !== '') {
+                    $puzzle['locktype'] = $locks[$i];
+                }
+                $questionname = $questions[$i] ?? '';
+                if ($questionname !== '') {
+                    $puzzle['questionbankentryid'] = $this->get_question_bank_entry_id($questionname);
+                    if (!isset($puzzle['locktype'])) {
+                        $puzzle['locktype'] = 'question';
+                    }
+                }
+                if (($hints[$i] ?? '') !== '') {
+                    $puzzle['hints'] = [$hints[$i]];
+                }
+                if (($points[$i] ?? '') !== '') {
+                    $puzzle['points'] = (float)$points[$i];
+                }
+                $puzzles[] = $this->complete_puzzle($puzzle, $i);
+            }
+            return $puzzles;
+        }
+
+        return [
+            $this->complete_puzzle(['title' => 'Desk', 'locktype' => 'key'], 0),
+            $this->complete_puzzle(['title' => 'Safe', 'locktype' => 'none'], 1),
+        ];
+    }
+
+    /**
+     * Fill the missing keys of a puzzle with defaults.
+     *
+     * @param array $puzzle partial puzzle
+     * @param int $index position (for the default title)
+     * @return array
+     */
+    private function complete_puzzle(array $puzzle, int $index): array {
+        $title = (string)($puzzle['title'] ?? ('Puzzle ' . ($index + 1)));
+        $hints = [];
+        foreach ((array)($puzzle['hints'] ?? []) as $hint) {
+            if (trim((string)$hint) !== '') {
+                $hints[] = (string)$hint;
+            }
+        }
+        return [
+            'title' => $title,
+            'clue' => (string)($puzzle['clue'] ?? '<p>A clue at ' . s($title) . '.</p>'),
+            'locktype' => (string)($puzzle['locktype'] ?? 'key'),
+            'keyname' => (string)($puzzle['keyname'] ?? 'Key'),
+            'questionbankentryid' => (int)($puzzle['questionbankentryid'] ?? 0),
+            'hints' => array_slice($hints, 0, 2),
+            'points' => (float)($puzzle['points'] ?? 1),
+        ];
     }
 
     /**

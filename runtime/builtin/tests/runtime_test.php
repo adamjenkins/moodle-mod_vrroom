@@ -55,7 +55,7 @@ final class runtime_test extends \advanced_testcase {
         $this->assertSame(1, $caps->maxusers);
         $this->assertFalse($caps->voice);
         $this->assertFalse($caps->avatars);
-        $this->assertSame([], $caps->xrmodes);
+        $this->assertSame(['vr', 'ar', 'mr'], $caps->xrmodes);
         $this->assertSame(['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'], $caps->objectivetypes);
 
         $this->assertSame('browser', $runtime->statement_channel());

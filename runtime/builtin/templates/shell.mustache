@@ -17,8 +17,9 @@
 {{!
     @template mavrruntime_builtin/shell
 
-    The frame of the built-in viewer: launch buttons, message region, 3D stage, list view,
-    progress panel and the live region for screen readers.
+    The frame of the built-in viewer: launch buttons, message region, 3D stage (with the VR, AR
+    and mixed reality buttons, which stay hidden until the device is known to support them),
+    list view, progress panel and the live region for screen readers.
 
     Classes required for JS:
     * none
@@ -61,7 +62,12 @@
             <div class="mavr-hud-buttons d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-light btn-sm" data-action="mavr-toggle-progress" aria-expanded="false" aria-controls="mavr-progress-{{cmid}}">{{#str}}progress, mavrruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-light btn-sm" data-action="mavr-switch-list">{{#str}}switchtolist, mavrruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-primary btn-sm d-none" data-action="mavr-enter-vr">{{#str}}entervr, mavrruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-primary btn-sm d-none" data-action="mavr-enter-ar">{{#str}}enterar, mavrruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-danger btn-sm d-none" data-action="mavr-exit-xr">{{#str}}exitxr, mavrruntime_builtin{{/str}}</button>
             </div>
+            <div class="mavr-xr-status alert alert-info d-none" data-region="mavr-xr-status" role="status"></div>
+            <p class="mavr-xr-note small text-muted d-none" data-region="mavr-xr-note"></p>
         </div>
         <div class="mavr-overlay" data-region="mavr-overlay"></div>
     </div>

@@ -155,6 +155,8 @@ final class start_attempt_test extends \advanced_testcase {
         $this->assertTrue($config['preview']);
         $this->assertSame(0, $config['attemptid']);
         $this->assertSame([], $config['events']);
+        $this->assertSame([], $config['hints']);
+        $this->assertSame(0, $config['state']['timedue']);
         foreach ($config['questions'] as $question) {
             $this->assertFalse($question['available']);
         }

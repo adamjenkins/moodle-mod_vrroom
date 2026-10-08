@@ -1,0 +1,120 @@
+{
+  "name": "hint_penalty",
+  "intent": "Two hints of 0.5 on a 2-point interact: both requested (one twice, counted once), then completed -> earned 2 - 1 = 1. A 1.5-point hint on a 1-point objective floors its earned points at 0.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "x-a",
+        "type": "interact",
+        "title": "Take the key",
+        "target": "g-a",
+        "points": 2,
+        "required": true,
+        "hints": [
+          {
+            "id": "hn-a-1",
+            "text": "Look on the desk.",
+            "penalty": 0.5
+          },
+          {
+            "id": "hn-a-2",
+            "text": "It is under the lamp.",
+            "penalty": 0.5
+          }
+        ]
+      },
+      {
+        "id": "x-b",
+        "type": "interact",
+        "title": "Take the coin",
+        "target": "g-b",
+        "points": 1,
+        "required": true,
+        "hints": [
+          {
+            "id": "hn-b-1",
+            "text": "Check the drawer.",
+            "penalty": 1.5
+          }
+        ]
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-a-1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-a-1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-a-2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "g-a",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-b-1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "g-b",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "x-a": {
+        "status": "completed",
+        "earned": 1,
+        "hintsused": 2
+      },
+      "x-b": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 1
+      }
+    },
+    "earnedpoints": 1,
+    "maxpoints": 3,
+    "score": 0.33333,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

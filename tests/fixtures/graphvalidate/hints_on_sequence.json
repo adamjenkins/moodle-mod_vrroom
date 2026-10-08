@@ -1,0 +1,75 @@
+{
+  "name": "hints_on_sequence",
+  "intent": "Hints are not allowed on a sequence (an empty list is); more than five hints are refused.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v-1",
+        "type": "visit_zone",
+        "title": "A",
+        "zone": "z-1"
+      },
+      {
+        "id": "s-1",
+        "type": "sequence",
+        "title": "S",
+        "steps": [
+          "v-1"
+        ],
+        "hints": [
+          {
+            "id": "hn-1",
+            "text": "x"
+          }
+        ]
+      },
+      {
+        "id": "s-2",
+        "type": "sequence",
+        "title": "T",
+        "steps": [
+          "v-1"
+        ],
+        "hints": []
+      },
+      {
+        "id": "v-6",
+        "type": "visit_zone",
+        "title": "Six",
+        "zone": "z-6",
+        "hints": [
+          {
+            "id": "hn-6-1",
+            "text": "Hint 1"
+          },
+          {
+            "id": "hn-6-2",
+            "text": "Hint 2"
+          },
+          {
+            "id": "hn-6-3",
+            "text": "Hint 3"
+          },
+          {
+            "id": "hn-6-4",
+            "text": "Hint 4"
+          },
+          {
+            "id": "hn-6-5",
+            "text": "Hint 5"
+          },
+          {
+            "id": "hn-6-6",
+            "text": "Hint 6"
+          }
+        ]
+      }
+    ],
+    "rules": []
+  },
+  "errors": [
+    "objectives[1].hints are not allowed on a sequence",
+    "objectives[3].hints must be an array of at most 5 hints"
+  ]
+}

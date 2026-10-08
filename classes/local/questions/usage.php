@@ -197,6 +197,46 @@ final class usage {
     }
 
     /**
+     * Keep the finished try and start a fresh attempt of the same question in the same usage slot.
+     *
+     * This is the question engine's own redo (the quiz's "Try another question like this one",
+     * mod/quiz/classes/quiz_attempt.php process_redo_question()): the finished question attempt
+     * moves to a new usage slot and a new attempt of the same question version takes its place,
+     * so the attempt's slot map does not change. Nothing happens when the question is not
+     * finished yet.
+     *
+     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param int $graphslot The graph slot number.
+     * @param int $timenow The time the new try starts.
+     */
+    public static function restart(\stdClass $attempt, int $graphslot, int $timenow): void {
+        self::require_engine();
+        $quba = self::load($attempt);
+        $slot = self::usage_slot($attempt, $quba, $graphslot);
+        $qa = $quba->get_question_attempt($slot);
+        if (!$qa->get_state()->is_finished()) {
+            return;
+        }
+        $question = \question_bank::load_question($qa->get_question(false)->id);
+        $quba->add_question_in_place_of_other($slot, $question);
+        $quba->start_question($slot, null, $timenow);
+        \question_engine::save_questions_usage_by_activity($quba);
+    }
+
+    /**
+     * The current question attempt of a graph slot (for the in-world question view).
+     *
+     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param int $graphslot The graph slot number.
+     * @return \question_attempt The question attempt in the usage slot the slot map names.
+     */
+    public static function get_question_attempt(\stdClass $attempt, int $graphslot): \question_attempt {
+        self::require_engine();
+        $quba = self::load($attempt);
+        return $quba->get_question_attempt(self::usage_slot($attempt, $quba, $graphslot));
+    }
+
+    /**
      * Close every question in an attempt's usage (unanswered ones become "gave up").
      *
      * @param \stdClass $attempt The mavr_attempts record (uniqueid).

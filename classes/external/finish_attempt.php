@@ -25,6 +25,9 @@ use mod_mavr\local\attempt\attempt_manager;
 /**
  * Finish the current user's open attempt: final replay, grade and completion.
  *
+ * An attempt whose time ran out is finished as of its deadline, and its data is returned as for
+ * any other finish.
+ *
  * @package    mod_mavr
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -54,9 +57,18 @@ class finish_attempt extends external_api {
 
         $context = helper::context_for_attempt($attemptid);
         self::validate_context($context);
-        [$attempt, , $cm] = attempt_manager::require_own_open_attempt($attemptid, (int)$USER->id);
-
-        $attempt = attempt_manager::finish($attempt);
+        $attempt = attempt_manager::get_attempt($attemptid);
+        if ((int)$attempt->userid !== (int)$USER->id) {
+            throw new \moodle_exception('errornotyourattempt', 'mod_mavr');
+        }
+        [, $cm] = attempt_manager::load_activity($attempt);
+        require_capability('mod/mavr:attempt', $context);
+        if (attempt_manager::close_if_overdue($attempt)) {
+            $attempt = attempt_manager::get_attempt($attemptid);
+        } else {
+            [$attempt, , $cm] = attempt_manager::require_own_open_attempt($attemptid, (int)$USER->id);
+            $attempt = attempt_manager::finish($attempt);
+        }
 
         return [
             'attemptid' => (int)$attempt->id,

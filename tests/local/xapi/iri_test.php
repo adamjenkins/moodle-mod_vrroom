@@ -40,6 +40,7 @@ final class iri_test extends \advanced_testcase {
             'object' => ['object', '5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11', 'h_2', '5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11', 'h_2'],
             'question' => ['question', null, '3', null, '3'],
             'objective' => ['objective', null, 'q-1', null, 'q-1'],
+            'hint' => ['hint', null, 'hn-desk-1', null, 'hn-desk-1'],
         ];
     }
 
@@ -76,6 +77,8 @@ final class iri_test extends \advanced_testcase {
         $this->assertSame($act . '/scene/s/object/o', iri::for_object(7, 'object', 's', 'o'));
         $this->assertSame($act . '/question/2', iri::for_object(7, 'question', null, '2'));
         $this->assertSame($act . '/objective/v-1', iri::for_object(7, 'objective', null, 'v-1'));
+        $this->assertSame($act . '/hint/hn-1', iri::for_object(7, 'hint', null, 'hn-1'));
+        $this->assertContains('hint', iri::OBJECT_TYPES);
     }
 
     /**
@@ -99,6 +102,9 @@ final class iri_test extends \advanced_testcase {
             $act . '12/scene/s/thing/z',
             $act . '12/question/q1',
             $act . '12/objective/a/b',
+            $act . '12/hint/',
+            $act . '12/hint/a b',
+            $act . '12/scene/s/hint/h',
             $act . '12/scene/s/zone/z?x=1',
         ];
         foreach ($bad as $value) {
@@ -117,12 +123,24 @@ final class iri_test extends \advanced_testcase {
     }
 
     /**
+     * A hint IRI needs a valid hint id.
+     *
+     * @return void
+     */
+    public function test_hint_requires_id(): void {
+        $this->expectException(\coding_exception::class);
+        iri::for_object(1, 'hint', null, null);
+    }
+
+    /**
      * Verb lookups.
      *
      * @return void
      */
     public function test_verbs(): void {
-        $this->assertCount(10, iri::VERBS);
+        $this->assertCount(11, iri::VERBS);
+        $this->assertSame('https://wisecat.net/xapi/mavr/verbs/requested', iri::verb_iri('requested'));
+        $this->assertSame('requested', iri::verb_short('https://wisecat.net/xapi/mavr/verbs/requested'));
         foreach (iri::VERBS as $short => $verbiri) {
             $this->assertSame($verbiri, iri::verb_iri($short));
             $this->assertSame($short, iri::verb_short($verbiri));
@@ -133,6 +151,8 @@ final class iri_test extends \advanced_testcase {
         }
         $this->assertArrayNotHasKey('answered', iri::CLIENT_VERBS);
         $this->assertArrayNotHasKey('completed', iri::CLIENT_VERBS);
+        // Hint requests are asserted by the server only.
+        $this->assertArrayNotHasKey('requested', iri::CLIENT_VERBS);
         $this->expectException(\coding_exception::class);
         iri::verb_iri('jumped');
     }

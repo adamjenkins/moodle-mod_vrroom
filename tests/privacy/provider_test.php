@@ -187,6 +187,35 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     }
 
     /**
+     * The attempt deadline is listed in the metadata and exported: empty without a time limit,
+     * as a date with one.
+     */
+    public function test_export_timedue(): void {
+        global $DB;
+        $collection = provider::get_metadata(new collection('mod_mavr'));
+        $fields = [];
+        foreach ($collection->get_collection() as $item) {
+            if ($item->get_name() === 'mavr_attempts') {
+                $fields = $item->get_privacy_fields();
+            }
+        }
+        $this->assertSame('privacy:metadata:mavr_attempts:timedue', $fields['timedue'] ?? null);
+
+        $subcontext = [get_string('privacy:attemptpath', 'mod_mavr', 1)];
+        $this->export_context_data_for_user((int)$this->students[1]->id, $this->context, 'mod_mavr');
+        $data = writer::with_context($this->context)->get_data($subcontext);
+        $this->assertTrue(property_exists($data, 'timedue'));
+        $this->assertNull($data->timedue);
+
+        $timedue = (int)$this->attempts[2]->timestart + 900;
+        $DB->set_field('mavr_attempts', 'timedue', $timedue, ['id' => $this->attempts[2]->id]);
+        writer::reset();
+        $this->export_context_data_for_user((int)$this->students[2]->id, $this->context, 'mod_mavr');
+        $data = writer::with_context($this->context)->get_data($subcontext);
+        $this->assertSame(\core_privacy\local\request\transform::datetime($timedue), $data->timedue);
+    }
+
+    /**
      * Deleting a context removes every user's attempts, events, usages and states there.
      */
     public function test_delete_data_for_all_users_in_context(): void {

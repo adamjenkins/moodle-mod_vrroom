@@ -67,6 +67,10 @@ final class get_attempt_state_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(2.0, $state['maxpoints'], 1e-6);
         $graph = instance_manager::get_graph((int)$module->id);
         $this->assertSame(array_column($graph['objectives'], 'id'), array_column($state['objectives'], 'id'));
+        // No time limit: no deadline; the server time lets the client correct its clock.
+        $this->assertSame(0, $state['timedue']);
+        $this->assertGreaterThan(0, $state['servertime']);
+        $this->assertSame([0, 0], array_column($state['objectives'], 'hintsused'));
 
         $scene = instance_manager::get_scenes((int)$module->id)[0];
         $zone = $scene['zones'][0];

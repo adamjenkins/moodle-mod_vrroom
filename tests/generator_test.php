@@ -144,4 +144,110 @@ final class generator_test extends \advanced_testcase {
         $this->assertTrue($DB->record_exists('mavr_events',
             ['attemptid' => $attempt->id, 'verb' => 'completed', 'objecttype' => 'objective']));
     }
+
+    /**
+     * The default escape chain: puzzle "Desk" with a key and "Safe" without a lock, in the escape
+     * room, compiled into one room and a graph with an exit door.
+     */
+    public function test_create_escape_instance_defaults(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+
+        $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id, 'template' => 'escape']);
+
+        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertSame('escape', $record->template);
+        $this->assertEquals(0, $record->customised);
+        $config = json_decode($record->templateconfig);
+        $this->assertSame('mavrtemplate_escape/1', $config->schema);
+        $this->assertSame('escape-room', $config->environment);
+        $this->assertSame(['Desk', 'Safe'], array_column($config->puzzles, 'title'));
+        $this->assertSame(['key', 'none'], array_column($config->puzzles, 'locktype'));
+        $this->assertSame('Key', $config->puzzles[0]->keyname);
+
+        $scenes = instance_manager::get_scenes((int)$mavr->id);
+        $this->assertCount(1, $scenes);
+        $graph = instance_manager::get_graph((int)$mavr->id);
+        $objectiveids = array_column($graph['objectives'], 'id');
+        $this->assertContains('o-exit', $objectiveids);
+        $this->assertContains('d-exit', $graph['hidden']);
+        $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+    }
+
+    /**
+     * Behat-style strings: a key puzzle with a hint and a question lock, with a time limit and a
+     * hint penalty.
+     */
+    public function test_create_escape_instance_from_strings(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $qbank = $generator->create_module('qbank', ['course' => $course->id]);
+        $qgen = $generator->get_plugin_generator('core_question');
+        $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
+        $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
+
+        $mavr = $generator->create_module('mavr', [
+            'course' => $course->id,
+            'template' => 'escape',
+            'puzzletitles' => 'Desk|Safe',
+            'puzzlelocks' => 'key|question',
+            'puzzlequestions' => '|Q1',
+            'puzzlehints' => 'Look on the desk.|',
+            'timelimit' => 900,
+            'hintpenalty' => 0.5,
+            'story' => 'You are locked in.',
+        ]);
+
+        $config = json_decode($DB->get_field('mavr', 'templateconfig', ['id' => $mavr->id]));
+        $this->assertSame(['key', 'question'], array_column($config->puzzles, 'locktype'));
+        $this->assertSame(['Look on the desk.'], $config->puzzles[0]->hints);
+        $this->assertSame([], $config->puzzles[1]->hints);
+        $this->assertEquals($question->questionbankentryid, $config->puzzles[1]->questionbankentryid);
+        $this->assertEquals(900, $config->timelimit);
+        $this->assertEquals(0.5, $config->hintpenalty);
+        $this->assertSame('You are locked in.', $config->story);
+
+        $graph = instance_manager::get_graph((int)$mavr->id);
+        $this->assertSame(900, $graph['timelimit']);
+        $slots = $DB->get_records('mavr_slots', ['mavrid' => $mavr->id]);
+        $this->assertCount(1, $slots);
+        $this->assertEquals(1, reset($slots)->slot);
+
+        // A new attempt gets its deadline from the graph's time limit.
+        $student = $generator->create_and_enrol($course, 'student');
+        /** @var \mod_mavr_generator $mavrgen */
+        $mavrgen = $generator->get_plugin_generator('mod_mavr');
+        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
+        $this->assertEquals((int)$attempt->timestart + 900, (int)$attempt->timedue);
+    }
+
+    /**
+     * The empty room: one room without objects and an empty graph.
+     */
+    public function test_create_blank_instance(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $course = $this->getDataGenerator()->create_course();
+
+        $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id, 'template' => 'blank']);
+
+        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertSame('blank', $record->template);
+        $config = json_decode($record->templateconfig);
+        $this->assertSame('mavrtemplate_blank/1', $config->schema);
+        $this->assertSame('gallery-hall', $config->environment);
+
+        $scenes = instance_manager::get_scenes((int)$mavr->id);
+        $this->assertCount(1, $scenes);
+        $this->assertEmpty($scenes[0]['zones'] ?? []);
+        $this->assertEmpty($scenes[0]['interactables'] ?? []);
+        $graph = instance_manager::get_graph((int)$mavr->id);
+        $this->assertSame([], $graph['objectives']);
+        $this->assertSame([], $graph['rules']);
+        $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+    }
 }

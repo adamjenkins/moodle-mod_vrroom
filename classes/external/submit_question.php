@@ -30,6 +30,11 @@ use mod_mavr\local\questions\usage;
  * Submit a response to one question; the question engine grades it and the server records the
  * `answered` statement and replays the attempt.
  *
+ * When the objective needs a minimum fraction (pass_fraction) and the answer falls short, the
+ * objective stays available and the question is restarted in place, so the student can try
+ * again (Phase 2 contract §4.2.3); the response then carries retry = true and the feedback HTML
+ * of the try that fell short.
+ *
  * @package    mod_mavr
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -75,7 +80,7 @@ class submit_question extends external_api {
         self::validate_context($context);
         [$attempt] = attempt_manager::require_own_open_attempt($attemptid, (int)$USER->id);
 
-        [$status, , $result] = helper::question_status($attempt, $slot);
+        [$status, $objective, $result] = helper::question_status($attempt, $slot);
         if ($status === evaluator::OBJECTIVE_COMPLETED) {
             throw new \moodle_exception('errorquestionanswered', 'mod_mavr');
         }
@@ -95,9 +100,19 @@ class submit_question extends external_api {
             ]);
             $result = attempt_manager::recompute($attempt);
             [$html, $javascript] = usage::render($attempt, $slot, true);
+            $retry = false;
+            $passfraction = $objective['pass_fraction'] ?? null;
+            $objectivestatus = (string)($result->objectives[(string)$objective['id']]['status'] ?? '');
+            if ((is_int($passfraction) || is_float($passfraction))
+                    && max(0.0, min(1.0, (float)($fraction ?? 0.0))) < (float)$passfraction - 1e-9
+                    && $objectivestatus === evaluator::OBJECTIVE_AVAILABLE) {
+                // Not good enough: keep the graded try and start a fresh one in the same slot.
+                usage::restart($attempt, $slot, time());
+                $retry = true;
+            }
             $events = event_store::get_events((int)$attempt->id);
             $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state,
-                (int)$attempt->graphversion, $result, count($events));
+                (int)$attempt->graphversion, $result, count($events), (int)($attempt->timedue ?? 0));
             return [
                 'slot' => $slot,
                 'status' => (string)$outcome['status'],
@@ -105,6 +120,7 @@ class submit_question extends external_api {
                 'html' => $html,
                 'javascript' => $javascript,
                 'state' => $state,
+                'retry' => $retry,
             ];
         }
 
@@ -112,7 +128,7 @@ class submit_question extends external_api {
         [$html, $javascript] = usage::render($attempt, $slot, false);
         $events = event_store::get_events((int)$attempt->id);
         $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state,
-            (int)$attempt->graphversion, $result, count($events));
+            (int)$attempt->graphversion, $result, count($events), (int)($attempt->timedue ?? 0));
         return [
             'slot' => $slot,
             'status' => (string)$outcome['status'],
@@ -120,6 +136,7 @@ class submit_question extends external_api {
             'html' => $html,
             'javascript' => $javascript,
             'state' => $state,
+            'retry' => false,
         ];
     }
 
@@ -136,6 +153,8 @@ class submit_question extends external_api {
             'html' => new external_value(PARAM_RAW, 'Question HTML'),
             'javascript' => new external_value(PARAM_RAW, 'JavaScript the question needs'),
             'state' => helper::attempt_state_structure(),
+            'retry' => new external_value(PARAM_BOOL, 'Whether the answer fell short and the question was restarted',
+                VALUE_DEFAULT, false),
         ]);
     }
 }

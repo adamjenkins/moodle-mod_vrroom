@@ -90,7 +90,7 @@ class template extends \mod_mavr\local\template\base {
      * @param \moodleform_mod $form the activity form (owner of repeat_elements())
      * @param \MoodleQuickForm $mform its QuickForm
      * @param int $courseid course the activity is in
-     * @return string[] names of the non-repeated elements, for mod_form to hide by template
+     * @return string[] names of the non-repeated elements added (headers excluded)
      */
     public function define_form(\moodleform_mod $form, \MoodleQuickForm $mform, int $courseid): array {
         $instance = (int)$form->get_instance();
@@ -163,7 +163,7 @@ class template extends \mod_mavr\local\template\base {
             'gallery_required' => ['default' => 1],
             'gallery_points' => ['default' => 1, 'helpbutton' => ['stationpoints', self::COMPONENT]],
         ];
-        $repeats = $form->repeat_elements(
+        $form->repeat_elements(
             $repeated,
             max(count($stations), self::DEFAULT_REPEATS),
             $options,
@@ -173,16 +173,6 @@ class template extends \mod_mavr\local\template\base {
             get_string('addstations', self::COMPONENT)
         );
 
-        // A repeat option takes one hideif only, so the template condition is added here.
-        $hideable = ['gallery_title', 'gallery_text', 'gallery_mediatype', 'gallery_model', 'gallery_image',
-            'gallery_question', 'gallery_required', 'gallery_points'];
-        for ($i = 0; $i < $repeats; $i++) {
-            foreach ($hideable as $name) {
-                $mform->hideIf("{$name}[{$i}]", 'template', 'neq', $this->get_name());
-            }
-        }
-
-        // Headers cannot be hidden, so gallery_heading is not returned.
         return ['gallery_environment', 'gallery_environmentfile', 'gallery_ordered', 'gallery_addstations'];
     }
 
@@ -707,6 +697,32 @@ class template extends \mod_mavr\local\template\base {
         ];
 
         return new compiled_activity([$scene], $graph, $slots);
+    }
+
+    /**
+     * Replace the stations' question bank entry ids after a restore.
+     *
+     * @param \stdClass $config decoded mavrtemplate_gallery/1 config, changed in place
+     * @param callable $map fn(int $old): int, returns $old when there is no mapping
+     * @return bool whether any id changed
+     */
+    public function remap_question_entries(\stdClass $config, callable $map): bool {
+        if (empty($config->stations) || !is_array($config->stations)) {
+            return false;
+        }
+        $changed = false;
+        foreach ($config->stations as $station) {
+            if (!is_object($station) || empty($station->questionbankentryid)) {
+                continue;
+            }
+            $old = (int)$station->questionbankentryid;
+            $new = (int)$map($old);
+            if ($new > 0 && $new !== $old) {
+                $station->questionbankentryid = $new;
+                $changed = true;
+            }
+        }
+        return $changed;
     }
 
     /**

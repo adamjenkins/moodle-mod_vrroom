@@ -143,6 +143,53 @@ final class instance_manager_test extends \advanced_testcase {
     }
 
     /**
+     * While the room editor owns the room, the settings form keeps the room and the tasks; a rebuild
+     * recompiles from the template and clears the customised flag.
+     */
+    public function test_customised_room_kept_until_rebuild(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [, $mavr, $cm] = $this->create_activity();
+        $context = \context_module::instance($cm->id);
+        $this->assertEquals(0, $mavr->customised);
+        $templatesceneid = instance_manager::get_scenes($mavr->id)[0]['id'];
+
+        // The room editor replaces the room and the tasks.
+        instance_manager::apply_compiled($mavr, $context, new compiled_activity([self::scene('scene-a')], self::graph('A'), []));
+        $DB->set_field('mavr', 'customised', 100, ['id' => $mavr->id]);
+        $mavr = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $configbefore = $mavr->templateconfig;
+        $versionbefore = (int)$mavr->graphversion;
+
+        // A settings form save changes the activity's own settings only.
+        $data = self::form_data_for_update($mavr, $cm);
+        $data->name = 'Renamed walk';
+        $data->maxattempts = 3;
+        $data->gallery_title[0] = 'Amphora';
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertSame('Renamed walk', $after->name);
+        $this->assertEquals(3, $after->maxattempts);
+        $this->assertEquals(100, $after->customised);
+        $this->assertSame($configbefore, $after->templateconfig);
+        $this->assertEquals($versionbefore, $after->graphversion);
+        $this->assertSame(['scene-a'], array_column(instance_manager::get_scenes($mavr->id), 'id'));
+        $this->assertSame('A', instance_manager::get_graph($mavr->id)['objectives'][0]['title']);
+
+        // "Rebuild from the template" recompiles and clears the flag.
+        $data = self::form_data_for_update($after, $cm);
+        $data->gallery_title[0] = 'Amphora';
+        $data->mavr_rebuild = 1;
+        instance_manager::update_instance($data);
+        $rebuilt = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $this->assertEquals(0, $rebuilt->customised);
+        $this->assertSame([$templatesceneid], array_column(instance_manager::get_scenes($mavr->id), 'id'));
+        $this->assertGreaterThan($versionbefore, (int)$rebuilt->graphversion);
+        $this->assertStringContainsString('Amphora', json_encode(instance_manager::get_graph($mavr->id)));
+    }
+
+    /**
      * apply_compiled() upserts scenes by idnumber and deletes vanished ones.
      */
     public function test_apply_compiled_scenes_upsert_and_delete(): void {

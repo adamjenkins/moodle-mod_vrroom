@@ -34,6 +34,8 @@ const DELTA = 1e-6;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixturedir = path.join(here, '..', 'fixtures', 'graph');
 const files = fs.readdirSync(fixturedir).filter((f) => f.endsWith('.json')).sort();
+const validatedir = path.join(here, '..', 'fixtures', 'graphvalidate');
+const validatefiles = fs.readdirSync(validatedir).filter((f) => f.endsWith('.json')).sort();
 
 /**
  * Whether a value is a plain object.
@@ -86,11 +88,29 @@ const assertMatches = (expected, actual, where, subset = false) => {
 
 test('the fixture set is complete', () => {
     assert.deepEqual(files.map((f) => f.replace(/\.json$/, '')), [
-        'answer_while_locked', 'collect_n_of_set', 'empty_graph', 'finish_on_all_required', 'gallery_ordered',
-        'interacted_zone_counts', 'locked_until_after', 'rules_show_hide', 'score_at_least', 'sequence_strict',
-        'single_visit', 'unlock_action_cascade', 'visit_then_question', 'zero_points_required_ratio',
+        'answer_while_locked', 'collect_keys_lock', 'collect_n_of_set', 'empty_graph', 'escape_chain',
+        'finish_on_all_required', 'gallery_ordered', 'hint_locked_completed', 'hint_penalty',
+        'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'rules_show_hide', 'score_at_least',
+        'sequence_strict', 'single_visit', 'unlock_action_cascade', 'visit_then_question',
+        'zero_points_required_ratio',
     ]);
 });
+
+test('the validator fixture set is complete', () => {
+    assert.deepEqual(validatefiles.map((f) => f.replace(/\.json$/, '')), [
+        'digit_objective_id', 'duplicate_hint_id', 'hints_invalid', 'hints_on_sequence',
+        'pass_fraction_invalid', 'timelimit_invalid', 'valid_extensions',
+    ]);
+});
+
+for (const file of validatefiles) {
+    const fixture = JSON.parse(fs.readFileSync(path.join(validatedir, file), 'utf8'));
+
+    test(`validator fixture ${fixture.name}`, () => {
+        assert.equal(fixture.name, file.replace(/\.json$/, ''));
+        assert.deepEqual(validate(fixture.graph), fixture.errors);
+    });
+}
 
 for (const file of files) {
     const fixture = JSON.parse(fs.readFileSync(path.join(fixturedir, file), 'utf8'));

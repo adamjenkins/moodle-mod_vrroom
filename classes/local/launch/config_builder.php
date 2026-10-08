@@ -18,6 +18,7 @@ namespace mod_mavr\local\launch;
 
 use mod_mavr\local\attempt\attempt_manager;
 use mod_mavr\local\attempt\event_store;
+use mod_mavr\local\attempt\hint_manager;
 use mod_mavr\local\graph\evaluator;
 use mod_mavr\local\instance_manager;
 use mod_mavr\local\xapi\iri;
@@ -27,7 +28,9 @@ use mod_mavr\local\xapi\iri;
  *
  * Every piece of teacher content leaves the server formatted: hotspot text as format_text()
  * HTML, names and titles through format_string() (tags stripped, entities decoded, because the
- * client escapes them in its templates), and file references with a pluginfile URL.
+ * client escapes them in its templates), and file references with a pluginfile URL. Hint texts
+ * never travel inside the graph: only the hints already requested in the attempt are sent, in
+ * the separate `hints` key.
  *
  * @package    mod_mavr
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -42,7 +45,7 @@ final class config_builder {
     public const RESUME_STATEID = 'mavr-resume';
 
     /** @var string[] File areas a scene may reference. */
-    private const FILE_AREAS = ['models', 'media', 'environment'];
+    private const FILE_AREAS = ['models', 'media', 'environment', 'assets'];
 
     /**
      * Build the launch config (§4.5).
@@ -70,13 +73,13 @@ final class config_builder {
         if ($preview) {
             $events = [];
             $result = (new evaluator($graph))->evaluate([]);
-            $state = attempt_manager::build_state(0, 'preview', $graphversion, $result, 0);
+            $state = attempt_manager::build_state(0, 'preview', $graphversion, $result, 0, 0);
             $slotmap = [];
         } else {
             $events = event_store::get_events((int)$attempt->id);
             $result = (new evaluator($graph))->evaluate($events);
             $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state, $graphversion, $result,
-                count($events));
+                count($events), (int)($attempt->timedue ?? 0));
             $slotmap = json_decode((string)$attempt->slotmap, true) ?: [];
         }
 
@@ -112,7 +115,8 @@ final class config_builder {
             'maxbatch' => self::get_maxbatch(),
             'startscene' => $scenes ? (string)$scenes[0]['id'] : '',
             'scenes' => $scenes,
-            'graph' => $graph,
+            'graph' => hint_manager::strip_texts($graph),
+            'hints' => (object)hint_manager::launch_hints($graph, $events, $context),
             'state' => $state,
             'events' => $events,
             'questions' => $questions,
@@ -148,7 +152,7 @@ final class config_builder {
         if (isset($scene['environment']['file']) && is_array($scene['environment']['file'])) {
             $scene['environment']['file'] = self::file_ref($scene['environment']['file'], $context);
         }
-        foreach (['zones', 'interactables'] as $list) {
+        foreach (['spawn', 'zones', 'interactables'] as $list) {
             if (empty($scene[$list]) || !is_array($scene[$list])) {
                 continue;
             }

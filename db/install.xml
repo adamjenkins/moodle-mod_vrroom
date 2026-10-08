@@ -20,6 +20,7 @@
         <FIELD NAME="grademethod" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="How attempt scores combine: 1 highest, 2 average, 3 last."/>
         <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attempts allowed per user; 0 = unlimited."/>
         <FIELD NAME="completionobjectives" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: all required objectives completed in a finished attempt."/>
+        <FIELD NAME="customised" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time of the first room editor save; 0 while the room is built by its template."/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
@@ -92,6 +93,7 @@
         <FIELD NAME="requireddone" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when every required objective has been completed."/>
         <FIELD NAME="timestart" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timefinish" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timedue" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the attempt's time runs out (timestart + graph timelimit); 0 = no limit."/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
       <KEYS>
@@ -102,7 +104,7 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="mavrid-userid-attempt" UNIQUE="true" FIELDS="mavrid, userid, attempt"/>
-        <INDEX NAME="state" UNIQUE="false" FIELDS="state"/>
+        <INDEX NAME="state-timedue" UNIQUE="false" FIELDS="state, timedue"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="mavr_events" COMMENT="Accepted xAPI statements of an attempt, in order of acceptance.">

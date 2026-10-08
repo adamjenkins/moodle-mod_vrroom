@@ -235,7 +235,11 @@ class restore_mavr_activity_structure_step extends restore_questions_activity_st
     }
 
     /**
-     * Restore the file areas and remap the question bank entries named in the template config.
+     * Restore the file areas and let the template remap the question bank entries named in its
+     * stored config.
+     *
+     * Times are not shifted: attempt times keep their original values (as in Phase 1), so an
+     * attempt's deadline stays consistent with its start.
      *
      * @return void
      */
@@ -247,30 +251,28 @@ class restore_mavr_activity_structure_step extends restore_questions_activity_st
         $this->add_related_files('mod_mavr', 'models', null);
         $this->add_related_files('mod_mavr', 'media', null);
         $this->add_related_files('mod_mavr', 'environment', null);
+        $this->add_related_files('mod_mavr', 'assets', null);
 
         $mavrid = $this->get_new_parentid('mavr');
         if (!$mavrid) {
             return;
         }
-        $json = $DB->get_field('mavr', 'templateconfig', ['id' => $mavrid]);
-        if ($json === false || $json === null || $json === '') {
+        $mavr = $DB->get_record('mavr', ['id' => $mavrid], 'id, template, templateconfig');
+        if (!$mavr || $mavr->templateconfig === null || $mavr->templateconfig === '') {
             return;
         }
-        $config = json_decode($json, false);
-        if (!$config instanceof stdClass || empty($config->stations) || !is_array($config->stations)) {
+        $config = json_decode($mavr->templateconfig, false);
+        if (!$config instanceof stdClass) {
             return;
         }
-        $changed = false;
-        foreach ($config->stations as $station) {
-            if (!is_object($station) || empty($station->questionbankentryid)) {
-                continue;
-            }
-            $newid = $this->get_mappingid('question_bank_entry', (int)$station->questionbankentryid);
-            if ($newid && (int)$newid !== (int)$station->questionbankentryid) {
-                $station->questionbankentryid = (int)$newid;
-                $changed = true;
-            }
+        try {
+            $template = \mod_mavr\local\template\registry::get((string)$mavr->template);
+        } catch (\moodle_exception $e) {
+            // The template is not installed on this site: its config stays as it was.
+            return;
         }
+        $changed = $template->remap_question_entries($config,
+            fn(int $old): int => (int)($this->get_mappingid('question_bank_entry', $old) ?: $old));
         if ($changed) {
             // Same flags as instance_manager, so link markers awaiting decoding stay intact.
             $DB->set_field('mavr', 'templateconfig',

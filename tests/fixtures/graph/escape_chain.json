@@ -1,0 +1,258 @@
+{
+  "name": "escape_chain",
+  "intent": "The escape template's compile for two puzzles (Desk: key lock with one 0.5-point hint; Safe: question lock with pass_fraction 1) and the exit door, walked through: hint, key, wrong then right answer, exit, finish. Earned 1.5 + 3 of 5.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "timelimit": 900,
+    "hidden": [
+      "k-p1",
+      "d-exit"
+    ],
+    "objectives": [
+      {
+        "id": "v-p1",
+        "type": "visit_zone",
+        "title": "Search Desk",
+        "zone": "z-p1",
+        "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "x-p1",
+        "type": "interact",
+        "title": "Take the Brass key",
+        "target": "k-p1",
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-p1"
+          ]
+        },
+        "hints": [
+          {
+            "id": "hn-p1-1",
+            "text": "Look on the desk.",
+            "penalty": 0.5
+          }
+        ]
+      },
+      {
+        "id": "v-p2",
+        "type": "visit_zone",
+        "title": "Search Safe",
+        "zone": "z-p2",
+        "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+        "points": 0,
+        "required": true,
+        "unlock": {
+          "after": [
+            "x-p1"
+          ]
+        }
+      },
+      {
+        "id": "x-p2",
+        "type": "answer_question",
+        "title": "Open the lock at Safe",
+        "slot": 1,
+        "points": 3,
+        "required": true,
+        "pass_fraction": 1,
+        "unlock": {
+          "after": [
+            "v-p2"
+          ]
+        }
+      },
+      {
+        "id": "o-exit",
+        "type": "interact",
+        "title": "Leave through the exit door",
+        "target": "d-exit",
+        "points": 0,
+        "required": true,
+        "unlock": {
+          "after": [
+            "x-p1",
+            "x-p2"
+          ]
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r-show-p1",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-p1"
+        },
+        "actions": [
+          {
+            "do": "show",
+            "target": "k-p1"
+          }
+        ]
+      },
+      {
+        "id": "r-take-p1",
+        "on": {
+          "on": "objective_completed",
+          "objective": "x-p1"
+        },
+        "actions": [
+          {
+            "do": "hide",
+            "target": "k-p1"
+          }
+        ]
+      },
+      {
+        "id": "r-open-p2",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-p2"
+        },
+        "actions": [
+          {
+            "do": "open_question",
+            "slot": 1
+          }
+        ]
+      },
+      {
+        "id": "r-exit",
+        "on": {
+          "on": "objective_unlocked",
+          "objective": "o-exit"
+        },
+        "actions": [
+          {
+            "do": "show",
+            "target": "d-exit"
+          }
+        ]
+      },
+      {
+        "id": "r-finish",
+        "on": {
+          "on": "objective_completed",
+          "objective": "o-exit"
+        },
+        "actions": [
+          {
+            "do": "finish"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-p1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "requested",
+      "type": "hint",
+      "id": "hn-p1-1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "k-p1",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-p2",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "d-exit",
+      "scene": "8c0f9a3e-2f4b-4c1d-9a7e-0d6b2c1f4e55",
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v-p1": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 0
+      },
+      "x-p1": {
+        "status": "completed",
+        "earned": 1.5,
+        "hintsused": 1
+      },
+      "v-p2": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 0
+      },
+      "x-p2": {
+        "status": "completed",
+        "earned": 3,
+        "hintsused": 0
+      },
+      "o-exit": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 0
+      }
+    },
+    "earnedpoints": 4.5,
+    "maxpoints": 5,
+    "score": 0.9,
+    "requireddone": 5,
+    "requiredtotal": 5,
+    "finished": true,
+    "allrequiredcompleted": true,
+    "hidden": [
+      "k-p1"
+    ],
+    "effects": [
+      {
+        "event": 3,
+        "rule": "r-open-p2",
+        "do": "open_question",
+        "target": "1"
+      }
+    ]
+  }
+}

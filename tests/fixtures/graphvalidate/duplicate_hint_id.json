@@ -1,0 +1,37 @@
+{
+  "name": "duplicate_hint_id",
+  "intent": "Hint ids are unique across all objectives of the graph.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "x-1",
+        "type": "interact",
+        "title": "One",
+        "target": "g-1",
+        "hints": [
+          {
+            "id": "hn-1",
+            "text": "First"
+          }
+        ]
+      },
+      {
+        "id": "x-2",
+        "type": "interact",
+        "title": "Two",
+        "target": "g-2",
+        "hints": [
+          {
+            "id": "hn-1",
+            "text": "Second"
+          }
+        ]
+      }
+    ],
+    "rules": []
+  },
+  "errors": [
+    "duplicate hint id \"hn-1\""
+  ]
+}

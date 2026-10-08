@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['addstations'] = 'Add {no} more stations';
+$string['chooserhelp'] = 'Students walk from station to station, look at models, images and texts, and answer questions from the question bank.';
 $string['environment'] = 'Environment';
 $string['environment_help'] = 'The room the stations are placed in. Bundled rooms have fixed places for stations. An uploaded model gets its stations in a circle.';
 $string['environmentfile'] = 'Environment model';

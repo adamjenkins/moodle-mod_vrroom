@@ -14,10 +14,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The 3D room: renderer, scene from mavr-scene/1, models, zones, clicks, hidden objects and
- * graph effects.
+ * The 3D room: renderer, rooms built by the scene builder, clicks, zones, portals between rooms,
+ * media, hidden objects, graph effects, and immersive VR, AR and mixed reality.
  *
- * The click-to-raycast-to-hotspot-panel flow and the GLTF loading follow mod_gear's viewer.
+ * The click-to-raycast-to-hotspot-panel flow follows mod_gear's viewer.
  *
  * @module     mavrruntime_builtin/viewer
  * @copyright  2026 Boban Blagojevic
@@ -29,20 +29,26 @@ import * as THREE from 'mavrruntime_builtin/three';
 import {GLTFLoader} from 'mavrruntime_builtin/three';
 import Log from 'core/log';
 import Pending from 'core/pending';
-import {getStrings} from 'core/str';
-import {buildEnvironment} from 'mavrruntime_builtin/environment';
+import {getString, getStrings} from 'core/str';
+import {buildScene, DEG} from 'mavrruntime_builtin/scenebuilder';
 import {attach} from 'mavrruntime_builtin/controls';
 import {createPanels} from 'mavrruntime_builtin/panels';
+import {detect, createXr, createWristPanel} from 'mavrruntime_builtin/xr';
+import {createXrInput} from 'mavrruntime_builtin/xrinput';
+import {createXrPanels} from 'mavrruntime_builtin/xrpanel';
 import {region, plainText, announce, showMessage, clearMessage, startScene} from 'mavrruntime_builtin/util';
-
-/** Degrees to radians. */
-const DEG = Math.PI / 180;
 
 /** Distance within which Enter activates the object in the middle of the screen (m). */
 const REACH = 6;
 
-/** Opacity of locked station hotspots. */
-const LOCKEDOPACITY = 0.4;
+/** Eye height of the desktop camera (m). */
+const EYE = 1.6;
+
+/** How long the "locked" message stays (ms). */
+const MESSAGE_TIME = 4000;
+
+/** How often the wrist panel is refreshed (s). */
+const WRIST_INTERVAL = 0.5;
 
 /**
  * Whether the browser can create a WebGL context.
@@ -84,123 +90,16 @@ const vec3 = (value, fallback) => {
 };
 
 /**
- * Wrap text into lines that fit a width.
+ * Seconds as m:ss.
  *
- * @param {CanvasRenderingContext2D} ctx Context with the font set.
- * @param {string} text Text.
- * @param {number} maxwidth Width in px.
- * @returns {string[]}
+ * @param {number} seconds Whole seconds.
+ * @returns {string}
  */
-const wrap = (ctx, text, maxwidth) => {
-    const lines = [];
-    String(text).split(/\n/).forEach((paragraph) => {
-        let line = '';
-        paragraph.split(/\s+/).forEach((word) => {
-            const candidate = line ? `${line} ${word}` : word;
-            if (ctx.measureText(candidate).width > maxwidth && line) {
-                lines.push(line);
-                line = word;
-            } else {
-                line = candidate;
-            }
-        });
-        lines.push(line);
-    });
-    return lines.slice(0, 12);
-};
-
-/**
- * A canvas texture.
- *
- * @param {HTMLCanvasElement} canvas Canvas.
- * @returns {Object} THREE.CanvasTexture
- */
-const canvasTexture = (canvas) => {
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 4;
-    return texture;
-};
-
-/**
- * A billboard label sprite.
- *
- * @param {string} text Plain text.
- * @returns {Object} THREE.Sprite
- */
-const makeLabel = (text) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const font = 'bold 44px sans-serif';
-    ctx.font = font;
-    const width = Math.min(1024, Math.ceil(ctx.measureText(text).width) + 48);
-    canvas.width = width;
-    canvas.height = 80;
-    ctx.font = font;
-    ctx.fillStyle = 'rgba(20, 24, 30, 0.78)';
-    ctx.fillRect(0, 0, width, 80);
-    ctx.fillStyle = '#ffffff';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, width / 2, 42);
-    const material = new THREE.SpriteMaterial({map: canvasTexture(canvas), transparent: true, depthWrite: false});
-    const sprite = new THREE.Sprite(material);
-    const height = 0.22;
-    sprite.scale.set(height * width / 80, height, 1);
-    return sprite;
-};
-
-/**
- * A text board as a plane with a canvas texture.
- *
- * @param {string} text Plain text.
- * @param {number} width Width in metres.
- * @returns {Object} THREE.Mesh
- */
-const makeTextBoard = (text, width) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const px = 1024;
-    const font = '48px sans-serif';
-    ctx.font = font;
-    const lines = wrap(ctx, text, px - 96);
-    const lineheight = 60;
-    canvas.width = px;
-    canvas.height = Math.max(120, lines.length * lineheight + 72);
-    ctx.font = font;
-    ctx.fillStyle = '#fbfaf7';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1d2125';
-    ctx.textBaseline = 'top';
-    lines.forEach((line, i) => ctx.fillText(line, 48, 36 + i * lineheight));
-    const height = width * canvas.height / canvas.width;
-    return new THREE.Mesh(
-        new THREE.PlaneGeometry(width, height),
-        new THREE.MeshBasicMaterial({map: canvasTexture(canvas), side: THREE.DoubleSide})
-    );
-};
-
-/**
- * Release GPU resources under an object.
- *
- * @param {Object} object THREE.Object3D
- */
-const disposeTree = (object) => {
-    object.traverse((child) => {
-        if (child.geometry) {
-            child.geometry.dispose();
-        }
-        const materials = Array.isArray(child.material) ? child.material : (child.material ? [child.material] : []);
-        materials.forEach((material) => {
-            Object.keys(material).forEach((key) => {
-                const value = material[key];
-                if (value && value.isTexture) {
-                    value.dispose();
-                }
-            });
-            material.dispose();
-        });
-    });
+const clockText = (seconds) => {
+    const s = Math.max(0, Math.floor(seconds));
+    const minutes = Math.floor(s / 60);
+    const rest = s % 60;
+    return `${minutes}:${rest < 10 ? '0' : ''}${rest}`;
 };
 
 /**
@@ -213,39 +112,74 @@ const disposeTree = (object) => {
  */
 export const start = (root, session, config) => {
     const pending = new Pending('mavrruntime_builtin/viewer:start');
-    const scenedoc = startScene(config);
     const stage = region(root, 'mavr-stage');
     const canvas = region(root, 'mavr-canvas');
+    const scenes = Array.isArray(config.scenes) ? config.scenes : [];
 
     return getStrings([
         {key: 'loading', component: 'mavrruntime_builtin'},
         {key: 'modelloadfailed', component: 'mavrruntime_builtin'},
         {key: 'stationlocked', component: 'mavrruntime_builtin'},
-    ]).then(([loading, modelfailed, locked]) => {
-        if (!scenedoc) {
+        {key: 'entervr', component: 'mavrruntime_builtin'},
+        {key: 'enterar', component: 'mavrruntime_builtin'},
+        {key: 'entermr', component: 'mavrruntime_builtin'},
+        {key: 'exitxr', component: 'mavrruntime_builtin'},
+        {key: 'xrinsecure', component: 'mavrruntime_builtin'},
+        {key: 'xrfailed', component: 'mavrruntime_builtin'},
+        {key: 'xrplace', component: 'mavrruntime_builtin'},
+    ]).then(([loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace]) => {
+        const strings = {loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace};
+        if (!startScene(config)) {
             throw new Error('No scene in the launch config');
         }
-        const strings = {loading: loading, modelfailed: modelfailed, locked: locked};
         stage.classList.remove('d-none');
         showMessage(root, loading, 'info');
 
         const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.xr.enabled = true;
         const scene3 = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 300);
+        const rig = new THREE.Group();
+        rig.name = 'mavr-rig';
+        rig.add(camera);
+        scene3.add(rig);
         const loader = new GLTFLoader();
         const textureloader = new THREE.TextureLoader();
+        let stopped = false;
 
-        return Promise.all([
-            buildEnvironment(THREE, scenedoc.environment, loader),
-            session.loadResume(),
-        ]).then(([env, resume]) => run({root, session, scenedoc, stage, canvas, renderer, scene3, camera, loader,
-            textureloader, env, resume, strings}))
-            .catch((error) => {
-                renderer.dispose();
-                clearMessage(root, loading);
-                throw error;
-            });
+        const roomOptions = () => ({
+            loader: loader,
+            textureloader: textureloader,
+            hidden: session.getState().hidden,
+            onLoadError: (error) => {
+                Log.debug(error);
+                if (!stopped) {
+                    showMessage(root, strings.modelfailed, 'warning');
+                }
+            },
+            roomName: (sceneid) => {
+                const target = scenes.find((s) => s.id === sceneid);
+                return target ? target.name : null;
+            },
+        });
+
+        return session.loadResume().then((resume) => {
+            const resumed = resume ? scenes.find((s) => s.id === resume.scene) : null;
+            const doc = resumed || startScene(config);
+            return buildScene(THREE, doc, roomOptions()).then((handle) => run({
+                root, session, config, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions,
+                doc, handle, resume: resumed ? resume : null, setStopped: () => {
+                    stopped = true;
+                },
+            }));
+        }).catch((error) => {
+            stopped = true;
+            renderer.setAnimationLoop(null);
+            renderer.dispose();
+            clearMessage(root, loading);
+            throw error;
+        });
     }).then((handle) => {
         pending.resolve();
         return handle;
@@ -257,178 +191,184 @@ export const start = (root, session, config) => {
 };
 
 /**
- * Build the scene and run the frame loop.
+ * Run the room: picking, zones, rooms, effects, XR and the frame loop.
  *
  * @param {Object} p Everything prepared by start().
  * @returns {Object} {stop()}
  */
 const run = (p) => {
-    const {root, session, scenedoc, stage, canvas, renderer, scene3, camera, loader, textureloader, env, resume, strings} = p;
-    const sceneid = scenedoc.id;
+    const {root, session, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions, resume} = p;
+    let current = {doc: p.doc, handle: p.handle};
     let stopped = false;
-    const items = new Map();
-    const props = new Map();
-    const interactables = Array.isArray(scenedoc.interactables) ? scenedoc.interactables : [];
-    const zones = Array.isArray(scenedoc.zones) ? scenedoc.zones : [];
-    const spawns = Array.isArray(scenedoc.spawn) ? scenedoc.spawn : [];
+    let switching = null;
     const inside = new Set();
     const enteredrecorded = new Set();
-    let lockedtimer = null;
+    const grabbed = new Set();
+    let messagetimer = null;
 
-    scene3.background = env.background;
-    scene3.add(env.group);
+    // XR state.
+    let xrmode = null;
+    let placed = false;
+    let placement = null;
+    let lasthit = null;
+    let xrinput = null;
+    let xrpanels = null;
+    let xrpanelspromise = null;
+    let wrist = null;
+    let wristclock = 0;
+    let xr = null;
+    const reticle = new THREE.Mesh(
+        new THREE.RingGeometry(0.07, 0.09, 32).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.9})
+    );
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    reticle.name = 'mavr-xr-place';
+    scene3.add(reticle);
 
-    // Props.
-    (Array.isArray(scenedoc.props) ? scenedoc.props : []).forEach((prop) => {
-        const size = vec3(prop.size, [1, 1, 1]);
-        const geometry = prop.shape === 'cylinder'
-            ? new THREE.CylinderGeometry(size[0] / 2, size[0] / 2, size[1], 32)
-            : new THREE.BoxGeometry(size[0], size[1], size[2]);
-        const material = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(/^#[0-9a-fA-F]{6}$/.test(prop.color || '') ? prop.color : '#d9d4cc'),
-            roughness: 0.8,
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        const pos = vec3(prop.position, [0, 0, 0]);
-        mesh.position.set(pos[0], pos[1], pos[2]);
-        const rot = vec3(prop.rotation, [0, 0, 0]);
-        mesh.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
-        mesh.userData.mavrProp = prop.id;
-        scene3.add(mesh);
-        props.set(prop.id, mesh);
-    });
+    const xrstatus = region(root, 'mavr-xr-status');
+    const exitbutton = stage.querySelector('[data-action="mavr-exit-xr"]');
+    const sceneid = () => current.doc.id;
+    const findItem = (id) => (Array.isArray(current.doc.interactables) ? current.doc.interactables : [])
+        .find((i) => i.id === id) || null;
+    const spawnsOf = (doc) => (Array.isArray(doc.spawn) ? doc.spawn : []);
+    const zonesOf = (doc) => (Array.isArray(doc.zones) ? doc.zones : []);
 
-    // Models load in the background; a failure leaves a message and the scene goes on.
-    const modelpending = new Pending('mavrruntime_builtin/viewer:models');
-    const loads = [];
-    const failedLoad = (error) => {
-        Log.debug(error);
-        if (!stopped) {
-            showMessage(root, strings.modelfailed, 'warning');
-        }
-    };
-
-    interactables.forEach((item) => {
-        const group = new THREE.Group();
-        const pos = vec3(item.position, [0, 0, 0]);
-        const rot = vec3(item.rotation, [0, 0, 0]);
-        group.position.set(pos[0], pos[1], pos[2]);
-        group.rotation.set(rot[0] * DEG, rot[1] * DEG, rot[2] * DEG);
-        group.userData.mavrItem = item.id;
-        const record = {item: item, group: group, sphere: null, label: null};
-
-        if (item.kind === 'hotspot') {
-            const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(0.15, 24, 16),
-                new THREE.MeshStandardMaterial({
-                    color: 0xffcc33, emissive: 0xffaa00, emissiveIntensity: 0.9, transparent: true,
-                })
-            );
-            group.add(sphere);
-            const hit = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), new THREE.MeshBasicMaterial({visible: false}));
-            group.add(hit);
-            const title = plainText((item.content && item.content.title) || item.name || '');
-            if (title) {
-                const label = makeLabel(title);
-                label.position.set(0, 0.38, 0);
-                group.add(label);
-                record.label = label;
-            }
-            // Labels and spheres are upright regardless of the hotspot's rotation.
-            group.rotation.set(0, 0, 0);
-            record.sphere = sphere;
-        } else if (item.kind === 'model' && item.file && item.file.url) {
-            const scale = vec3(item.scale, [1, 1, 1]);
-            group.scale.set(scale[0], scale[1], scale[2]);
-            loads.push(loader.loadAsync(item.file.url).then((gltf) => {
-                if (stopped) {
-                    disposeTree(gltf.scene);
-                    return;
-                }
-                const model = gltf.scene || (gltf.scenes && gltf.scenes[0]);
-                if (!model) {
-                    return;
-                }
-                const fit = Number(item.fit);
-                let box = new THREE.Box3().setFromObject(model);
-                const size = box.getSize(new THREE.Vector3());
-                const maxdim = Math.max(size.x, size.y, size.z);
-                if (Number.isFinite(fit) && fit > 0 && maxdim > 0) {
-                    model.scale.multiplyScalar(fit / maxdim);
-                    model.updateMatrixWorld(true);
-                    box = new THREE.Box3().setFromObject(model);
-                }
-                const centre = box.getCenter(new THREE.Vector3());
-                model.position.x -= centre.x;
-                model.position.z -= centre.z;
-                model.position.y -= box.min.y;
-                group.add(model);
-                return;
-            }).catch(failedLoad));
-        } else if (item.kind === 'image' && item.file && item.file.url) {
-            const width = Number(item.width) > 0 ? Number(item.width) : 1.6;
-            const placeholder = new THREE.Mesh(
-                new THREE.PlaneGeometry(width, width * 0.75),
-                new THREE.MeshBasicMaterial({color: 0xcccccc, side: THREE.DoubleSide})
-            );
-            group.add(placeholder);
-            loads.push(textureloader.loadAsync(item.file.url).then((texture) => {
-                if (stopped) {
-                    texture.dispose();
-                    return;
-                }
-                texture.colorSpace = THREE.SRGBColorSpace;
-                const image = texture.image || {};
-                const aspect = image.width > 0 && image.height > 0 ? image.height / image.width : 0.75;
-                const plane = new THREE.Mesh(
-                    new THREE.PlaneGeometry(width, width * aspect),
-                    new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide})
-                );
-                group.remove(placeholder);
-                disposeTree(placeholder);
-                group.add(plane);
-                return;
-            }).catch(failedLoad));
-        } else if (item.kind === 'text') {
-            const width = Number(item.width) > 0 ? Number(item.width) : 2;
-            group.add(makeTextBoard(plainText(item.text || item.name || ''), width));
-        }
-
-        scene3.add(group);
-        items.set(item.id, record);
-    });
-    Promise.all(loads).then(() => modelpending.resolve(), () => modelpending.resolve());
-
-    const findItem = (id) => interactables.find((i) => i.id === id) || null;
+    scene3.add(current.handle.root);
 
     const panels = createPanels(stage, session, {
         onClose: () => canvas.focus({preventScroll: true}),
     });
 
-    // Picking.
+    // In-world panels are used in VR, mixed reality, and AR without a DOM overlay.
+    const worldPanels = () => !!xrmode && !(xrmode === 'ar' && xr && xr.domOverlay);
+
+    const ensureXrPanels = () => {
+        if (!xrpanelspromise) {
+            xrpanelspromise = createXrPanels(THREE, {parent: scene3, camera: camera, session: session})
+                .then((created) => {
+                    if (stopped) {
+                        created.dispose();
+                        return null;
+                    }
+                    xrpanels = created;
+                    return created;
+                })
+                .catch((error) => {
+                    Log.debug(error);
+                    xrpanelspromise = null;
+                    return null;
+                });
+        }
+        return xrpanelspromise;
+    };
+
+    // A short message: in the page, in the AR overlay, or on an in-world panel (sticky ones stay).
+    const notify = (text, level = 'warning', sticky = false) => {
+        announce(root, text);
+        if (xrmode && worldPanels()) {
+            if (xrpanels) {
+                xrpanels.showMessage(text);
+            }
+            return;
+        }
+        if (xrmode && xrstatus) {
+            xrstatus.textContent = text;
+            xrstatus.classList.remove('d-none');
+        } else {
+            showMessage(root, text, level);
+        }
+        if (messagetimer) {
+            window.clearTimeout(messagetimer);
+            messagetimer = null;
+        }
+        if (sticky) {
+            return;
+        }
+        messagetimer = window.setTimeout(() => {
+            messagetimer = null;
+            clearMessage(root, text);
+            if (xrstatus && xrstatus.textContent === text) {
+                xrstatus.textContent = '';
+                xrstatus.classList.add('d-none');
+            }
+        }, MESSAGE_TIME);
+    };
+
+    const showLocked = () => notify(strings.locked, 'warning');
+
+    const openHotspot = (hotspot) => {
+        if (worldPanels()) {
+            if (xrpanels) {
+                xrpanels.openInteractable(hotspot);
+            }
+        } else {
+            panels.openInteractable(hotspot);
+        }
+    };
+
+    const openQuestion = (slot) => {
+        if (worldPanels()) {
+            if (xrpanels) {
+                xrpanels.openQuestion(Number(slot));
+            }
+        } else {
+            panels.openQuestion(Number(slot));
+        }
+    };
+
+    // Media.
+    const mediaOf = (id) => {
+        const record = current.handle.items.get(id);
+        return record && record.media ? record : null;
+    };
+    const playMedia = (record) => {
+        const element = record.media;
+        if (element.ended) {
+            element.currentTime = 0;
+        }
+        Promise.resolve(element.play()).then(() => getString('mediaplay', 'mavrruntime_builtin',
+            plainText(record.item.name || ''))).then((text) => announce(root, text)).catch((error) => Log.debug(error));
+    };
+    const toggleMedia = (id) => {
+        const record = mediaOf(id);
+        if (!record) {
+            return;
+        }
+        if (record.media.paused) {
+            playMedia(record);
+        } else {
+            record.media.pause();
+            getString('mediapause', 'mavrruntime_builtin', plainText(record.item.name || ''))
+                .then((text) => announce(root, text))
+                .catch((error) => Log.debug(error));
+        }
+    };
+
+    // Picking with the mouse or a tap.
     const raycaster = new THREE.Raycaster();
+    const isShown = (object) => {
+        let o = object;
+        while (o) {
+            if (o.visible === false) {
+                return false;
+            }
+            o = o.parent;
+        }
+        return true;
+    };
     const pick = (ndc, far) => {
+        camera.updateMatrixWorld(true);
         raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
         raycaster.far = far;
-        const targets = [env.group];
-        props.forEach((mesh) => {
-            if (mesh.visible) {
-                targets.push(mesh);
-            }
-        });
-        items.forEach((record) => {
-            if (record.group.visible) {
-                targets.push(record.group);
-            }
-        });
-        const hits = raycaster.intersectObjects(targets, true);
+        const hits = raycaster.intersectObjects(current.handle.pickTargets(), true);
         for (const hit of hits) {
-            let object = hit.object;
-            while (object && object.userData.mavrItem === undefined && object.parent) {
-                object = object.parent;
+            if (!isShown(hit.object) || hit.object.isLine || hit.object.isLineSegments) {
+                continue;
             }
-            if (object && object.userData.mavrItem !== undefined) {
-                return findItem(object.userData.mavrItem);
+            const found = current.handle.findPickable(hit.object);
+            if (found && found.kind === 'interactable') {
+                return findItem(found.id);
             }
             if (hit.object.isSprite) {
                 continue;
@@ -439,18 +379,215 @@ const run = (p) => {
         return null;
     };
 
-    const showLocked = () => {
-        showMessage(root, strings.locked, 'warning');
-        announce(root, strings.locked);
-        if (lockedtimer) {
-            window.clearTimeout(lockedtimer);
-        }
-        lockedtimer = window.setTimeout(() => clearMessage(root, strings.locked), 4000);
+    // Zones the player is in, and leaving them all (room change, XR mode change).
+    const leaveZones = () => {
+        inside.forEach((zoneid) => {
+            if (enteredrecorded.has(zoneid)) {
+                session.record('exited', 'zone', zoneid, sceneid());
+            }
+        });
+        inside.clear();
+        enteredrecorded.clear();
     };
 
-    // Activate an interactable: interacted statement + panel.
+    const enterZone = (zone) => {
+        if (session.isZoneLocked(zone.id)) {
+            showLocked();
+            return;
+        }
+        enteredrecorded.add(zone.id);
+        session.record('entered', 'zone', zone.id, sceneid());
+    };
+
+    // Placement of the room in AR (table top) and mixed reality (room scale).
+    const userYaw = () => {
+        const dir = camera.getWorldDirection(new THREE.Vector3());
+        return Math.atan2(-dir.x, -dir.z);
+    };
+    const firstSpawn = (doc, spawnid) => {
+        const list = spawnsOf(doc);
+        return list.find((s) => s.id === spawnid) || list[0] || {position: [0, 0, 0], yaw: 0};
+    };
+    const applyPlacement = () => {
+        const roomroot = current.handle.root;
+        if (!placement) {
+            roomroot.position.set(0, 0, 0);
+            roomroot.rotation.set(0, 0, 0);
+            roomroot.scale.set(1, 1, 1);
+            return;
+        }
+        roomroot.scale.setScalar(placement.scale);
+        roomroot.rotation.set(0, placement.rotation, 0);
+        const offset = new THREE.Vector3(placement.centre[0], 0, placement.centre[2])
+            .multiplyScalar(placement.scale)
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), placement.rotation);
+        roomroot.position.copy(placement.point).sub(offset);
+        roomroot.updateMatrixWorld(true);
+    };
+    const arScale = (doc) => {
+        const xr = doc.xr && typeof doc.xr === 'object' ? doc.xr : {};
+        const value = Number(xr.arscale);
+        if (xr.arscale !== null && xr.arscale !== undefined && Number.isFinite(value) && value > 0) {
+            return value;
+        }
+        const b = current.handle.environment.bounds;
+        const extent = b ? Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) : 10;
+        return 1 / Math.max(extent, 0.01);
+    };
+    // Compute the placement of the current room at a floor or table point.
+    const placeAt = (point, spawnid) => {
+        const spawn = firstSpawn(current.doc, spawnid);
+        const spawnyaw = (Number(spawn.yaw) || 0) * DEG;
+        if (xrmode === 'ar') {
+            const b = current.handle.environment.bounds;
+            const centre = b ? [(b.min[0] + b.max[0]) / 2, 0, (b.min[2] + b.max[2]) / 2] : [0, 0, 0];
+            placement = {point: point.clone(), rotation: userYaw() - spawnyaw, scale: arScale(current.doc), centre: centre};
+        } else {
+            placement = {point: point.clone(), rotation: userYaw() - spawnyaw, scale: 1, centre: vec3(spawn.position, [0, 0, 0])};
+        }
+        applyPlacement();
+    };
+    // The floor point under the head in mixed reality.
+    const feetPoint = () => {
+        const head = camera.getWorldPosition(new THREE.Vector3());
+        head.y = placement ? placement.point.y : head.y - EYE;
+        return head;
+    };
+
+    const placeRoom = () => {
+        let point = null;
+        if (lasthit) {
+            const m = new THREE.Matrix4().fromArray(lasthit.transform.matrix);
+            point = new THREE.Vector3().setFromMatrixPosition(m);
+        } else if (xrmode === 'mr') {
+            point = feetPoint();
+        }
+        if (!point) {
+            notify(strings.xrplace, 'info', true);
+            return;
+        }
+        placeAt(point, null);
+        placed = true;
+        reticle.visible = false;
+        if (xrstatus) {
+            xrstatus.textContent = '';
+            xrstatus.classList.add('d-none');
+        }
+        if (xrpanels) {
+            xrpanels.close();
+        }
+    };
+
+    // Put the player (or, in mixed reality, the room) at a start point of the current room.
+    const placeAtSpawn = (spawnid) => {
+        const spawn = firstSpawn(current.doc, spawnid);
+        const position = vec3(spawn.position, [0, 0, 0]);
+        const yaw = Number(spawn.yaw) || 0;
+        if (xrmode === 'vr' && xrinput) {
+            xrinput.moveHeadTo(position, yaw);
+        } else if (xrmode === 'mr') {
+            if (placed) {
+                placeAt(feetPoint(), spawnid);
+            }
+        } else if (xrmode === 'ar') {
+            if (placement) {
+                const b = current.handle.environment.bounds;
+                placement.scale = arScale(current.doc);
+                placement.centre = b ? [(b.min[0] + b.max[0]) / 2, 0, (b.min[2] + b.max[2]) / 2] : [0, 0, 0];
+                applyPlacement();
+            }
+        } else {
+            controls.teleport(position, yaw);
+        }
+    };
+
+    // How the room looks in the current mode.
+    const applyLook = () => {
+        const env = current.handle.environment;
+        scene3.background = xrmode === 'ar' || xrmode === 'mr' ? null : env.background;
+        env.shell.forEach((mesh) => {
+            mesh.visible = xrmode !== 'mr';
+        });
+        if (env.ceiling) {
+            env.ceiling.visible = xrmode !== 'ar' && xrmode !== 'mr';
+        }
+        current.handle.setZonesVisible(xrmode === 'ar');
+        applyPlacement();
+    };
+
+    // Hidden objects and locked hotspots follow the state.
+    const applyState = () => {
+        current.handle.setHidden(session.getState().hidden);
+        current.handle.setLocked((item) => item.kind === 'hotspot' && !!item.zone && session.isZoneLocked(item.zone));
+    };
+
+    // Change room (portal or teleport effect), then go to a start point.
+    const goTo = (targetscene, spawnid) => {
+        if (!targetscene || targetscene === sceneid()) {
+            placeAtSpawn(spawnid);
+            return Promise.resolve();
+        }
+        const doc = scenes.find((s) => s.id === targetscene);
+        if (!doc || switching) {
+            return switching || Promise.resolve();
+        }
+        const pending = new Pending('mavrruntime_builtin/viewer:room');
+        leaveZones();
+        panels.close();
+        if (xrpanels) {
+            xrpanels.close();
+        }
+        if (xrinput) {
+            xrinput.releaseAll();
+        }
+        switching = buildScene(THREE, doc, roomOptions()).then((handle) => {
+            if (stopped) {
+                handle.dispose();
+                return undefined;
+            }
+            current.handle.dispose();
+            current = {doc: doc, handle: handle};
+            grabbed.clear();
+            scene3.add(handle.root);
+            session.setScene(doc.id);
+            controls.setBounds(handle.environment.bounds);
+            applyLook();
+            applyState();
+            placeAtSpawn(spawnid);
+            return getString('scenechanged', 'mavrruntime_builtin', plainText(doc.name || ''));
+        }).then((text) => {
+            if (text && !stopped) {
+                announce(root, text);
+            }
+            return undefined;
+        }).catch((error) => {
+            Log.debug(error);
+            if (!stopped) {
+                notify(strings.modelfailed, 'warning');
+            }
+        }).then(() => {
+            switching = null;
+            pending.resolve();
+            return undefined;
+        });
+        return switching;
+    };
+
+    // A start point id anywhere in the activity.
+    const goToSpawn = (spawnid) => {
+        if (spawnsOf(current.doc).some((s) => s.id === spawnid)) {
+            placeAtSpawn(spawnid);
+            return;
+        }
+        const target = scenes.find((s) => spawnsOf(s).some((sp) => sp.id === spawnid));
+        if (target) {
+            goTo(target.id, spawnid);
+        }
+    };
+
+    // Activate an interactable: interacted statement, then its panel, room change or media.
     const activate = (item) => {
-        if (!item) {
+        if (!item || switching) {
             return;
         }
         let hotspot = item.kind === 'hotspot' ? item : null;
@@ -465,20 +602,32 @@ const run = (p) => {
             showLocked();
             return;
         }
-        const status = session.record('interacted', 'object', eventid, sceneid);
+        const status = session.record('interacted', 'object', eventid, sceneid());
         if (status === 'locked') {
             showLocked();
             return;
         }
+        if (status === 'closed') {
+            return;
+        }
+        if (item.kind === 'portal') {
+            const target = item.target && typeof item.target === 'object' ? item.target : {};
+            goTo(target.scene, target.spawn);
+            return;
+        }
+        if (item.kind === 'media') {
+            toggleMedia(item.id);
+        }
         if (hotspot) {
-            panels.openInteractable(hotspot);
+            openHotspot(hotspot);
         }
     };
 
-    // Controls and spawn.
+    // Controls (desktop and touch) move the rig.
     const controls = attach(camera, canvas, {
-        bounds: env.bounds,
-        eyeHeight: 1.6,
+        bounds: current.handle.environment.bounds,
+        eyeHeight: EYE,
+        rig: rig,
         stick: region(root, 'mavr-stick'),
         onClick: (ndc) => {
             const item = pick(ndc, Infinity);
@@ -496,73 +645,28 @@ const run = (p) => {
         },
         onTouch: () => stage.classList.add('mavr-touch'),
     });
-    const spawn = spawns[0] || {position: [0, 0, 0], yaw: 0};
-    if (resume && resume.scene === sceneid) {
+    if (resume) {
         controls.teleport(resume.position, resume.yaw);
     } else {
+        const spawn = firstSpawn(current.doc, null);
         controls.teleport(vec3(spawn.position, [0, 0, 0]), Number(spawn.yaw) || 0);
     }
-
-    // Hidden objects and locked hotspots follow the state.
-    const applyState = () => {
-        const state = session.getState();
-        items.forEach((record, id) => {
-            record.group.visible = !state.hidden.has(id);
-            if (record.sphere) {
-                const zone = record.item.zone;
-                const opacity = zone && session.isZoneLocked(zone) ? LOCKEDOPACITY : 1;
-                record.sphere.material.opacity = opacity;
-                if (record.label) {
-                    record.label.material.opacity = opacity;
-                }
-            }
-        });
-        props.forEach((mesh, id) => {
-            mesh.visible = !state.hidden.has(id);
-        });
-    };
+    applyLook();
     applyState();
 
-    const enterZone = (zone) => {
-        if (session.isZoneLocked(zone.id)) {
-            showLocked();
-            return;
-        }
-        enteredrecorded.add(zone.id);
-        session.record('entered', 'zone', zone.id, sceneid);
-    };
-
-    const unsubscribe = session.on((message) => {
-        if (message.type !== 'change' || stopped) {
-            return;
-        }
-        applyState();
-        panels.refresh();
-        message.unlocked.forEach((objective) => {
-            if (objective.type === 'visit_zone' && objective.zone && inside.has(objective.zone) &&
-                    !enteredrecorded.has(objective.zone)) {
-                const zone = zones.find((z) => z.id === objective.zone);
-                if (zone) {
-                    enterZone(zone);
-                }
-            }
-        });
-        message.effects.forEach((effect) => {
-            if (effect.do === 'teleport') {
-                const target = spawns.find((s) => s.id === effect.target);
-                if (target) {
-                    controls.teleport(vec3(target.position, [0, 0, 0]), Number(target.yaw) || 0);
-                }
-            } else if (effect.do === 'open_question') {
-                panels.openQuestion(Number(effect.target));
-            }
-        });
-    });
-
-    // Zones, each frame.
+    // Zones, each frame: from the walking position, or the head in VR and mixed reality.
     const testZones = () => {
-        const p = controls.getPosition();
-        zones.forEach((zone) => {
+        let p;
+        if (!xrmode) {
+            p = controls.getPosition();
+        } else if (xrmode === 'vr' || (xrmode === 'mr' && placed)) {
+            const head = camera.getWorldPosition(new THREE.Vector3());
+            current.handle.root.worldToLocal(head);
+            p = [head.x, 0, head.z];
+        } else {
+            return;
+        }
+        zonesOf(current.doc).forEach((zone) => {
             const c = vec3(zone.center, [0, 0, 0]);
             const s = vec3(zone.size, [0, 0, 0]);
             const isinside = Math.abs(p[0] - c[0]) <= s[0] / 2 && Math.abs(p[2] - c[2]) <= s[2] / 2 &&
@@ -574,14 +678,124 @@ const run = (p) => {
                 inside.delete(zone.id);
                 if (enteredrecorded.has(zone.id)) {
                     enteredrecorded.delete(zone.id);
-                    session.record('exited', 'zone', zone.id, sceneid);
+                    session.record('exited', 'zone', zone.id, sceneid());
                 }
             }
         });
     };
 
-    // Resize.
+    // A tap on a zone box in AR counts as visiting it (the list view rule).
+    const tapZone = (zoneid) => {
+        if (session.isZoneLocked(zoneid)) {
+            showLocked();
+            return;
+        }
+        if (session.record('interacted', 'zone', zoneid, sceneid()) === 'locked') {
+            showLocked();
+        }
+    };
+
+    // Select with a controller ray, a hand or a screen tap.
+    const onXrSelect = (object) => {
+        if ((xrmode === 'ar' || xrmode === 'mr') && !placed) {
+            placeRoom();
+            return true;
+        }
+        if (!object) {
+            return false;
+        }
+        if (xrpanels && xrpanels.select(object)) {
+            return true;
+        }
+        if (wrist && wrist.isExit(object)) {
+            xr.exit();
+            return true;
+        }
+        const found = current.handle.findPickable(object);
+        if (!found) {
+            return false;
+        }
+        if (found.kind === 'interactable') {
+            activate(findItem(found.id));
+        } else if (found.kind === 'zone' && xrmode === 'ar') {
+            tapZone(found.id);
+        }
+        return true;
+    };
+
+    const ensureXrInput = () => {
+        if (xrinput) {
+            return xrinput;
+        }
+        xrinput = createXrInput(THREE, renderer, rig, {
+            camera: camera,
+            getTargets: () => {
+                const targets = [];
+                if (xrpanels && xrpanels.isOpen()) {
+                    targets.push(...xrpanels.getTargets());
+                }
+                if (wrist) {
+                    targets.push(...wrist.getTargets());
+                }
+                return targets.concat(current.handle.pickTargets());
+            },
+            onSelect: (object) => onXrSelect(object),
+            onTeleport: (point) => xrinput.moveHeadTo([point.x, 0, point.z], null),
+            teleportAllowed: () => xrmode === 'vr' && !switching,
+            bounds: () => current.handle.environment.bounds,
+            onGrabStart: (itemid) => {
+                const item = findItem(itemid);
+                if (!item || item.kind !== 'grabbable') {
+                    return false;
+                }
+                if (grabbed.has(itemid)) {
+                    return true;
+                }
+                const status = session.record('interacted', 'object', itemid, sceneid());
+                if (status === 'locked') {
+                    showLocked();
+                    return false;
+                }
+                grabbed.add(itemid);
+                return status !== 'closed';
+            },
+            onGrabEnd: () => undefined,
+            onConnect: (handedness, grip) => {
+                if (handedness === 'left' && wrist && (xrmode === 'vr' || xrmode === 'mr')) {
+                    grip.add(wrist.object);
+                }
+            },
+        });
+        return xrinput;
+    };
+
+    // The wrist panel: required tasks done and time left.
+    const updateWrist = () => {
+        if (!wrist) {
+            return;
+        }
+        const state = session.getState();
+        const timeleft = session.getTimeLeft();
+        const requests = [];
+        if (state.requiredtotal > 0) {
+            requests.push(getString('xrprogress', 'mavrruntime_builtin', {done: state.requireddone, total: state.requiredtotal}));
+        }
+        if (timeleft !== null && timeleft !== undefined) {
+            requests.push(getString('timeleft', 'mavrruntime_builtin', clockText(timeleft)));
+        }
+        Promise.all(requests).then((lines) => {
+            if (wrist) {
+                wrist.setLines(lines);
+            }
+            return undefined;
+        }).catch((error) => Log.debug(error));
+    };
+
+    // Resize (not while an immersive session sizes the canvas).
     const resize = () => {
+        if (renderer.xr.isPresenting) {
+            return;
+        }
         const width = Math.max(1, canvas.clientWidth);
         const height = Math.max(1, canvas.clientHeight);
         renderer.setSize(width, height, false);
@@ -592,31 +806,236 @@ const run = (p) => {
     observer.observe(canvas);
     resize();
 
-    // Frame loop.
-    const clock = new THREE.Clock();
-    renderer.setAnimationLoop(() => {
-        const dt = clock.getDelta();
-        controls.update(dt);
-        testZones();
-        const t = clock.elapsedTime;
-        items.forEach((record) => {
-            if (record.sphere) {
-                const s = 1 + 0.08 * Math.sin(t * 3);
-                record.sphere.scale.set(s, s, s);
+    // Immersive sessions.
+    xr = createXr(renderer, {
+        stage: stage,
+        onStart: (mode) => {
+            if (stopped) {
+                return;
+            }
+            xrmode = mode;
+            placed = mode === 'vr';
+            placement = null;
+            lasthit = null;
+            controls.setEnabled(false);
+            panels.close();
+            leaveZones();
+            session.setChannel(`builtin-${mode}`);
+            stage.classList.add('mavr-xr');
+            stage.classList.toggle('mavr-xr-overlay', mode === 'ar' && xr.domOverlay);
+            if (exitbutton) {
+                exitbutton.classList.toggle('d-none', !(mode === 'ar' && xr.domOverlay));
+            }
+            if (mode !== 'vr') {
+                // The reference space maps straight onto the world: the room is placed instead.
+                rig.position.set(0, 0, 0);
+                rig.rotation.set(0, 0, 0);
+                rig.updateMatrixWorld(true);
+            }
+            ensureXrInput();
+            if (mode === 'vr' || mode === 'mr') {
+                wrist = createWristPanel(THREE, {exitlabel: strings.exitxr});
+                const grip = xrinput.getGrip('left');
+                if (grip) {
+                    grip.add(wrist.object);
+                }
+                updateWrist();
+            }
+            applyLook();
+            ensureXrPanels().then(() => {
+                if (xrmode && !placed) {
+                    notify(strings.xrplace, 'info', true);
+                }
+                return undefined;
+            }).catch((error) => Log.debug(error));
+        },
+        onEnd: (mode) => {
+            if (stopped) {
+                return;
+            }
+            const head = camera.getWorldPosition(new THREE.Vector3());
+            const headyaw = userYaw() / DEG;
+            xrmode = null;
+            placed = false;
+            placement = null;
+            lasthit = null;
+            reticle.visible = false;
+            if (xrinput) {
+                xrinput.releaseAll();
+            }
+            if (xrpanels) {
+                xrpanels.close();
+            }
+            if (wrist) {
+                wrist.dispose();
+                wrist = null;
+            }
+            leaveZones();
+            applyLook();
+            stage.classList.remove('mavr-xr', 'mavr-xr-overlay');
+            if (exitbutton) {
+                exitbutton.classList.add('d-none');
+            }
+            if (xrstatus) {
+                xrstatus.textContent = '';
+                xrstatus.classList.add('d-none');
+            }
+            controls.setEnabled(true);
+            if (mode === 'vr') {
+                controls.teleport([head.x, 0, head.z], headyaw);
+            }
+            session.setChannel('builtin-3d');
+            resize();
+            canvas.focus({preventScroll: true});
+        },
+    });
+
+    const enterXr = (mode) => {
+        if (xr.mode || switching) {
+            return;
+        }
+        const pending = new Pending('mavrruntime_builtin/viewer:xr');
+        // Called straight from the click, so the browser still sees the user's gesture.
+        xr.enter(mode).catch((error) => {
+            Log.debug(error);
+            if (!stopped) {
+                showMessage(root, strings.xrfailed, 'warning');
+            }
+        }).then(() => pending.resolve()).catch(() => pending.resolve());
+    };
+
+    // HUD buttons.
+    const vrbutton = stage.querySelector('[data-action="mavr-enter-vr"]');
+    const arbutton = stage.querySelector('[data-action="mavr-enter-ar"]');
+    const xrnote = region(root, 'mavr-xr-note');
+    const onHudClick = (e) => {
+        const button = e.target.closest('[data-action]');
+        if (!button || !stage.contains(button)) {
+            return;
+        }
+        if (button.dataset.action === 'mavr-enter-vr') {
+            e.preventDefault();
+            enterXr('vr');
+        } else if (button.dataset.action === 'mavr-enter-ar') {
+            e.preventDefault();
+            enterXr('ar');
+        } else if (button.dataset.action === 'mavr-exit-xr') {
+            e.preventDefault();
+            xr.exit();
+        }
+    };
+    stage.addEventListener('click', onHudClick);
+    // Taps on the AR overlay's buttons and panels must not also select in the room.
+    const onBeforeXrSelect = (e) => {
+        if (e.target.closest('button, a, input, select, textarea, label, [data-region="mavr-overlay"], .mavr-hud-buttons')) {
+            e.preventDefault();
+        }
+    };
+    stage.addEventListener('beforexrselect', onBeforeXrSelect);
+
+    if (!window.isSecureContext && xrnote) {
+        xrnote.textContent = strings.xrinsecure;
+        xrnote.classList.remove('d-none');
+    }
+    detect().then((info) => {
+        if (stopped) {
+            return undefined;
+        }
+        if (vrbutton && info.vr) {
+            vrbutton.textContent = strings.entervr;
+            vrbutton.classList.remove('d-none');
+        }
+        if (arbutton && info.ar) {
+            arbutton.textContent = info.headset ? strings.entermr : strings.enterar;
+            arbutton.classList.remove('d-none');
+        }
+        if (info.vr || info.ar) {
+            // Ready before the first click, so entering XR keeps the user's gesture.
+            ensureXrPanels();
+        }
+        return undefined;
+    }).catch((error) => Log.debug(error));
+
+    // Session messages: state changes, effects and the end of the time.
+    const unsubscribe = session.on((message) => {
+        if (stopped) {
+            return;
+        }
+        if (message.type === 'timeup') {
+            if (xr.mode) {
+                xr.exit();
+            }
+            return;
+        }
+        if (message.type !== 'change') {
+            return;
+        }
+        applyState();
+        panels.refresh();
+        updateWrist();
+        message.unlocked.forEach((objective) => {
+            if (objective.type === 'visit_zone' && objective.zone && inside.has(objective.zone) &&
+                    !enteredrecorded.has(objective.zone)) {
+                const zone = zonesOf(current.doc).find((z) => z.id === objective.zone);
+                if (zone) {
+                    enterZone(zone);
+                }
             }
         });
+        message.effects.forEach((effect) => {
+            if (effect.do === 'teleport') {
+                goToSpawn(effect.target);
+            } else if (effect.do === 'open_question') {
+                openQuestion(Number(effect.target));
+            } else if (effect.do === 'play_media') {
+                const record = mediaOf(effect.target);
+                if (record) {
+                    playMedia(record);
+                }
+            }
+        });
+    });
+
+    // Frame loop.
+    const clock = new THREE.Clock();
+    renderer.setAnimationLoop((time, frame) => {
+        const dt = clock.getDelta();
+        if (!xrmode) {
+            controls.update(dt);
+        } else {
+            if ((xrmode === 'ar' || xrmode === 'mr') && !placed) {
+                lasthit = xr.getHitPose(frame);
+                reticle.visible = !!lasthit;
+                if (lasthit) {
+                    reticle.matrix.fromArray(lasthit.transform.matrix);
+                }
+            }
+            if (xrinput) {
+                xrinput.update(dt);
+            }
+            if (xrpanels) {
+                xrpanels.update(dt);
+            }
+            wristclock += dt;
+            if (wristclock >= WRIST_INTERVAL) {
+                wristclock = 0;
+                updateWrist();
+            }
+        }
+        testZones();
+        current.handle.update(dt, clock.elapsedTime);
         renderer.render(scene3, camera);
     });
 
-    session.start('builtin-3d', sceneid);
-    session.startResume(() => ({scene: sceneid, position: controls.getPosition(), yaw: controls.getYaw()}));
+    session.start('builtin-3d', sceneid());
+    session.startResume(() => (xrmode ? null : {scene: sceneid(), position: controls.getPosition(), yaw: controls.getYaw()}));
     clearMessage(root, strings.loading);
 
     // Behat hooks.
     root.dataset.mavrReady = '3d';
     root.mavrTest = {
         enterZone: (name) => {
-            const zone = zones.find((z) => z.name === name || plainText(z.name) === name);
+            const zone = zonesOf(current.doc).find((z) => z.name === name || plainText(z.name) === name);
             if (!zone) {
                 return false;
             }
@@ -625,8 +1044,8 @@ const run = (p) => {
             return true;
         },
         clickObject: (name) => {
-            const matches = interactables.filter((i) => {
-                const record = items.get(i.id);
+            const matches = (Array.isArray(current.doc.interactables) ? current.doc.interactables : []).filter((i) => {
+                const record = current.handle.items.get(i.id);
                 const title = i.content && i.content.title ? plainText(i.content.title) : '';
                 return record && record.group.visible && (i.name === name || plainText(i.name) === name || title === name);
             });
@@ -637,6 +1056,7 @@ const run = (p) => {
             activate(item);
             return true;
         },
+        currentScene: () => sceneid(),
     };
     canvas.focus({preventScroll: true});
 
@@ -647,19 +1067,44 @@ const run = (p) => {
                 return;
             }
             stopped = true;
+            p.setStopped();
+            if (xr.mode) {
+                xr.exit();
+            }
             renderer.setAnimationLoop(null);
             observer.disconnect();
             controls.detach();
             unsubscribe();
+            stage.removeEventListener('click', onHudClick);
+            stage.removeEventListener('beforexrselect', onBeforeXrSelect);
             panels.close();
-            if (lockedtimer) {
-                window.clearTimeout(lockedtimer);
+            if (messagetimer) {
+                window.clearTimeout(messagetimer);
+            }
+            if (xrinput) {
+                xrinput.dispose();
+                xrinput = null;
+            }
+            if (xrpanels) {
+                xrpanels.dispose();
+                xrpanels = null;
+            }
+            if (wrist) {
+                wrist.dispose();
+                wrist = null;
             }
             session.stop();
-            disposeTree(scene3);
+            current.handle.dispose();
+            reticle.geometry.dispose();
+            reticle.material.dispose();
             renderer.dispose();
+            [vrbutton, arbutton, exitbutton, xrnote, xrstatus].forEach((element) => {
+                if (element) {
+                    element.classList.add('d-none');
+                }
+            });
             stage.classList.add('d-none');
-            stage.classList.remove('mavr-touch');
+            stage.classList.remove('mavr-touch', 'mavr-xr', 'mavr-xr-overlay');
             delete root.dataset.mavrReady;
             delete root.mavrTest;
         },

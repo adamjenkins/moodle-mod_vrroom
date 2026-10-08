@@ -1,0 +1,105 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_mavr/editor_page
+
+    The room editor's frame: toolbar, tabs, outline, 3D preview, inspector and the tasks panel.
+    mod_mavr/editor_app fills the regions once the document is loaded.
+
+    Classes required for JS:
+    * mavr-editor
+
+    Data attributes required for JS:
+    * data-region="mavr-editor", data-cmid
+    * data-action="mavr-editor-add" with data-kind (and data-media for audio and video)
+    * data-action="mavr-editor-mode" with data-mode
+    * data-action="mavr-editor-undo", "mavr-editor-redo", "mavr-editor-save", "mavr-editor-tab" with data-tab
+    * data-region="mavr-editor-status", "mavr-editor-attempts", "mavr-editor-room", "mavr-editor-outline",
+      "mavr-editor-stage", "mavr-editor-canvas", "mavr-editor-message", "mavr-editor-inspector",
+      "mavr-editor-tasks", "mavr-editor-logic", "mavr-editor-live"
+
+    Context variables required for this template:
+    * rootid - id of the editor's root element
+    * cmid - course module id
+    * viewurl - URL of the activity page
+
+    Example context (json):
+    {
+        "rootid": "mavr-editor-12",
+        "cmid": 12,
+        "viewurl": "https://example.com/mod/mavr/view.php?id=12"
+    }
+}}
+<div class="mavr-editor" id="{{rootid}}" data-region="mavr-editor" data-cmid="{{cmid}}">
+    <div class="mavr-editor-toolbar d-flex flex-wrap align-items-center gap-2 mb-2" role="toolbar" aria-label="{{#str}}editor, mod_mavr{{/str}}">
+        <div class="dropdown">
+            <button type="button" class="btn btn-secondary dropdown-toggle" id="mavr-editor-add-{{cmid}}"
+                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
+                {{#str}}editoradd, mod_mavr{{/str}}
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="mavr-editor-add-{{cmid}}">
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="hotspot">{{#str}}editoraddhotspot, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="model">{{#str}}editoraddmodel, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="image">{{#str}}editoraddimage, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="text">{{#str}}editoraddtext, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="zone">{{#str}}editoraddzone, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="spawn">{{#str}}editoraddspawn, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="portal">{{#str}}editoraddportal, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="grabbable">{{#str}}editoraddgrabbable, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="prop">{{#str}}editoraddprop, mod_mavr{{/str}}</button></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">{{#str}}editoraddmedia, mod_mavr{{/str}}</h6></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="media" data-media="audio">{{#str}}editormedia_audio, mod_mavr{{/str}}</button></li>
+                <li><button type="button" class="dropdown-item" data-action="mavr-editor-add" data-kind="media" data-media="video">{{#str}}editormedia_video, mod_mavr{{/str}}</button></li>
+            </ul>
+        </div>
+        <div class="btn-group" role="group" aria-label="{{#str}}editormodetranslate, mod_mavr{{/str}}, {{#str}}editormoderotate, mod_mavr{{/str}}, {{#str}}editormodescale, mod_mavr{{/str}}">
+            <button type="button" class="btn btn-outline-secondary active" data-action="mavr-editor-mode" data-mode="translate" aria-pressed="true">{{#str}}editormodetranslate, mod_mavr{{/str}}</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="mavr-editor-mode" data-mode="rotate" aria-pressed="false">{{#str}}editormoderotate, mod_mavr{{/str}}</button>
+            <button type="button" class="btn btn-outline-secondary" data-action="mavr-editor-mode" data-mode="scale" aria-pressed="false">{{#str}}editormodescale, mod_mavr{{/str}}</button>
+        </div>
+        <button type="button" class="btn btn-secondary" data-action="mavr-editor-undo" disabled>{{#str}}editorundo, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-secondary" data-action="mavr-editor-redo" disabled>{{#str}}editorredo, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-primary" data-action="mavr-editor-save" disabled>{{#str}}editorsave, mod_mavr{{/str}}</button>
+        <a class="btn btn-outline-secondary" href="{{viewurl}}">{{#str}}editorpreview, mod_mavr{{/str}}</a>
+        <span class="ms-2" data-region="mavr-editor-status" role="status">{{#str}}editorloading, mod_mavr{{/str}}</span>
+    </div>
+    <div class="alert alert-info d-none" data-region="mavr-editor-attempts">{{#str}}editorattemptsexist, mod_mavr{{/str}}</div>
+    <ul class="nav nav-tabs mb-2" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link active" id="mavr-editor-tab-room-{{cmid}}" role="tab" aria-selected="true"
+                    aria-controls="mavr-editor-room-{{cmid}}" data-action="mavr-editor-tab" data-tab="room">{{#str}}editortabroom, mod_mavr{{/str}}</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button type="button" class="nav-link" id="mavr-editor-tab-tasks-{{cmid}}" role="tab" aria-selected="false" tabindex="-1"
+                    aria-controls="mavr-editor-tasks-{{cmid}}" data-action="mavr-editor-tab" data-tab="tasks">{{#str}}editortabtasks, mod_mavr{{/str}}</button>
+        </li>
+    </ul>
+    <div class="mavr-editor-room d-flex flex-wrap gap-3" id="mavr-editor-room-{{cmid}}" role="tabpanel"
+         aria-labelledby="mavr-editor-tab-room-{{cmid}}" data-region="mavr-editor-room">
+        <nav class="mavr-editor-outline" data-region="mavr-editor-outline" aria-label="{{#str}}editoroutline, mod_mavr{{/str}}"></nav>
+        <div class="mavr-editor-stage flex-grow-1" data-region="mavr-editor-stage">
+            <canvas data-region="mavr-editor-canvas" tabindex="0" aria-label="{{#str}}editorcanvaslabel, mod_mavr{{/str}}" aria-describedby="mavr-editor-help-{{cmid}}"></canvas>
+            <p class="visually-hidden" id="mavr-editor-help-{{cmid}}">{{#str}}editorkeyboardhelp, mod_mavr{{/str}}</p>
+            <div class="alert alert-warning d-none" data-region="mavr-editor-message" role="status"></div>
+        </div>
+        <aside class="mavr-editor-inspector" data-region="mavr-editor-inspector" aria-label="{{#str}}editorinspector, mod_mavr{{/str}}"></aside>
+    </div>
+    <div class="d-none" id="mavr-editor-tasks-{{cmid}}" role="tabpanel" aria-labelledby="mavr-editor-tab-tasks-{{cmid}}"
+         data-region="mavr-editor-tasks"><div data-region="mavr-editor-logic"></div></div>
+    <div class="visually-hidden" aria-live="polite" data-region="mavr-editor-live"></div>
+</div>
