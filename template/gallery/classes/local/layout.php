@@ -45,7 +45,7 @@ final class layout {
      * the stations are spread evenly on a circle: station k at φ = k·360/count, position
      * (r sin φ, 0, −r cos φ), yaw −φ, where r = circle_radius($count).
      *
-     * @param array|null $preset preset definition from \mod_vrroom\local\scene\presets::get(), or null for uploads
+     * @param array|null $preset environment_registry definition (preset or pack room), or null for uploads
      * @param int $count number of stations
      * @return array[] list of ['position' => [x, y, z], 'yaw' => degrees]
      */

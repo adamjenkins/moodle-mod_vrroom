@@ -229,6 +229,15 @@ export const buildEnvironment = (THREE, environment, loader, resolveUrl = null) 
     let url = null;
     if (env.type === 'model' && env.file) {
         url = resolveUrl ? resolveUrl(env.file) : (env.file.url || null);
+    } else if (env.type === 'pack') {
+        // A room from a room pack: the launch config (or the editor's environment list) gives its URL.
+        // Without one the pack is not installed, and the caller falls back to a plain hall sized from
+        // env.bounds.
+        const ref = {kind: 'pack', pack: env.pack, room: env.room, url: env.url || null};
+        url = resolveUrl ? resolveUrl(ref) : ref.url;
+        if (!url) {
+            return Promise.reject(new Error(`Room ${env.pack}/${env.room} is not installed on this site.`));
+        }
     }
 
     if (url) {

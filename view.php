@@ -27,6 +27,7 @@ require_once($CFG->dirroot . '/mod/vrroom/lib.php');
 
 use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\runtime\registry as runtime_registry;
+use mod_vrroom\local\scene\environment_registry;
 
 $id = required_param('id', PARAM_INT);
 [$course, $cm] = get_course_and_cm_from_cmid($id, 'vrroom');
@@ -105,6 +106,16 @@ if ($canattempt) {
     $message = get_string('cannotattempt', 'vrroom');
 }
 
+// Rooms from room packs: credits for everyone, a warning to teachers when a pack room is not installed.
+$scenes = [];
+foreach ($DB->get_fieldset_select('vrroom_scenes', 'scenejson', 'vrroomid = ?', [$vrroom->id]) as $scenejson) {
+    $scene = json_decode((string)$scenejson, true);
+    if (is_array($scene)) {
+        $scenes[] = $scene;
+    }
+}
+$environments = environment_registry::describe_scenes($scenes);
+
 $rootid = 'vrroom-root-' . $cm->id;
 $templatecontext = [
     'rootid' => $rootid,
@@ -117,6 +128,8 @@ $templatecontext = [
     'reporturl' => has_capability('mod/vrroom:viewreports', $context)
         ? (new moodle_url('/mod/vrroom/report.php', ['id' => $cm->id]))->out(false) : '',
     'editurl' => $canpreview ? (new moodle_url('/mod/vrroom/edit.php', ['id' => $cm->id]))->out(false) : '',
+    'hascredits' => !empty($environments['credits']),
+    'credits' => $environments['credits'],
 ];
 
 if ($runtime !== null) {
@@ -137,6 +150,12 @@ echo $OUTPUT->header();
 if ($runtimeerror !== '') {
     // The message is a lang string whose only variable part went through s() above.
     echo $OUTPUT->notification($runtimeerror, \core\output\notification::NOTIFY_ERROR);
+}
+if ($environments['missing'] && $canpreview) {
+    echo $OUTPUT->notification(
+        get_string('envmissing', 'vrroom', s(implode(', ', $environments['missing']))),
+        \core\output\notification::NOTIFY_WARNING
+    );
 }
 echo $OUTPUT->render_from_template('mod_vrroom/view_page', $templatecontext);
 echo $OUTPUT->footer();

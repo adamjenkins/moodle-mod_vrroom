@@ -80,7 +80,7 @@
         <textarea class="form-control form-control-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}" rows="4">{{value}}</textarea>
         {{/istextarea}}
         {{#isselect}}
-        <select class="form-select form-select-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}">
+        <select class="form-select form-select-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"{{#hintid}} aria-describedby="{{hintid}}"{{/hintid}}>
             {{#options}}
             <option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>
             {{/options}}

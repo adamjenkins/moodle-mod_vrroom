@@ -17,6 +17,7 @@
 namespace vrroomtemplate_escape;
 
 use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\scene\scene_validator;
 use mod_vrroom\local\template\compiled_activity;
 
@@ -32,6 +33,19 @@ use mod_vrroom\local\template\compiled_activity;
 final class template_test extends \advanced_testcase {
     /** @var string Fixed scene id used by the configs built here. */
     private const SCENEID = '7a2e4c1d-3b5f-4e6a-8c9d-0f1e2d3c4b5a';
+
+    protected function tearDown(): void {
+        environment_registry::phpunit_set_packs(null);
+        parent::tearDown();
+    }
+
+    /**
+     * Install the fixture room pack (testpack/a: 4 anchors and an exit; testpack/b: start yaw 90, no exit).
+     */
+    private function use_test_pack(): void {
+        global $CFG;
+        environment_registry::phpunit_set_packs(['testpack' => $CFG->dirroot . '/mod/vrroom/tests/fixtures/envpack']);
+    }
 
     /**
      * A module context to hold mod_vrroom file areas (compile only reads files from it).
@@ -422,6 +436,77 @@ final class template_test extends \advanced_testcase {
         $this->assertEquals(0.5, $model['fit']);
         $this->assertSame('h-pz2', $model['opens']);
         $this->assertSame(['area' => 'models', 'itemid' => 2, 'filepath' => '/', 'filename' => 'cube.glb'], $model['file']);
+    }
+
+    /**
+     * A room from a room pack: environment block, start, anchors; the story panel follows the start yaw.
+     */
+    public function test_compile_pack_room(): void {
+        $this->resetAfterTest();
+        $this->use_test_pack();
+        $context = $this->make_context();
+
+        $compiled = (new template())->compile($this->make_config([[], []], [
+            'environment' => 'testpack/b',
+            'story' => 'Find the way out.',
+        ]), $context);
+        $this->assert_valid($compiled);
+        $scene = $compiled->scenes[0];
+        $this->assertSame(environment_registry::get('testpack/b')['environment'], $scene['environment']);
+        $this->assertSame([['id' => template::SPAWN_ID, 'position' => [0.0, 0.0, 0.0], 'yaw' => 90.0]], $scene['spawn']);
+        $items = $this->by_id($scene['interactables']);
+        // Start (0, 0, 0) at yaw 90 looks along -X: the story stands 1.9 m ahead, facing back.
+        $this->assertSame([-1.9, 2.2, 0.0], $items['t-story']['position']);
+        $this->assertSame([0.0, 90.0, 0.0], $items['t-story']['rotation']);
+
+        // Room a has an exit anchor (0, 0, -9.5): the door goes there.
+        $compiled = (new template())->compile($this->make_config([[]], ['environment' => 'testpack/a']), $context);
+        $this->assert_valid($compiled);
+        $props = $this->by_id($compiled->scenes[0]['props']);
+        $this->assertArrayHasKey('p-exit', $props);
+
+        // Five puzzles do not fit four anchors.
+        $this->expectException(\moodle_exception::class);
+        (new template())->compile($this->make_config(array_fill(0, 5, []), ['environment' => 'testpack/a']), $context);
+    }
+
+    /**
+     * Without the pack the activity compiles from its stored snapshot, identically.
+     */
+    public function test_compile_from_snapshot_without_pack(): void {
+        $this->resetAfterTest();
+        $this->use_test_pack();
+        $context = $this->make_context();
+        $config = $this->make_config([[], []], ['environment' => 'testpack/a', 'story' => 'Hello.']);
+        $config->envsnapshot = environment_registry::snapshot(environment_registry::get('testpack/a'));
+        $config = json_decode(json_encode($config));
+        $installed = (new template())->compile($config, $context);
+
+        environment_registry::phpunit_set_packs([]);
+        $missing = (new template())->compile($config, $context);
+        $this->assert_valid($missing);
+        $this->assertSame(json_encode($installed->scenes), json_encode($missing->scenes));
+
+        // The extract_config() method keeps the stored missing room only through the stored config's snapshot.
+        $config = (new template())->extract_config((object)['escape_environment' => 'testpack/a', 'escape_title' => ['One']]);
+        $this->assertSame(template::DEFAULT_ENVIRONMENT, $config->environment);
+        $this->assertNull($config->envsnapshot);
+    }
+
+    /**
+     * Validation limits the puzzles to the pack room's anchors.
+     */
+    public function test_pack_room_validation(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $this->use_test_pack();
+        $course = $this->getDataGenerator()->create_course();
+        $titles = array_map(fn ($i) => "Puzzle {$i}", range(1, 5));
+        $template = new template();
+        $errors = $template->validation(['escape_environment' => 'testpack/a', 'escape_title' => $titles], [], (int)$course->id);
+        $this->assertSame(get_string('errortoomanypuzzles', 'vrroomtemplate_escape', 4), $errors['escape_environment']);
+        $errors = $template->validation(['escape_environment' => 'testpack/zz', 'escape_title' => ['One']], [], (int)$course->id);
+        $this->assertSame(get_string('required'), $errors['escape_environment']);
     }
 
     /**

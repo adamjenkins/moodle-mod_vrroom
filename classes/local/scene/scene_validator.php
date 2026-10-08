@@ -406,8 +406,25 @@ final class scene_validator {
             }
         } else if ($type === 'model') {
             self::check_file($environment['file'] ?? null, ['environment', 'assets'], 'environment.file', $errors);
+        } else if ($type === 'pack') {
+            // Shape only: whether the pack is installed is never checked here, so an activity restored
+            // onto a site without the pack stays loadable and editable (it falls back to a plain hall).
+            $pack = $environment['pack'] ?? null;
+            if (!is_string($pack) || !\core_component::is_valid_plugin_name(environment_registry::PLUGINTYPE, $pack)) {
+                $errors[] = 'environment.pack must be a room pack name';
+            }
+            $room = $environment['room'] ?? null;
+            if (!is_string($room) || preg_match(environment_registry::ROOM_PATTERN, $room) !== 1) {
+                $errors[] = 'environment.room must be a room id';
+            }
+            if (!array_key_exists('bounds', $environment)) {
+                $errors[] = 'environment.bounds is required for a room from a room pack';
+            }
+            if (array_key_exists('file', $environment)) {
+                $errors[] = 'environment.file is not allowed for a room from a room pack';
+            }
         } else {
-            $errors[] = 'environment.type must be "preset" or "model"';
+            $errors[] = 'environment.type must be "preset", "model" or "pack"';
         }
         if (array_key_exists('sky', $environment) && !self::is_colour($environment['sky'])) {
             $errors[] = 'environment.sky must be a #rrggbb colour';

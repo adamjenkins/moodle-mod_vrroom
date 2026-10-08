@@ -249,6 +249,58 @@ JSON
     }
 
     /**
+     * A room from a room pack: valid by shape alone, whether or not the pack is installed.
+     */
+    public function test_pack_environment(): void {
+        $scene = self::valid_scene();
+        $scene['environment'] = [
+            'type' => 'pack',
+            'pack' => 'rooms',
+            'room' => 'atrium',
+            'sky' => '#20242a',
+            'lights' => [],
+            'bounds' => ['min' => [-3.8, 0, -5.8], 'max' => [19.6, 0, 6.0]],
+        ];
+        // No pack named "rooms" is installed in the test site's registry (empty pack list).
+        environment_registry::phpunit_set_packs([]);
+        try {
+            $this->assertSame([], scene_validator::validate($scene));
+        } finally {
+            environment_registry::phpunit_set_packs(null);
+        }
+
+        $cases = [
+            'environment.bounds is required' => function (array $env): array {
+                unset($env['bounds']);
+                return $env;
+            },
+            'environment.pack must be a room pack name' => function (array $env): array {
+                $env['pack'] = 'Rooms!';
+                return $env;
+            },
+            'environment.room must be a room id' => function (array $env): array {
+                $env['room'] = '../atrium';
+                return $env;
+            },
+            'environment.file is not allowed' => function (array $env): array {
+                $env['file'] = ['area' => 'environment', 'itemid' => 0, 'filepath' => '/', 'filename' => 'room.glb'];
+                return $env;
+            },
+        ];
+        foreach ($cases as $expected => $change) {
+            $broken = $scene;
+            $broken['environment'] = $change($scene['environment']);
+            $errors = scene_validator::validate($broken);
+            $this->assertNotEmpty($errors, $expected);
+            $this->assertStringContainsString($expected, implode("\n", $errors));
+        }
+
+        $broken = $scene;
+        $broken['environment']['type'] = 'hubs';
+        $this->assertContains('environment.type must be "preset", "model" or "pack"', scene_validator::validate($broken));
+    }
+
+    /**
      * A room set: valid rooms, ids unique across rooms, portals lead to start points of the set.
      */
     public function test_validate_set(): void {

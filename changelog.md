@@ -7,6 +7,8 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Changed
 
+- Escape chain: the story panel follows the start point's yaw (unchanged for the built-in rooms).
+- The plain-hall fallback of the viewer is centred on the stored bounds.
 - Keyboard: A/D and ←/→ turn; Q/E step sideways (previously the reverse).
 - Renamed the plugin from `mod_mavr` to `mod_vrroom` ("VR room"); sub-plugin types
   `vrroomruntime` and `vrroomtemplate`. Never released under the old name.
@@ -14,6 +16,14 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Added
 
+- Sub-plugin type `vrroomenv` (directory `environment/`, room packs) with
+  `\mod_vrroom\local\scene\environment_registry` (presets and pack rooms in one key space,
+  manifest schema `vrroom-envpack/1`), scene environment type `pack`, the file endpoint
+  `envfile.php`, credits on the activity page and a missing-pack warning for teachers. Templates
+  store an `envsnapshot` of a pack room's layout. `$plugin->version` 2026100802 (registers the new
+  sub-plugin type; no schema or web-service change).
+- Viewer and room editor: GLTFLoader plugin for `MOZ_lightmap` (`vrroomruntime_builtin/mozlightmap`,
+  MPL-2.0, adapted from Hubs).
 - Bar under the 3D room: Fullscreen toggle; user preferences `mod_vrroom_invertx`,
   `mod_vrroom_inverty`, `mod_vrroom_locky` (exported by the privacy provider).
 - Collision for walking: 0.3 m body radius against the environment, props and 3D models, with

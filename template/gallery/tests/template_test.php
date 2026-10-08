@@ -17,6 +17,7 @@
 namespace vrroomtemplate_gallery;
 
 use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\scene\scene_validator;
 
 /**
@@ -31,6 +32,19 @@ use mod_vrroom\local\scene\scene_validator;
 final class template_test extends \advanced_testcase {
     /** @var string Fixed scene id used by the configs built here. */
     private const SCENEID = '5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11';
+
+    protected function tearDown(): void {
+        environment_registry::phpunit_set_packs(null);
+        parent::tearDown();
+    }
+
+    /**
+     * Install the fixture room pack (rooms testpack/a with 4 anchors and testpack/b).
+     */
+    private function use_test_pack(): void {
+        global $CFG;
+        environment_registry::phpunit_set_packs(['testpack' => $CFG->dirroot . '/mod/vrroom/tests/fixtures/envpack']);
+    }
 
     /**
      * A module context to hold mod_vrroom file areas (compile only reads files from it).
@@ -371,6 +385,82 @@ final class template_test extends \advanced_testcase {
         $config = $this->make_config(array_fill(0, 9, []), 'courtyard');
         $this->expectException(\moodle_exception::class);
         (new template())->compile($config, $context);
+    }
+
+    /**
+     * A room from a room pack: its environment block, start point and anchors; no snapshot needed.
+     */
+    public function test_compile_pack_room(): void {
+        $this->resetAfterTest();
+        $this->use_test_pack();
+        $context = $this->make_context();
+        $config = $this->make_config([['title' => 'One'], ['title' => 'Two']], 'testpack/a');
+
+        $compiled = (new template())->compile($config, $context);
+        $this->assert_valid($compiled);
+        $scene = $compiled->scenes[0];
+        $def = environment_registry::get('testpack/a');
+        $this->assertSame($def['environment'], $scene['environment']);
+        $this->assertSame('pack', $scene['environment']['type']);
+        $this->assertSame([['id' => 'spawn-main', 'position' => [0.0, 0.0, 8.0], 'yaw' => 0.0]], $scene['spawn']);
+        // Station 1 sits at anchor (-8, 0, 4), yaw 90 (front +X): zone 1.5 m in front.
+        $zones = $this->by_id($scene['zones']);
+        $this->assertSame([-6.5, 1.5, 4.0], $zones['z-st1']['center']);
+        $this->assertSame([6.5, 1.5, 4.0], $zones['z-st2']['center']);
+
+        // Five stations do not fit the room's four anchors.
+        $this->expectException(\moodle_exception::class);
+        (new template())->compile($this->make_config(array_fill(0, 5, []), 'testpack/a'), $context);
+    }
+
+    /**
+     * Without the pack the activity compiles from the stored snapshot (the viewer shows a plain hall).
+     */
+    public function test_compile_from_snapshot_without_pack(): void {
+        $this->resetAfterTest();
+        $this->use_test_pack();
+        $context = $this->make_context();
+        $config = $this->make_config([['title' => 'One'], ['title' => 'Two']], 'testpack/a');
+        $config->envsnapshot = environment_registry::snapshot(environment_registry::get('testpack/a'));
+        $config = json_decode(json_encode($config));
+        $installed = (new template())->compile($config, $context);
+
+        environment_registry::phpunit_set_packs([]);
+        $missing = (new template())->compile($config, $context);
+        $this->assert_valid($missing);
+        $this->assertSame(json_encode($installed->scenes), json_encode($missing->scenes));
+
+        // Without a snapshot it cannot compile.
+        unset($config->envsnapshot);
+        $this->expectException(\moodle_exception::class);
+        (new template())->compile($config, $context);
+    }
+
+    /**
+     * extract_config() stores a snapshot for a pack room, none for a preset; validation limits the
+     * stations to the room's anchors.
+     */
+    public function test_pack_room_config_and_validation(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $this->use_test_pack();
+        $template = new template();
+
+        $config = $template->extract_config((object)['gallery_environment' => 'testpack/a', 'gallery_title' => ['One']]);
+        $this->assertSame('testpack/a', $config->environment);
+        $this->assertSame(environment_registry::snapshot(environment_registry::get('testpack/a')), $config->envsnapshot);
+        $config = $template->extract_config((object)['gallery_environment' => 'courtyard', 'gallery_title' => ['One']]);
+        $this->assertNull($config->envsnapshot);
+        // An unknown key falls back to the default.
+        $config = $template->extract_config((object)['gallery_environment' => 'testpack/zz', 'gallery_title' => ['One']]);
+        $this->assertSame(template::DEFAULT_ENVIRONMENT, $config->environment);
+
+        $course = $this->getDataGenerator()->create_course();
+        $titles = array_map(fn ($i) => "Station {$i}", range(1, 5));
+        $errors = $template->validation(['gallery_environment' => 'testpack/a', 'gallery_title' => $titles], [], (int)$course->id);
+        $this->assertSame(get_string('errortoomanystations', 'vrroomtemplate_gallery', 4), $errors['gallery_environment']);
+        $errors = $template->validation(['gallery_environment' => 'testpack/c', 'gallery_title' => ['One']], [], (int)$course->id);
+        $this->assertSame(get_string('required'), $errors['gallery_environment']);
     }
 
     /**

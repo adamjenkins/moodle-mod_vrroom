@@ -22,6 +22,7 @@ use mod_vrroom\local\attempt\hint_manager;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\questions\mode;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\xapi\iri;
 
 /**
@@ -173,6 +174,9 @@ final class config_builder {
         if (isset($scene['environment']['file']) && is_array($scene['environment']['file'])) {
             $scene['environment']['file'] = self::file_ref($scene['environment']['file'], $context);
         }
+        if (isset($scene['environment']) && is_array($scene['environment']) && ($scene['environment']['type'] ?? '') === 'pack') {
+            $scene['environment'] = self::prepare_pack_environment($scene['environment']);
+        }
         foreach (['spawn', 'zones', 'interactables'] as $list) {
             if (empty($scene[$list]) || !is_array($scene[$list])) {
                 continue;
@@ -197,6 +201,30 @@ final class config_builder {
             }
         }
         return $scene;
+    }
+
+    /**
+     * Add the model URL, room name and credit of a room from a room pack, or mark it missing.
+     *
+     * The viewer falls back to a plain hall sized from the stored bounds when there is no URL.
+     *
+     * @param array $environment environment block of type 'pack'
+     * @return array
+     */
+    private static function prepare_pack_environment(array $environment): array {
+        unset($environment['url'], $environment['roomname'], $environment['credit'], $environment['missing']);
+        $def = null;
+        if (is_string($environment['pack'] ?? null) && is_string($environment['room'] ?? null)) {
+            $def = environment_registry::get_pack_room($environment['pack'], $environment['room']);
+        }
+        if ($def === null) {
+            $environment['missing'] = true;
+            return $environment;
+        }
+        $environment['url'] = $def['url'];
+        $environment['roomname'] = $def['name'];
+        $environment['credit'] = $def['credit'];
+        return $environment;
     }
 
     /**

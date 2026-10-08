@@ -16,7 +16,7 @@
 
 namespace vrroomtemplate_blank;
 
-use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
 
 /**
@@ -42,6 +42,9 @@ class template extends \mod_vrroom\local\template\base {
     /** @var string Scene id of the single spawn point. */
     public const SPAWN_ID = 's-start';
 
+    /** @var int|null Instance id of the activity being edited, captured from the form in define_form(). */
+    private ?int $editinginstance = null;
+
     /**
      * Add the empty room fields to the activity form.
      *
@@ -51,14 +54,21 @@ class template extends \mod_vrroom\local\template\base {
      * @return string[] names of the non-repeated elements added (headers excluded)
      */
     public function define_form(\moodleform_mod $form, \MoodleQuickForm $mform, int $courseid): array {
+        $instance = (int)$form->get_instance();
+        $this->editinginstance = $instance > 0 ? $instance : null;
+        $config = $this->editinginstance ? self::load_stored_config($this->editinginstance) : null;
+
         $mform->addElement('header', 'blank_heading', get_string('blankheading', self::COMPONENT));
         $mform->setExpanded('blank_heading');
 
+        // Presets and installed pack rooms grouped by category; a stored room this site lacks stays a
+        // choice (selectgroups drops any submitted value that is not an option).
+        $storedenvironment = $config !== null && is_string($config->environment ?? null) ? $config->environment : null;
         $mform->addElement(
-            'select',
+            'selectgroups',
             'blank_environment',
             get_string('environment', self::COMPONENT),
-            presets::get_choices()
+            environment_registry::get_choices($storedenvironment)
         );
         $mform->setDefault('blank_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('blank_environment', 'environment', self::COMPONENT);
@@ -80,7 +90,7 @@ class template extends \mod_vrroom\local\template\base {
             }
             return;
         }
-        $defaultvalues['blank_environment'] = self::clean_environment($config->environment ?? null);
+        $defaultvalues['blank_environment'] = self::resolve_environment($config->environment ?? null, $config)[0];
     }
 
     /**
@@ -93,7 +103,8 @@ class template extends \mod_vrroom\local\template\base {
      */
     public function validation(array $data, array $files, int $courseid): array {
         $environment = $data['blank_environment'] ?? self::DEFAULT_ENVIRONMENT;
-        if (!is_string($environment) || presets::get($environment) === null) {
+        $stored = $this->editinginstance !== null ? self::load_stored_config($this->editinginstance) : null;
+        if (!is_string($environment) || self::resolve_environment($environment, $stored, false) === null) {
             return ['blank_environment' => get_string('required')];
         }
         return [];
@@ -109,6 +120,7 @@ class template extends \mod_vrroom\local\template\base {
      */
     public function extract_config(\stdClass $formdata): \stdClass {
         $sceneid = '';
+        $existing = null;
         if (!empty($formdata->instance)) {
             $existing = self::load_stored_config((int)$formdata->instance);
             if ($existing && is_string($existing->sceneid ?? null) && self::is_uuid($existing->sceneid)) {
@@ -118,10 +130,12 @@ class template extends \mod_vrroom\local\template\base {
         if ($sceneid === '') {
             $sceneid = strtolower(\core\uuid::generate());
         }
+        [$environment, $def] = self::resolve_environment($formdata->blank_environment ?? null, $existing);
         return (object)[
             'schema' => self::SCHEMA,
             'sceneid' => $sceneid,
-            'environment' => self::clean_environment($formdata->blank_environment ?? null),
+            'environment' => $environment,
+            'envsnapshot' => environment_registry::snapshot($def),
         ];
     }
 
@@ -143,11 +157,7 @@ class template extends \mod_vrroom\local\template\base {
      * @return compiled_activity
      */
     public function compile(\stdClass $config, \context_module $context): compiled_activity {
-        $environmentid = self::clean_environment($config->environment ?? null);
-        $preset = presets::get($environmentid);
-        if ($preset === null) {
-            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'Unknown environment preset.');
-        }
+        [, $preset] = self::resolve_environment($config->environment ?? null, $config);
         $sceneid = (is_string($config->sceneid ?? null) && self::is_uuid($config->sceneid))
             ? $config->sceneid : strtolower(\core\uuid::generate());
 
@@ -160,14 +170,7 @@ class template extends \mod_vrroom\local\template\base {
             'schema' => 'vrroom-scene/1',
             'id' => $sceneid,
             'name' => get_string('scenename', self::COMPONENT),
-            'environment' => [
-                'type' => 'preset',
-                'preset' => $environmentid,
-                'shape' => $preset['shape'],
-                'sky' => $preset['sky'],
-                'lights' => $preset['lights'],
-                'bounds' => $preset['bounds'],
-            ],
+            'environment' => $preset['environment'],
             'spawn' => [[
                 'id' => self::SPAWN_ID,
                 'position' => $position,
@@ -205,13 +208,26 @@ class template extends \mod_vrroom\local\template\base {
     }
 
     /**
-     * A known preset id, or the default.
+     * Resolve an environment key: an installed preset or pack room, or the stored pack room this site
+     * lacks (rebuilt from the config's snapshot); otherwise the default.
      *
-     * @param mixed $value submitted or stored value
-     * @return string
+     * @param mixed $value submitted or stored key
+     * @param \stdClass|null $config stored config whose snapshot may stand in for a missing room
+     * @param bool $fallback false returns null instead of the default for an unknown key
+     * @return array|null [key, definition]
      */
-    private static function clean_environment($value): string {
-        return (is_string($value) && presets::get($value) !== null) ? $value : self::DEFAULT_ENVIRONMENT;
+    private static function resolve_environment($value, ?\stdClass $config, bool $fallback = true): ?array {
+        if (is_string($value)) {
+            $snapshot = ($config !== null && ($config->environment ?? null) === $value) ? ($config->envsnapshot ?? null) : null;
+            $def = environment_registry::resolve($value, $snapshot);
+            if ($def !== null) {
+                return [$value, $def];
+            }
+        }
+        if (!$fallback) {
+            return null;
+        }
+        return [self::DEFAULT_ENVIRONMENT, environment_registry::get(self::DEFAULT_ENVIRONMENT)];
     }
 
     /**

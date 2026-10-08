@@ -19,6 +19,9 @@ namespace mod_vrroom\backup;
 use backup;
 use backup_controller;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\launch\config_builder;
+use mod_vrroom\local\scene\environment_registry;
+use mod_vrroom\local\template\registry as template_registry;
 use restore_controller;
 
 defined('MOODLE_INTERNAL') || die();
@@ -43,6 +46,11 @@ require_once($CFG->dirroot . '/mod/vrroom/backup/moodle2/restore_vrroom_activity
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrroom_activity_structure_step::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrroom_activity_task::class)]
 final class backup_restore_test extends \advanced_testcase {
+    protected function tearDown(): void {
+        environment_registry::phpunit_set_packs(null);
+        parent::tearDown();
+    }
+
     /**
      * A course with a question bank, a two-station gallery walk (one question) and a student
      * attempt with a visit, an answer and a finish.
@@ -252,6 +260,49 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertEquals(0, $DB->count_records(
             'question_usages',
             ['component' => 'mod_vrroom', 'contextid' => \context_module::instance($newcm->id)->id]
+        ));
+    }
+
+    /**
+     * A gallery in a room-pack room: the scene and the config (with its snapshot) come across
+     * byte-identical; without the pack the restored activity still compiles from the snapshot and
+     * its launch config marks the room missing.
+     */
+    public function test_backup_restore_pack_room(): void {
+        global $CFG, $DB, $USER;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        environment_registry::phpunit_set_packs(['testpack' => $CFG->dirroot . '/mod/vrroom/tests/fixtures/envpack']);
+
+        $course = $this->getDataGenerator()->create_course();
+        $module = $this->getDataGenerator()->create_module('vrroom', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase|Portrait',
+            'gallery_environment' => 'testpack/a',
+        ]);
+        $cm = get_coursemodule_from_instance('vrroom', $module->id, 0, false, MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        $config = json_decode($vrroom->templateconfig);
+        $this->assertSame('testpack/a', $config->environment);
+        $this->assertNotEmpty($config->envsnapshot);
+        $scenejson = $DB->get_field('vrroom_scenes', 'scenejson', ['vrroomid' => $vrroom->id], MUST_EXIST);
+        $this->assertSame('pack', json_decode($scenejson, true)['environment']['type']);
+
+        $newcourseid = $this->backup_and_restore($course, $cm, false);
+        [$new, $newcm] = $this->get_restored($newcourseid);
+        $this->assertSame($vrroom->templateconfig, $new->templateconfig);
+        $this->assertSame($scenejson, $DB->get_field('vrroom_scenes', 'scenejson', ['vrroomid' => $new->id], MUST_EXIST));
+
+        // The pack is gone (another site): compile from the snapshot, launch with a missing room.
+        environment_registry::phpunit_set_packs([]);
+        $newcontext = \context_module::instance($newcm->id);
+        $compiled = template_registry::get('gallery')->compile(json_decode($new->templateconfig), $newcontext);
+        $this->assertSame(json_decode($scenejson, true)['environment'], $compiled->scenes[0]['environment']);
+        $launch = config_builder::build($newcm, $newcontext, $new, null, $USER);
+        $this->assertTrue($launch['scenes'][0]['environment']['missing']);
+        $this->assertArrayNotHasKey('url', $launch['scenes'][0]['environment']);
+        $this->assertSame(['credits' => [], 'missing' => ['testpack/a']], environment_registry::describe_scenes(
+            instance_manager::get_scenes((int)$new->id)
         ));
     }
 

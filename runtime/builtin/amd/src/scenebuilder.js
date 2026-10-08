@@ -776,19 +776,35 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         }
     };
 
-    // The environment, with a plain hall when an uploaded environment fails to load.
-    const makeEnvironment = (environment) => buildEnvironment(THREE, environment, loader, resolveUrl).catch((error) => {
-        onLoadError(error, {kind: 'environment'});
-        const env = environment || {};
-        const b = env.bounds && Array.isArray(env.bounds.min) && Array.isArray(env.bounds.max) ? env.bounds : null;
-        const width = b ? Math.max(2, Number(b.max[0]) - Number(b.min[0]) + 0.8) : 12;
-        const length = b ? Math.max(2, Number(b.max[2]) - Number(b.min[2]) + 0.8) : 12;
-        return buildEnvironment(THREE, Object.assign({}, env, {
-            type: 'preset',
-            file: null,
-            shape: {kind: 'hall', width: width, length: length, height: 3, ceiling: false},
-        }), loader, resolveUrl);
-    });
+    // The environment, with a plain hall when an uploaded environment fails to load or a room from a
+    // room pack is not installed. The hall is centred on the stored bounds (a pack room's bounds need
+    // not be centred on the origin).
+    const makeEnvironment = (environment) => {
+        // The fallback hall's centre, set in the catch and applied after the chain (no nested promise).
+        let offset = null;
+        return buildEnvironment(THREE, environment, loader, resolveUrl).catch((error) => {
+            onLoadError(error, {kind: 'environment'});
+            const env = environment || {};
+            const b = env.bounds && Array.isArray(env.bounds.min) && Array.isArray(env.bounds.max) ? env.bounds : null;
+            const width = b ? Math.max(2, Number(b.max[0]) - Number(b.min[0]) + 0.8) : 12;
+            const length = b ? Math.max(2, Number(b.max[2]) - Number(b.min[2]) + 0.8) : 12;
+            const cx = b ? (Number(b.max[0]) + Number(b.min[0])) / 2 : 0;
+            const cz = b ? (Number(b.max[2]) + Number(b.min[2])) / 2 : 0;
+            if (Number.isFinite(cx) && Number.isFinite(cz)) {
+                offset = {x: cx, z: cz};
+            }
+            return buildEnvironment(THREE, Object.assign({}, env, {
+                type: 'preset',
+                file: null,
+                shape: {kind: 'hall', width: width, length: length, height: 3, ceiling: false},
+            }), loader, resolveUrl);
+        }).then((result) => {
+            if (offset && result && result.group) {
+                result.group.position.set(offset.x, 0, offset.z);
+            }
+            return result;
+        });
+    };
 
     const handle = {
         root: root,

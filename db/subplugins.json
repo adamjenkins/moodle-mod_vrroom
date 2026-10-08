@@ -1,9 +1,11 @@
 {
     "subplugintypes": {
+        "vrroomenv": "environment",
         "vrroomruntime": "runtime",
         "vrroomtemplate": "template"
     },
     "plugintypes": {
+        "vrroomenv": "mod/vrroom/environment",
         "vrroomruntime": "mod/vrroom/runtime",
         "vrroomtemplate": "mod/vrroom/template"
     }

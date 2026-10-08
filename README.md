@@ -82,12 +82,28 @@ No release has been tagged yet (0.1.0, ALPHA). The code includes:
 - Three templates: Gallery walk, Escape chain and Empty room; a room and task editor.
 - Question-bank questions graded by Moodle's question engine, in either question mode.
 - Live mode for small groups (below), built in.
+- Room packs (below): ready-made 3D rooms that templates and the room editor offer next to the
+  simple built-in rooms.
 - xAPI statements through Moodle's xAPI web service, validated and stored by the activity.
 - Teacher reports, privacy provider, backup and restore, course reset and clean uninstall.
 
 Separate, optional: the **companion** run mode (`vrroomruntime_companion` plus the
 `vrroom-companion` container stack) for larger live rooms. Not yet built: Hubs integration,
 spatial analytics and Moodle app support.
+
+## Room packs
+
+A room pack is a sub-plugin of type `vrroomenv`, installed at `mod/vrroom/environment/<name>`. It
+holds 3D rooms (a GLB model and a preview image each) and an `environments.json` manifest
+(schema `vrroom-envpack/1`) giving each room's start point, walkable area, places for stations and
+credit line. The bundled pack `vrroomenv_rooms` ("Bundled rooms", 18 rooms) is a separate
+repository; VR room works without it.
+
+Teachers pick a room in the activity form (Gallery walk, Escape chain, Empty room) or in the room
+editor; rooms are grouped by category. Room files are served to logged-in users by
+`envfile.php`. If a room's pack is not installed (for example after a restore onto another site),
+students see a plain hall of the same size and teachers see a warning on the activity page. The
+credits of the rooms an activity uses are shown on its activity page.
 
 ## Live mode
 
@@ -136,4 +152,7 @@ reports.
 GNU GPL v3 or later; see `LICENSE`. Bundled third-party code is listed in
 `runtime/builtin/thirdpartylibs.xml`. Some grading and reporting code was adapted from
 [mod_gear](https://moodle.org/plugins/mod_gear) by Boban Blagojevic (GPL v3); the files concerned
-carry his copyright line.
+carry his copyright line. The viewer's `MOZ_lightmap` loader plugin
+(`runtime/builtin/amd/src/mozlightmap.js`, baked lighting of Hubs rooms) is adapted from
+[Hubs](https://github.com/Hubs-Foundation/hubs) (`src/components/gltf-model-plus.js`) and is under
+the Mozilla Public License 2.0, as its header says.

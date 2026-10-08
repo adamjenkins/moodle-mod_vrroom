@@ -1,0 +1,63 @@
+{
+  "schema": "vrroom-envpack/1",
+  "rooms": {
+    "a": {
+      "name": "room_a",
+      "category": "learning",
+      "file": "rooms/a/room.glb",
+      "preview": "rooms/a/preview.jpg",
+      "bytes": 1540,
+      "licence": "CC0-1.0",
+      "credit": "\"Test room A\" by VR room tests, CC0-1.0",
+      "source": "https://example.com/rooms/a",
+      "start": {"position": [0, 0, 8], "yaw": 0},
+      "bounds": {"min": [-10, 0, -10], "max": [10, 0, 10]},
+      "anchors": [
+        {"position": [-8, 0, 4], "yaw": 90},
+        {"position": [8, 0, 4], "yaw": -90},
+        {"position": [-8, 0, -4], "yaw": 90},
+        {"position": [8, 0, -4], "yaw": -90}
+      ],
+      "exit": {"position": [0, 0, -9.5], "yaw": 0},
+      "sky": "#112233",
+      "lights": [{"type": "ambient", "intensity": 0.8}],
+      "lightmap": false,
+      "stats": {"triangles": 12, "vertices": 24, "textures": 0}
+    },
+    "b": {
+      "name": "room_b",
+      "category": "culture",
+      "file": "rooms/b/room.glb",
+      "preview": "rooms/b/preview.jpg",
+      "bytes": 1540,
+      "licence": "CC-BY-4.0",
+      "credit": "\"Test room B\" by Test Author, CC-BY-4.0",
+      "source": "https://example.com/rooms/b",
+      "start": {"position": [0, 0, 0], "yaw": 90},
+      "bounds": {"min": [-5, 0, -5], "max": [5, 0, 5]},
+      "anchors": [
+        {"position": [-4, 0, -4], "yaw": 0},
+        {"position": [4, 0, -4], "yaw": 0},
+        {"position": [-4, 0, 4], "yaw": 180},
+        {"position": [4, 0, 4], "yaw": 180}
+      ]
+    },
+    "c": {
+      "name": "room_c",
+      "category": "work",
+      "file": "rooms/c/room.glb",
+      "preview": "rooms/c/preview.jpg",
+      "bytes": 1540,
+      "licence": "CC0-1.0",
+      "credit": "\"Test room C\" (invalid: three anchors)",
+      "source": "https://example.com/rooms/c",
+      "start": {"position": [0, 0, 0], "yaw": 0},
+      "bounds": {"min": [-10, 0, -10], "max": [10, 0, 10]},
+      "anchors": [
+        {"position": [-8, 0, 0], "yaw": 90},
+        {"position": [8, 0, 0], "yaw": -90},
+        {"position": [0, 0, -8], "yaw": 0}
+      ]
+    }
+  }
+}

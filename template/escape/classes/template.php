@@ -18,7 +18,7 @@ namespace vrroomtemplate_escape;
 
 use vrroomtemplate_escape\local\layout;
 use mod_vrroom\local\questions\bank;
-use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
 
 /**
@@ -123,11 +123,14 @@ class template extends \mod_vrroom\local\template\base {
         $mform->addElement('header', 'escape_heading', get_string('escapeheading', self::COMPONENT));
         $mform->setExpanded('escape_heading');
 
+        // Presets and installed pack rooms grouped by category; a stored room this site lacks stays a
+        // choice (selectgroups drops any submitted value that is not an option).
+        $storedenvironment = $config !== null && is_string($config->environment ?? null) ? $config->environment : null;
         $mform->addElement(
-            'select',
+            'selectgroups',
             'escape_environment',
             get_string('environment', self::COMPONENT),
-            presets::get_choices()
+            environment_registry::get_choices($storedenvironment)
         );
         $mform->setDefault('escape_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('escape_environment', 'environment', self::COMPONENT);
@@ -341,7 +344,8 @@ class template extends \mod_vrroom\local\template\base {
     public function validation(array $data, array $files, int $courseid): array {
         $errors = [];
 
-        $preset = presets::get((string)($data['escape_environment'] ?? self::DEFAULT_ENVIRONMENT));
+        $environment = (string)($data['escape_environment'] ?? self::DEFAULT_ENVIRONMENT);
+        $preset = environment_registry::resolve($environment, $this->stored_snapshot($environment, $courseid));
         if ($preset === null) {
             $errors['escape_environment'] = get_string('required');
             return $errors;
@@ -457,9 +461,14 @@ class template extends \mod_vrroom\local\template\base {
             $knownids[$puzzle->id] = true;
         }
 
+        // An installed environment, or the stored pack room this site lacks (kept from its snapshot).
         $environment = (string)($data['escape_environment'] ?? self::DEFAULT_ENVIRONMENT);
-        if (presets::get($environment) === null) {
+        $storedsnapshot = ($existing && ($existing->environment ?? null) === $environment)
+            ? ($existing->envsnapshot ?? null) : null;
+        $def = environment_registry::resolve($environment, $storedsnapshot);
+        if ($def === null) {
             $environment = self::DEFAULT_ENVIRONMENT;
+            $def = environment_registry::get($environment);
         }
 
         $puzzles = [];
@@ -505,6 +514,7 @@ class template extends \mod_vrroom\local\template\base {
             'schema' => self::SCHEMA,
             'sceneid' => $sceneid,
             'environment' => $environment,
+            'envsnapshot' => environment_registry::snapshot($def),
             'story' => trim(clean_param((string)($data['escape_story'] ?? ''), PARAM_TEXT)),
             'timelimit' => self::clean_timelimit($data['escape_timelimit'] ?? 0),
             'hintpenalty' => self::clean_points($data['escape_hintpenalty'] ?? 0),
@@ -596,9 +606,9 @@ class template extends \mod_vrroom\local\template\base {
         $timelimit = self::clean_timelimit($config->timelimit ?? 0);
         $story = trim((string)($config->story ?? ''));
 
-        $preset = presets::get($environmentid);
+        $preset = environment_registry::resolve($environmentid, $config->envsnapshot ?? null);
         if ($preset === null) {
-            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'Unknown environment preset.');
+            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'Unknown environment.');
         }
         $available = count($preset['anchors'] ?? []);
         if ($count > $available) {
@@ -609,14 +619,7 @@ class template extends \mod_vrroom\local\template\base {
                 "The environment has room for {$available} puzzles."
             );
         }
-        $environment = [
-            'type' => 'preset',
-            'preset' => $environmentid,
-            'shape' => $preset['shape'],
-            'sky' => $preset['sky'],
-            'lights' => $preset['lights'],
-            'bounds' => $preset['bounds'],
-        ];
+        $environment = $preset['environment'];
         $spawn = layout::spawn($preset);
         $anchors = layout::anchors($preset, $count);
 
@@ -873,12 +876,19 @@ class template extends \mod_vrroom\local\template\base {
         ];
 
         if ($story !== '') {
+            // 1.9 m ahead of the start along its view direction (−sin θ, 0, −cos θ), turned to face
+            // back at the start point (a text at yaw θ faces (sin θ, 0, cos θ)).
+            $storyrad = deg2rad($spawn['yaw']);
             $interactables[] = [
                 'id' => 't-story',
                 'kind' => 'text',
                 'name' => get_string('storyname', self::COMPONENT),
-                'position' => [$spawn['position'][0], 2.2, layout::round3($spawn['position'][2] - 1.9)],
-                'rotation' => [0.0, 0.0, 0.0],
+                'position' => [
+                    layout::round3($spawn['position'][0] - 1.9 * sin($storyrad)),
+                    2.2,
+                    layout::round3($spawn['position'][2] - 1.9 * cos($storyrad)),
+                ],
+                'rotation' => [0.0, $spawn['yaw'], 0.0],
                 'width' => 2.4,
                 'text' => $story,
             ];
@@ -1033,6 +1043,24 @@ class template extends \mod_vrroom\local\template\base {
             return null;
         }
         return $config;
+    }
+
+    /**
+     * The environment snapshot stored with the activity being edited, when it is for this environment.
+     *
+     * @param string $environment environment key chosen in the form
+     * @param int $courseid course of the form
+     * @return \stdClass|array|null
+     */
+    private function stored_snapshot(string $environment, int $courseid) {
+        if ($this->editinginstance === null || $this->editingcourse !== $courseid) {
+            return null;
+        }
+        $stored = self::load_stored_config($this->editinginstance, $courseid);
+        if ($stored === null || ($stored->environment ?? null) !== $environment) {
+            return null;
+        }
+        return $stored->envsnapshot ?? null;
     }
 
     /**

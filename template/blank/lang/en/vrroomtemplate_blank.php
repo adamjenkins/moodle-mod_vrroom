@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 $string['blankheading'] = 'Empty room';
 $string['chooserhelp'] = 'Starts with an empty room that you fill in the room editor.';
 $string['environment'] = 'Surroundings';
-$string['environment_help'] = 'The room you start from. You can change it later in the room editor.';
+$string['environment_help'] = 'The room you start from: a simple room or a room from an installed room pack. You can change it later in the room editor.';
 $string['pluginname'] = 'Empty room';
 $string['privacy:metadata'] = 'The Empty room template stores no personal data.';
 $string['scenename'] = 'Room 1';

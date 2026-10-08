@@ -17,6 +17,7 @@
 namespace vrroomtemplate_blank;
 
 use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\scene\scene_validator;
 
 /**
@@ -31,6 +32,11 @@ use mod_vrroom\local\scene\scene_validator;
 final class template_test extends \advanced_testcase {
     /** @var string Fixed scene id used by the configs built here. */
     private const SCENEID = '3c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+
+    protected function tearDown(): void {
+        environment_registry::phpunit_set_packs(null);
+        parent::tearDown();
+    }
 
     /**
      * A module context (compile reads no files, but takes one).
@@ -137,5 +143,45 @@ final class template_test extends \advanced_testcase {
         $values = [];
         $template->data_preprocessing($values, (object)['environment' => 'courtyard'], null);
         $this->assertSame(['blank_environment' => 'courtyard'], $values);
+    }
+
+    /**
+     * A room from a room pack: compiled from the installed room, or from the stored snapshot without it.
+     */
+    public function test_pack_room(): void {
+        global $CFG;
+        $this->resetAfterTest();
+        environment_registry::phpunit_set_packs(['testpack' => $CFG->dirroot . '/mod/vrroom/tests/fixtures/envpack']);
+        $template = new template();
+        $context = $this->make_context();
+
+        $this->assertSame([], $template->validation(['blank_environment' => 'testpack/b'], [], 0));
+        $this->assertSame(
+            ['blank_environment' => get_string('required')],
+            $template->validation(['blank_environment' => 'testpack/c'], [], 0)
+        );
+
+        $config = $template->extract_config((object)['blank_environment' => 'testpack/b']);
+        $this->assertSame('testpack/b', $config->environment);
+        $this->assertSame(environment_registry::snapshot(environment_registry::get('testpack/b')), $config->envsnapshot);
+        $this->assertNull($template->extract_config((object)['blank_environment' => 'courtyard'])->envsnapshot);
+
+        $config = json_decode(json_encode($config));
+        $installed = $template->compile($config, $context);
+        $scene = $installed->scenes[0];
+        $this->assertSame([], scene_validator::validate($scene));
+        $this->assertSame(environment_registry::get('testpack/b')['environment'], $scene['environment']);
+        $this->assertSame([['id' => template::SPAWN_ID, 'position' => [0.0, 0.0, 0.0], 'yaw' => 90.0]], $scene['spawn']);
+
+        // Without the pack: the same room from the snapshot, and the form keeps the key.
+        environment_registry::phpunit_set_packs([]);
+        $missing = $template->compile($config, $context);
+        $this->assertSame(json_encode($installed->scenes), json_encode($missing->scenes));
+        $values = [];
+        $template->data_preprocessing($values, $config, null);
+        $this->assertSame(['blank_environment' => 'testpack/b'], $values);
+        // Without a snapshot the default room is used.
+        unset($config->envsnapshot);
+        $this->assertSame('preset', $template->compile($config, $context)->scenes[0]['environment']['type']);
     }
 }

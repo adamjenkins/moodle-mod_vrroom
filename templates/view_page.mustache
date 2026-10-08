@@ -37,6 +37,8 @@
     * message - information message, or empty
     * reporturl - URL of the reports page, or empty
     * editurl - URL of the room editor, or empty
+    * hascredits - whether rooms from room packs need a credit line
+    * credits - plain-text credit lines of those rooms
 
     Example context (json):
     {
@@ -51,7 +53,9 @@
         "finalgrade": "Your final grade: 75.00 / 100.00",
         "message": "No more attempts are allowed.",
         "reporturl": "https://example.com/mod/vrroom/report.php?id=12",
-        "editurl": "https://example.com/mod/vrroom/edit.php?id=12"
+        "editurl": "https://example.com/mod/vrroom/edit.php?id=12",
+        "hascredits": true,
+        "credits": ["\"Hubs Atrium environment\" by Hubs Foundation / Mozilla, MPL-2.0"]
     }
 }}
 <div class="mod-vrroom-view">
@@ -97,4 +101,14 @@
     {{#hasroot}}
     <div id="{{rootid}}" class="vrroom-root" data-region="vrroom-root" data-cmid="{{cmid}}"></div>
     {{/hasroot}}
+    {{#hascredits}}
+    <div class="small text-muted mt-2 vrroom-credits" data-region="vrroom-credits">
+        <span class="fw-bold">{{#str}}envcredits, mod_vrroom{{/str}}</span>
+        <ul class="list-unstyled mb-0">
+            {{#credits}}
+            <li class="vrroom-credit">{{.}}</li>
+            {{/credits}}
+        </ul>
+    </div>
+    {{/hascredits}}
 </div>

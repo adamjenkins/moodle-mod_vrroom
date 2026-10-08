@@ -11,4 +11,16 @@
       <copyright>2010-2026 three.js authors</copyright>
     </copyrights>
   </library>
+  <library>
+    <location>amd/src/mozlightmap.js</location>
+    <name>Hubs MOZ_lightmap loader plugin</name>
+    <description>GLTFLoader plugin applying the MOZ_lightmap material extension (baked lighting of Hubs scenes), adapted from GLTFHubsLightMapExtension in Hubs src/components/gltf-model-plus.js.</description>
+    <version>master (2026-10-08)</version>
+    <license>MPL-2.0</license>
+    <licenseversion>2.0</licenseversion>
+    <repository>https://github.com/Hubs-Foundation/hubs</repository>
+    <copyrights>
+      <copyright>Hubs Foundation and Mozilla contributors (no copyright line in the source file)</copyright>
+    </copyrights>
+  </library>
 </libraries>

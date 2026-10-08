@@ -36,7 +36,7 @@ final class layout {
      *
      * The caller checks that the preset has enough anchors.
      *
-     * @param array $preset preset definition from \mod_vrroom\local\scene\presets::get()
+     * @param array $preset definition from \mod_vrroom\local\scene\environment_registry (preset or pack room)
      * @param int $count number of puzzles
      * @return array[] list of ['position' => [x, y, z], 'yaw' => degrees]
      */

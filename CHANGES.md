@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Room packs: a new sub-plugin type (`vrroomenv`) for packs of ready-made 3D rooms. The activity
+  form and the room editor list them by category next to the simple rooms, the activity page shows
+  their credits, and an activity whose room pack is missing shows a plain hall (with a warning for
+  teachers) instead of failing. Rooms from Hubs keep their baked lighting.
+- Escape chain: the story text now stands in front of the start point whichever way the room's
+  start point faces.
 - Renamed from MAVR (mod_mavr) to VR room (mod_vrroom); the sub-plugin types are now
   vrroomruntime and vrroomtemplate.
 - A bar under the 3D room: Fullscreen, and three drag settings remembered per user (reverse

@@ -27,6 +27,7 @@
 
 import * as THREE from 'vrroomruntime_builtin/three';
 import {GLTFLoader} from 'vrroomruntime_builtin/three';
+import {register as registerMozLightmap} from 'vrroomruntime_builtin/mozlightmap';
 import Log from 'core/log';
 import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
@@ -130,7 +131,8 @@ const prepareRoom = (base, values) => {
     rig.name = 'vrroom-rig';
     rig.add(camera);
     scene3.add(rig);
-    const loader = new GLTFLoader();
+    // Hubs rooms keep their baked lighting (MOZ_lightmap).
+    const loader = registerMozLightmap(new GLTFLoader());
     const textureloader = new THREE.TextureLoader();
     let stopped = false;
 

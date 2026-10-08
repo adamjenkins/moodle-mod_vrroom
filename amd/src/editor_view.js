@@ -30,6 +30,7 @@
 import * as THREE from 'vrroomruntime_builtin/three';
 import {GLTFLoader, OrbitControls, TransformControls} from 'vrroomruntime_builtin/three';
 import {buildScene, readTransform} from 'vrroomruntime_builtin/scenebuilder';
+import {register as registerMozLightmap} from 'vrroomruntime_builtin/mozlightmap';
 import Log from 'core/log';
 import Notification from 'core/notification';
 import {getString} from 'core/str';
@@ -184,7 +185,8 @@ export const init = (stage, model, context) => {
     scene3.background = new THREE.Color('#20242a');
     const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 500);
     camera.position.set(0, 6, 12);
-    const loader = new GLTFLoader();
+    // Hubs rooms keep their baked lighting (MOZ_lightmap), as in the viewer.
+    const loader = registerMozLightmap(new GLTFLoader());
     const textureloader = new THREE.TextureLoader();
 
     const orbit = new OrbitControls(camera, canvas);
@@ -208,12 +210,16 @@ export const init = (stage, model, context) => {
     let queue = Promise.resolve();
 
     /**
-     * URL of a file reference, from the editor's asset list.
+     * URL of a file reference, from the editor's asset list (a pack room from the environment list).
      *
-     * @param {Object} fileref File reference.
+     * @param {Object} fileref File reference, or {kind: 'pack', pack, room}.
      * @returns {string|null}
      */
     const resolveUrl = (fileref) => {
+        if (fileref && fileref.kind === 'pack') {
+            const p = context.presets[`${fileref.pack}/${fileref.room}`];
+            return p && p.url ? p.url : null;
+        }
         const asset = findAsset(context.assets, fileref);
         return asset ? asset.url : null;
     };

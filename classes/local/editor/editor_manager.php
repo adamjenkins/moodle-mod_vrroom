@@ -20,7 +20,7 @@ use mod_vrroom\local\graph\graph_validator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\questions\bank;
 use mod_vrroom\local\questions\slots;
-use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\scene\scene_validator;
 use mod_vrroom\local\template\compiled_activity;
 
@@ -116,10 +116,32 @@ final class editor_manager {
             'bindings' => $bindings,
         ];
 
+        // Presets and installed pack rooms under one key space (environment_registry), plus an entry
+        // for every pack room a room uses that this site lacks (the editor offers it as "not installed").
         $presets = [];
-        foreach (presets::get_all() as $id => $preset) {
-            $preset['name'] = get_string($preset['string'], 'mod_vrroom');
-            $presets[$id] = $preset;
+        foreach (environment_registry::get_all() as $key => $def) {
+            $presets[$key] = self::client_environment($def);
+        }
+        foreach ($scenes as $scene) {
+            $environment = $scene instanceof \stdClass ? ($scene->environment ?? null) : null;
+            if (!$environment instanceof \stdClass || ($environment->type ?? null) !== 'pack') {
+                continue;
+            }
+            if (!is_string($environment->pack ?? null) || !is_string($environment->room ?? null)) {
+                continue;
+            }
+            $key = $environment->pack . '/' . $environment->room;
+            if (!isset($presets[$key])) {
+                $presets[$key] = [
+                    'kind' => 'pack',
+                    'pack' => $environment->pack,
+                    'room' => $environment->room,
+                    'name' => $key,
+                    'group' => get_string('envgroup_missing', 'mod_vrroom'),
+                    'missing' => true,
+                    'bounds' => $environment->bounds ?? null,
+                ];
+            }
         }
 
         $questions = [];
@@ -670,7 +692,36 @@ final class editor_manager {
     }
 
     /**
-     * Remove what only the launch config adds: file URLs and formatted hotspot HTML.
+     * What the room editor needs of an environment definition (presets keep every presets.json key).
+     *
+     * @param array $def definition from environment_registry
+     * @return array
+     */
+    private static function client_environment(array $def): array {
+        if ($def['kind'] === 'preset') {
+            unset($def['environment'], $def['missing']);
+            return $def;
+        }
+        return [
+            'kind' => 'pack',
+            'pack' => $def['pack'],
+            'room' => $def['room'],
+            'name' => $def['name'],
+            'group' => $def['group'],
+            'sky' => $def['sky'],
+            'lights' => $def['lights'],
+            'bounds' => $def['bounds'],
+            'spawn' => $def['spawn'],
+            'url' => $def['url'],
+            'previewurl' => $def['previewurl'],
+            'credit' => $def['credit'],
+            'creditlabel' => get_string('editorenvironmentcredit', 'mod_vrroom', $def['credit']),
+        ];
+    }
+
+    /**
+     * Remove what only the launch config adds: file URLs, formatted hotspot HTML and a pack room's
+     * URL, name, credit and missing flag.
      *
      * @param array $scene A decoded scene document.
      * @return array
@@ -678,6 +729,14 @@ final class editor_manager {
     private static function strip_runtime_keys(array $scene): array {
         if (isset($scene['environment']['file']) && is_array($scene['environment']['file'])) {
             unset($scene['environment']['file']['url']);
+        }
+        if (isset($scene['environment']) && is_array($scene['environment']) && ($scene['environment']['type'] ?? null) === 'pack') {
+            unset(
+                $scene['environment']['url'],
+                $scene['environment']['roomname'],
+                $scene['environment']['credit'],
+                $scene['environment']['missing']
+            );
         }
         if (isset($scene['interactables']) && is_array($scene['interactables'])) {
             foreach ($scene['interactables'] as $j => $item) {

@@ -18,6 +18,7 @@ namespace mod_vrroom\local\editor;
 
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\questions\slots;
+use mod_vrroom\local\scene\environment_registry;
 
 /**
  * Tests for the room editor's document: load, revision, validation and save.
@@ -29,6 +30,11 @@ use mod_vrroom\local\questions\slots;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(editor_manager::class)]
 final class editor_manager_test extends \advanced_testcase {
+    protected function tearDown(): void {
+        environment_registry::phpunit_set_packs(null);
+        parent::tearDown();
+    }
+
     /**
      * A course with a two-station gallery, as the admin.
      *
@@ -191,6 +197,59 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertSame(editor_manager::MAX_DOCUMENT_BYTES, $info['maxdocumentbytes']);
         $this->assertSame(20, $info['maxscenes']);
         $this->assertSame(20 * 1048576, $info['maxbytes']);
+    }
+
+    /**
+     * Rooms from room packs: listed in presetsjson, saved without their runtime keys, and a room the
+     * site lacks is listed as missing.
+     */
+    public function test_pack_environment(): void {
+        global $CFG;
+        $fx = $this->setup_activity();
+        environment_registry::phpunit_set_packs(['testpack' => $CFG->dirroot . '/mod/vrroom/tests/fixtures/envpack']);
+
+        $loaded = editor_manager::load($fx->cm, $fx->context, $this->vrroom($fx));
+        // The fixture's invalid room c is reported once.
+        $this->assertDebuggingCalled();
+        $presets = json_decode($loaded['presetsjson'], true);
+        $this->assertSame(['gallery-hall', 'courtyard', 'escape-room', 'testpack/a', 'testpack/b'], array_keys($presets));
+        $this->assertSame('preset', $presets['gallery-hall']['kind']);
+        $this->assertSame(get_string('envgroup_builtin', 'mod_vrroom'), $presets['gallery-hall']['group']);
+        $a = $presets['testpack/a'];
+        $this->assertSame('pack', $a['kind']);
+        $this->assertSame('testpack', $a['pack']);
+        $this->assertSame('a', $a['room']);
+        $this->assertStringEndsWith('/testpack/1/a/room.glb', $a['url']);
+        $this->assertStringEndsWith('/testpack/1/a/preview.jpg', $a['previewurl']);
+        $this->assertSame(get_string('envcategory_learning', 'mod_vrroom'), $a['group']);
+        $this->assertSame(get_string('editorenvironmentcredit', 'mod_vrroom', $a['credit']), $a['creditlabel']);
+
+        // Save a pack environment carrying what the launch config adds: stored without it.
+        $document = json_decode($loaded['documentjson'], true);
+        $document['scenes'][0]['environment'] = environment_registry::get('testpack/a')['environment'] + [
+            'url' => 'https://example.com/room.glb',
+            'roomname' => 'Room A',
+            'credit' => 'Someone',
+            'missing' => false,
+        ];
+        $result = $this->save_document($fx, $document);
+        $this->assertTrue($result['scenesupdated']);
+        $stored = instance_manager::get_scenes($fx->vrroomid)[0]['environment'];
+        $this->assertSame(environment_registry::get('testpack/a')['environment'], $stored);
+
+        // Without the pack the room stays loadable and is listed as missing.
+        environment_registry::phpunit_set_packs([]);
+        $presets = json_decode(editor_manager::load($fx->cm, $fx->context, $this->vrroom($fx))['presetsjson'], true);
+        $this->assertSame(['gallery-hall', 'courtyard', 'escape-room', 'testpack/a'], array_keys($presets));
+        $this->assertTrue($presets['testpack/a']['missing']);
+        $this->assertSame(get_string('envgroup_missing', 'mod_vrroom'), $presets['testpack/a']['group']);
+        $this->assertSame($stored['bounds'], $presets['testpack/a']['bounds']);
+
+        // And it can still be saved (the validator checks the shape only).
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['name'] = 'Renamed';
+        $this->save_document($fx, $document);
+        $this->assertSame('Renamed', instance_manager::get_scenes($fx->vrroomid)[0]['name']);
     }
 
     /**

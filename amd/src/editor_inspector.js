@@ -45,6 +45,7 @@ const STRINGKEYS = [
     'editorenvironmentmodel', 'editorsky', 'editorarscale', 'editorarscalehint', 'editorrenamescene',
     'editoraddhotspot', 'editoraddmodel', 'editoraddimage', 'editoraddtext', 'editoraddzone', 'editoraddspawn',
     'editoraddportal', 'editoraddgrabbable', 'editoraddmedia', 'editoraddprop', 'editorquestionunavailable',
+    'editorenvironmentmissing',
 ];
 
 /** Core text format strings. */
@@ -240,20 +241,36 @@ const start = (container, model, context, str) => {
         if (ref.kind === 'environment') {
             const env = scene.environment || {};
             fields.push(textField(str.editorrenamescene, 'name', scene.name));
-            const presetoptions = Object.keys(context.presets).map((id) => option(`preset:${id}`,
-                String(context.presets[id].name || id), env.type === 'preset' && env.preset === id));
+            // Presets and room-pack rooms, one optgroup per group in the order the server lists them.
+            const envkey = env.type === 'pack' ? `${env.pack}/${env.room}` : null;
+            const groups = new Map();
+            Object.keys(context.presets).forEach((id) => {
+                const entry = context.presets[id];
+                const label = String(entry.group || str.editorenvironmentpreset);
+                if (!groups.has(label)) {
+                    groups.set(label, []);
+                }
+                const selected = entry.kind === 'pack' ? envkey === id : (env.type === 'preset' && env.preset === id);
+                groups.get(label).push(option(`preset:${id}`, String(entry.name || id), selected));
+            });
             const models = assetsOfKind(context.assets, 'model', ['environment', 'assets']);
             const modeloptions = models.map((asset) => option(`file:${refKey(asset)}`, asset.filename,
                 env.type === 'model' && findAsset([asset], env.file)));
             if (env.type === 'model' && env.file && !findAsset(models, env.file)) {
                 modeloptions.push(option(`file:${refKey(env.file)}`, String(env.file.filename || ''), true));
             }
-            const optgroups = [{label: str.editorenvironmentpreset, options: presetoptions}];
+            const optgroups = Array.from(groups, ([label, options]) => ({label: label, options: options}));
             if (modeloptions.length) {
                 optgroups.push({label: str.editorenvironmentmodel, options: modeloptions});
             }
-            fields.push(field('environment', str.editorenvironment, 'environment', 'envsource',
-                {options: [], optgroups: optgroups, uploadkind: 'model'}));
+            // A room from a room pack shows its credit, or that this site lacks it.
+            const extra = {options: [], optgroups: optgroups, uploadkind: 'model'};
+            if (envkey !== null) {
+                const entry = context.presets[envkey];
+                extra.hint = entry && !entry.missing && entry.creditlabel ? entry.creditlabel : str.editorenvironmentmissing;
+                extra.hintid = 'vrroom-insp-environment-hint';
+            }
+            fields.push(field('environment', str.editorenvironment, 'environment', 'envsource', extra));
             fields.push(field('environment-sky', str.editorsky, 'environment.sky', 'colour',
                 {value: /^#[0-9a-fA-F]{6}$/.test(env.sky || '') ? env.sky.toLowerCase() : '#20242a'}));
             const arscale = scene.xr && scene.xr.arscale !== null && scene.xr.arscale !== undefined ? num(scene.xr.arscale) : '';
@@ -480,10 +497,10 @@ const start = (container, model, context, str) => {
     };
 
     /**
-     * Change a room's surroundings to a preset or an uploaded model.
+     * Change a room's surroundings to a preset, a room from a room pack or an uploaded model.
      *
      * @param {Object} scene Draft scene.
-     * @param {string} value 'preset:<id>' or 'file:<key>'.
+     * @param {string} value 'preset:<id>', 'preset:<pack>/<room>' or 'file:<key>'.
      * @returns {boolean}
      */
     const applyEnvironment = (scene, value) => {
@@ -493,6 +510,21 @@ const start = (container, model, context, str) => {
             const preset = context.presets[id];
             if (!preset) {
                 return false;
+            }
+            if (preset.kind === 'pack') {
+                if (preset.missing) {
+                    // A room this site lacks can be kept, not chosen anew (its layout is unknown here).
+                    return false;
+                }
+                scene.environment = {
+                    type: 'pack',
+                    pack: preset.pack,
+                    room: preset.room,
+                    sky: preset.sky,
+                    lights: JSON.parse(JSON.stringify(preset.lights || [])),
+                    bounds: JSON.parse(JSON.stringify(preset.bounds || MODELBOUNDS)),
+                };
+                return true;
             }
             scene.environment = {
                 type: 'preset',

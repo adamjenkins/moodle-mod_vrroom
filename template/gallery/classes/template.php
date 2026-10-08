@@ -18,7 +18,7 @@ namespace vrroomtemplate_gallery;
 
 use vrroomtemplate_gallery\local\layout;
 use mod_vrroom\local\questions\bank;
-use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
 
 /**
@@ -101,9 +101,14 @@ class template extends \mod_vrroom\local\template\base {
 
         $mform->addElement('header', 'gallery_heading', get_string('galleryheading', self::COMPONENT));
 
-        $environments = presets::get_choices();
-        $environments[self::ENVIRONMENT_UPLOAD] = get_string('environmentupload', self::COMPONENT);
-        $mform->addElement('select', 'gallery_environment', get_string('environment', self::COMPONENT), $environments);
+        // Presets and installed pack rooms grouped by category; a stored room this site lacks stays a
+        // choice (selectgroups drops any submitted value that is not an option).
+        $storedenvironment = $config !== null && is_string($config->environment ?? null) ? $config->environment : null;
+        $environments = environment_registry::get_choices($storedenvironment);
+        $environments[get_string('environmentuploadgroup', self::COMPONENT)] = [
+            self::ENVIRONMENT_UPLOAD => get_string('environmentupload', self::COMPONENT),
+        ];
+        $mform->addElement('selectgroups', 'gallery_environment', get_string('environment', self::COMPONENT), $environments);
         $mform->setDefault('gallery_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('gallery_environment', 'environment', self::COMPONENT);
 
@@ -304,12 +309,12 @@ class template extends \mod_vrroom\local\template\base {
                 $errors['gallery_environmentfile'] = get_string('errorenvironmentfile', self::COMPONENT);
             }
         } else {
-            $preset = presets::get($environment);
-            if ($preset === null) {
+            $def = environment_registry::resolve($environment, $this->stored_snapshot($environment, $courseid));
+            if ($def === null) {
                 $errors['gallery_environment'] = get_string('required');
                 return $errors;
             }
-            $limit = count($preset['anchors'] ?? []);
+            $limit = count($def['anchors'] ?? []);
         }
 
         // Rows without a title but with other content are a mistake, not a blank row.
@@ -406,8 +411,17 @@ class template extends \mod_vrroom\local\template\base {
         }
 
         $environment = (string)($data['gallery_environment'] ?? self::DEFAULT_ENVIRONMENT);
-        if ($environment !== self::ENVIRONMENT_UPLOAD && presets::get($environment) === null) {
-            $environment = self::DEFAULT_ENVIRONMENT;
+        $envsnapshot = null;
+        if ($environment !== self::ENVIRONMENT_UPLOAD) {
+            // An installed environment, or the stored pack room this site lacks (kept from its snapshot).
+            $storedsnapshot = ($existing && ($existing->environment ?? null) === $environment)
+                ? ($existing->envsnapshot ?? null) : null;
+            $def = environment_registry::resolve($environment, $storedsnapshot);
+            if ($def === null) {
+                $environment = self::DEFAULT_ENVIRONMENT;
+                $def = environment_registry::get($environment);
+            }
+            $envsnapshot = environment_registry::snapshot($def);
         }
 
         $stations = [];
@@ -447,6 +461,7 @@ class template extends \mod_vrroom\local\template\base {
             'schema' => self::SCHEMA,
             'sceneid' => $sceneid,
             'environment' => $environment,
+            'envsnapshot' => $envsnapshot,
             'ordered' => !empty($data['gallery_ordered']),
             'stations' => $stations,
         ];
@@ -576,9 +591,9 @@ class template extends \mod_vrroom\local\template\base {
             ];
             $spawn = ['id' => self::SPAWN_ID, 'position' => [0.0, 0.0, 0.0], 'yaw' => 0.0];
         } else {
-            $preset = presets::get($environmentid);
+            $preset = environment_registry::resolve($environmentid, $config->envsnapshot ?? null);
             if ($preset === null) {
-                throw new \moodle_exception('invalidscene', 'mod_vrroom', '', "Unknown environment preset.");
+                throw new \moodle_exception('invalidscene', 'mod_vrroom', '', "Unknown environment.");
             }
             $available = count($preset['anchors'] ?? []);
             if ($count > $available) {
@@ -589,14 +604,7 @@ class template extends \mod_vrroom\local\template\base {
                     "The environment has room for {$available} stations."
                 );
             }
-            $environment = [
-                'type' => 'preset',
-                'preset' => $environmentid,
-                'shape' => $preset['shape'],
-                'sky' => $preset['sky'],
-                'lights' => $preset['lights'],
-                'bounds' => $preset['bounds'],
-            ];
+            $environment = $preset['environment'];
             $spawnposition = [];
             foreach (array_values($preset['spawn']['position'] ?? [0, 0, 0]) as $coordinate) {
                 $spawnposition[] = layout::round3((float)$coordinate);
@@ -907,6 +915,24 @@ class template extends \mod_vrroom\local\template\base {
             return null;
         }
         return $config;
+    }
+
+    /**
+     * The environment snapshot stored with the activity being edited, when it is for this environment.
+     *
+     * @param string $environment environment key chosen in the form
+     * @param int $courseid course of the form
+     * @return \stdClass|array|null
+     */
+    private function stored_snapshot(string $environment, int $courseid) {
+        if ($this->editinginstance === null || $this->editingcourse !== $courseid) {
+            return null;
+        }
+        $stored = self::load_stored_config($this->editinginstance, $courseid);
+        if ($stored === null || ($stored->environment ?? null) !== $environment) {
+            return null;
+        }
+        return $stored->envsnapshot ?? null;
     }
 
     /**
