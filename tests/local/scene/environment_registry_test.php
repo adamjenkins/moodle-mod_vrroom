@@ -19,7 +19,8 @@ namespace mod_vrroom\local\scene;
 /**
  * Tests for the environment registry: presets and room-pack rooms, manifest rules, choices, files.
  *
- * Uses the fixture pack tests/fixtures/envpack (rooms a and b valid, room c with three anchors).
+ * Uses the fixture pack tests/fixtures/envpack (rooms a and b valid, room c with three anchors, room d a
+ * small room: 'small' true, 'zonesize' 2, two anchors 2.2 m apart).
  *
  * @package    mod_vrroom
  * @category   test
@@ -54,9 +55,20 @@ final class environment_registry_test extends \advanced_testcase {
      * @return array parse_manifest() result
      */
     private static function parse_changed_room(callable $change): array {
+        return self::parse_changed('a', $change);
+    }
+
+    /**
+     * Parse a manifest holding one room derived from a fixture room.
+     *
+     * @param string $id fixture room id
+     * @param callable $change fn(array $room): array
+     * @return array parse_manifest() result
+     */
+    private static function parse_changed(string $id, callable $change): array {
         $manifest = self::manifest();
-        $room = $change($manifest['rooms']['a']);
-        $json = json_encode(['schema' => environment_registry::SCHEMA, 'rooms' => ['a' => $room]]);
+        $room = $change($manifest['rooms'][$id]);
+        $json = json_encode(['schema' => environment_registry::SCHEMA, 'rooms' => [$id => $room]]);
         return environment_registry::parse_manifest($json, 'testpack', self::packdir());
     }
 
@@ -76,7 +88,7 @@ final class environment_registry_test extends \advanced_testcase {
     public function test_get_all(): void {
         $all = environment_registry::get_all();
         $this->assertDebuggingCalled();
-        $this->assertSame(['gallery-hall', 'courtyard', 'escape-room', 'testpack/a', 'testpack/b'], array_keys($all));
+        $this->assertSame(['gallery-hall', 'courtyard', 'escape-room', 'testpack/a', 'testpack/b', 'testpack/d'], array_keys($all));
 
         $hall = $all['gallery-hall'];
         $this->assertSame('preset', $hall['kind']);
@@ -112,6 +124,17 @@ final class environment_registry_test extends \advanced_testcase {
         $this->assertArrayNotHasKey('exit', $b);
         $this->assertSame(environment_registry::DEFAULT_SKY, $b['sky']);
         $this->assertSame([], $b['lights']);
+        // Without the small-room keys: the default zone size, not small.
+        $this->assertSame(environment_registry::ZONE_SIZE, $b['zonesize']);
+        $this->assertFalse($b['small']);
+        $this->assertSame(environment_registry::ZONE_SIZE, $hall['zonesize']);
+        $this->assertFalse($hall['small']);
+
+        // Room d is a small room with two anchors and 2 m zones.
+        $d = $all['testpack/d'];
+        $this->assertCount(2, $d['anchors']);
+        $this->assertSame(2.0, $d['zonesize']);
+        $this->assertTrue($d['small']);
 
         // Errors are reported once per request.
         environment_registry::get_all();
@@ -143,7 +166,7 @@ final class environment_registry_test extends \advanced_testcase {
             'testpack',
             self::packdir()
         );
-        $this->assertSame(['a', 'b'], array_keys($result['rooms']));
+        $this->assertSame(['a', 'b', 'd'], array_keys($result['rooms']));
         $this->assertCount(1, $result['errors']);
         $this->assertStringContainsString('testpack/c: anchors must list 4 to 20 anchors, not 3', $result['errors'][0]);
     }
@@ -281,13 +304,15 @@ final class environment_registry_test extends \advanced_testcase {
         $builtin = get_string('envgroup_builtin', 'mod_vrroom');
         $learning = get_string('envcategory_learning', 'mod_vrroom');
         $culture = get_string('envcategory_culture', 'mod_vrroom');
+        $home = get_string('envcategory_home', 'mod_vrroom');
         $missing = get_string('envgroup_missing', 'mod_vrroom');
 
         $choices = environment_registry::get_choices();
-        $this->assertSame([$builtin, $learning, $culture], array_keys($choices));
+        $this->assertSame([$builtin, $learning, $culture, $home], array_keys($choices));
         $this->assertSame(['gallery-hall', 'courtyard', 'escape-room'], array_keys($choices[$builtin]));
         $this->assertSame(['testpack/a' => 'a'], $choices[$learning]);
         $this->assertSame(['testpack/b' => 'b'], $choices[$culture]);
+        $this->assertSame(['testpack/d' => 'd'], $choices[$home]);
 
         $this->assertSame([$builtin], array_keys(environment_registry::get_choices(null, false)));
 
@@ -295,7 +320,7 @@ final class environment_registry_test extends \advanced_testcase {
         $this->assertSame(array_keys($choices), array_keys(environment_registry::get_choices('testpack/a')));
         $this->assertSame(array_keys($choices), array_keys(environment_registry::get_choices('moon-base')));
         $kept = environment_registry::get_choices('rooms/atrium');
-        $this->assertSame([$builtin, $learning, $culture, $missing], array_keys($kept));
+        $this->assertSame([$builtin, $learning, $culture, $home, $missing], array_keys($kept));
         $this->assertSame(
             ['rooms/atrium' => get_string('envmissingoption', 'mod_vrroom', 'rooms/atrium')],
             $kept[$missing]
@@ -309,7 +334,7 @@ final class environment_registry_test extends \advanced_testcase {
         $def = environment_registry::get('testpack/a');
         $snapshot = environment_registry::snapshot($def);
         $this->assertSame(
-            ['key', 'pack', 'room', 'name', 'spawn', 'bounds', 'anchors', 'exit', 'sky', 'lights'],
+            ['key', 'pack', 'room', 'name', 'spawn', 'bounds', 'anchors', 'zonesize', 'small', 'exit', 'sky', 'lights'],
             array_keys($snapshot)
         );
         $this->assertNull(environment_registry::snapshot(environment_registry::get('gallery-hall')));
@@ -341,6 +366,116 @@ final class environment_registry_test extends \advanced_testcase {
         $broken = json_decode(json_encode($snapshot), true);
         $broken['anchors'] = [];
         $this->assertNull(environment_registry::resolve('testpack/a', $broken));
+    }
+
+    /**
+     * Small rooms: 'small' allows two anchors, 'zonesize' sets the zone edge used by the overlap test.
+     */
+    public function test_small_room_rules(): void {
+        $keep = fn (array $room): array => $room;
+        $this->assertSame(['d'], array_keys(self::parse_changed('d', $keep)['rooms']));
+
+        $cases = [
+            'without small' => ['anchors must list 4 to 20 anchors, not 2', function (array $room): array {
+                unset($room['small']);
+                return $room;
+            }],
+            'zone size 3' => ['the zones of anchors[0] and anchors[1] overlap', function (array $room): array {
+                $room['zonesize'] = 3.0;
+                return $room;
+            }],
+            'zone size 1.4' => ['zonesize must be a number from 1.5 to 3', function (array $room): array {
+                $room['zonesize'] = 1.4;
+                return $room;
+            }],
+            'zone size 3.1' => ['zonesize must be a number from 1.5 to 3', function (array $room): array {
+                $room['zonesize'] = 3.1;
+                return $room;
+            }],
+            'zone size string' => ['zonesize must be a number from 1.5 to 3', function (array $room): array {
+                $room['zonesize'] = '2';
+                return $room;
+            }],
+            'small not a bool' => ['small must be true or false', function (array $room): array {
+                $room['small'] = 'yes';
+                return $room;
+            }],
+            'one anchor' => ['anchors must list 2 to 20 anchors, not 1', function (array $room): array {
+                array_pop($room['anchors']);
+                return $room;
+            }],
+        ];
+        foreach ($cases as $name => [$expected, $change]) {
+            $result = self::parse_changed('d', $change);
+            $this->assertSame([], $result['rooms'], $name);
+            $this->assertStringContainsString($expected, implode("\n", $result['errors']), $name);
+        }
+
+        // A large room may set a zone size too: room a with 2 m zones and an anchor 2.5 m from another.
+        $result = self::parse_changed_room(function (array $room): array {
+            $room['zonesize'] = 2;
+            $room['anchors'][1] = ['position' => [-8, 0, 1.5], 'yaw' => 90];
+            return $room;
+        });
+        $this->assertSame([], $result['errors']);
+        $this->assertSame(['a'], array_keys($result['rooms']));
+    }
+
+    /**
+     * A small room's snapshot keeps its zone size and flag, so it still resolves without its pack;
+     * an old snapshot without those keys resolves with the defaults.
+     */
+    public function test_small_room_snapshot(): void {
+        $def = environment_registry::get('testpack/d');
+        $snapshot = environment_registry::snapshot($def);
+        $this->assertSame(2.0, $snapshot['zonesize']);
+        $this->assertTrue($snapshot['small']);
+        $stored = json_decode(json_encode($snapshot));
+
+        $old = json_decode(json_encode(environment_registry::snapshot(environment_registry::get('testpack/a'))), true);
+        unset($old['zonesize'], $old['small']);
+
+        environment_registry::phpunit_set_packs([]);
+        $missing = environment_registry::resolve('testpack/d', $stored);
+        $this->assertNotNull($missing);
+        $this->assertTrue($missing['missing']);
+        $this->assertCount(2, $missing['anchors']);
+        $this->assertSame(2.0, $missing['zonesize']);
+        $this->assertTrue($missing['small']);
+        $this->assertSame($snapshot, environment_registry::snapshot($missing));
+
+        // The same snapshot without its small flag is not a valid layout.
+        $unflagged = json_decode(json_encode($snapshot), true);
+        unset($unflagged['small']);
+        $this->assertNull(environment_registry::resolve('testpack/d', $unflagged));
+
+        $resolved = environment_registry::resolve('testpack/a', $old);
+        $this->assertNotNull($resolved);
+        $this->assertSame(environment_registry::ZONE_SIZE, $resolved['zonesize']);
+        $this->assertFalse($resolved['small']);
+    }
+
+    /**
+     * preview_url(): a preset's picture in pix/environments, a pack room's through envfile.php, none for a missing room.
+     */
+    public function test_preview_url(): void {
+        $hall = environment_registry::preview_url(environment_registry::get('gallery-hall'));
+        $this->assertNotNull($hall);
+        $this->assertStringContainsString('/mod_vrroom/', $hall);
+        $this->assertStringContainsString('environments/gallery-hall', $hall);
+        $this->assertNotNull(environment_registry::preview_url(environment_registry::get('courtyard')));
+        $this->assertNotNull(environment_registry::preview_url(environment_registry::get('escape-room')));
+
+        $a = environment_registry::get('testpack/a');
+        $this->assertSame($a['previewurl'], environment_registry::preview_url($a));
+        $this->assertStringContainsString('/mod/vrroom/envfile.php', environment_registry::preview_url($a));
+
+        $snapshot = environment_registry::snapshot($a);
+        environment_registry::phpunit_set_packs([]);
+        $this->assertNull(environment_registry::preview_url(environment_registry::resolve('testpack/a', $snapshot)));
+
+        // A preset without a picture has none.
+        $this->assertNull(environment_registry::preview_url(['key' => 'moon-base', 'kind' => 'preset']));
     }
 
     /**

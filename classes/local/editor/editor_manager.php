@@ -140,6 +140,7 @@ final class editor_manager {
                     'group' => get_string('envgroup_missing', 'mod_vrroom'),
                     'missing' => true,
                     'bounds' => $environment->bounds ?? null,
+                    'previewurl' => null,
                 ];
             }
         }
@@ -694,12 +695,15 @@ final class editor_manager {
     /**
      * What the room editor needs of an environment definition (presets keep every presets.json key).
      *
+     * Every entry has 'previewurl': the room's preview image URL, or null when it has none.
+     *
      * @param array $def definition from environment_registry
      * @return array
      */
     private static function client_environment(array $def): array {
         if ($def['kind'] === 'preset') {
             unset($def['environment'], $def['missing']);
+            $def['previewurl'] = environment_registry::preview_url($def);
             return $def;
         }
         return [

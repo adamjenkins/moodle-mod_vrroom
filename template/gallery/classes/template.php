@@ -17,6 +17,7 @@
 namespace vrroomtemplate_gallery;
 
 use vrroomtemplate_gallery\local\layout;
+use mod_vrroom\form\environment_preview;
 use mod_vrroom\local\questions\bank;
 use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
@@ -111,6 +112,20 @@ class template extends \mod_vrroom\local\template\base {
         $mform->addElement('selectgroups', 'gallery_environment', get_string('environment', self::COMPONENT), $environments);
         $mform->setDefault('gallery_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('gallery_environment', 'environment', self::COMPONENT);
+        environment_preview::add(
+            $mform,
+            'gallery_environment',
+            $environments,
+            $storedenvironment ?? self::DEFAULT_ENVIRONMENT,
+            ['previewplaces', self::COMPONENT],
+            [
+                self::ENVIRONMENT_UPLOAD => [
+                    'name' => get_string('environmentupload', self::COMPONENT),
+                    'placeholder' => get_string('envpreviewmodel', 'mod_vrroom'),
+                    'places' => layout::MAX_UPLOAD_STATIONS,
+                ],
+            ]
+        );
 
         $mform->addElement(
             'filemanager',
@@ -617,6 +632,8 @@ class template extends \mod_vrroom\local\template\base {
         }
 
         $anchors = layout::anchors($preset, $count);
+        $zone = layout::zone_size($preset);
+        $zoneoffset = $zone / 2;
 
         $zones = [];
         $props = [];
@@ -642,8 +659,8 @@ class template extends \mod_vrroom\local\template\base {
             $zones[] = [
                 'id' => $zoneid,
                 'name' => $title,
-                'center' => self::vec($a[0] + 1.5 * $front[0], 1.5, $a[2] + 1.5 * $front[2]),
-                'size' => [3.0, 3.0, 3.0],
+                'center' => self::vec($a[0] + $zoneoffset * $front[0], 1.5, $a[2] + $zoneoffset * $front[2]),
+                'size' => [$zone, 3.0, $zone],
             ];
 
             $itemid = (int)($station->fileitemid ?? ($i + 1));

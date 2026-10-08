@@ -414,6 +414,46 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
+     * A small room (testpack/d: 'small', 'zonesize' 2, two anchors): 2 m zones 1 m in front, two
+     * stations at most, and the same scenes from its snapshot without the pack.
+     */
+    public function test_compile_small_room(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $this->use_test_pack();
+        $context = $this->make_context();
+        $config = $this->make_config([['title' => 'One'], ['title' => 'Two']], 'testpack/d');
+        $config->envsnapshot = environment_registry::snapshot(environment_registry::get('testpack/d'));
+        $config = json_decode(json_encode($config));
+
+        $compiled = (new template())->compile($config, $context);
+        $this->assert_valid($compiled);
+        // Station 1 sits at anchor (-1.1, 0, 0), yaw 0 (front +Z).
+        $zones = $this->by_id($compiled->scenes[0]['zones']);
+        $this->assertSame([-1.1, 1.5, 1.0], $zones['z-st1']['center']);
+        $this->assertSame([2.0, 3.0, 2.0], $zones['z-st1']['size']);
+        $this->assertSame([1.1, 1.5, 1.0], $zones['z-st2']['center']);
+        $this->assertSame([2.0, 3.0, 2.0], $zones['z-st2']['size']);
+
+        environment_registry::phpunit_set_packs([]);
+        $missing = (new template())->compile($config, $context);
+        $this->assertSame(json_encode($compiled->scenes), json_encode($missing->scenes));
+        $this->use_test_pack();
+
+        // Three stations do not fit its two places.
+        $course = $this->getDataGenerator()->create_course();
+        $template = new template();
+        $errors = $template->validation(
+            ['gallery_environment' => 'testpack/d', 'gallery_title' => ['One', 'Two', 'Three']],
+            [],
+            (int)$course->id
+        );
+        $this->assertSame(get_string('errortoomanystations', 'vrroomtemplate_gallery', 2), $errors['gallery_environment']);
+        $this->expectException(\moodle_exception::class);
+        $template->compile($this->make_config(array_fill(0, 3, []), 'testpack/d'), $context);
+    }
+
+    /**
      * Without the pack the activity compiles from the stored snapshot (the viewer shows a plain hall).
      */
     public function test_compile_from_snapshot_without_pack(): void {
@@ -726,6 +766,10 @@ final class template_test extends \advanced_testcase {
         $this->assertStringContainsString('value="Vase"', $html);
         $this->assertStringContainsString('value="Portrait"', $html);
         $this->assertStringContainsString('name="gallery_addstations"', $html);
+        // The room preview stands under the selector, its image named after the room.
+        $this->assertStringContainsString('data-region="vrroom-envpreview"', $html);
+        $this->assertStringContainsString('alt="' . s(get_string('preset_galleryhall', 'mod_vrroom')) . '"', $html);
+        $this->assertStringContainsString('environments/gallery-hall', $html);
 
         // Stored values beat the repeat_elements() defaults (required 1, points 1).
         $xpath = self::form_xpath($html);

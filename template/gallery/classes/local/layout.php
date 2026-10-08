@@ -16,6 +16,8 @@
 
 namespace vrroomtemplate_gallery\local;
 
+use mod_vrroom\local\scene\environment_registry;
+
 /**
  * Station placement for the Gallery walk template.
  *
@@ -84,6 +86,23 @@ final class layout {
             ];
         }
         return $anchors;
+    }
+
+    /**
+     * Edge in metres of the square zone in front of each station.
+     *
+     * An uploaded environment (null) and a room without 'zonesize' get the default 3 m; a room's
+     * own value is clamped to the registry's range (1.5 to 3 m). The zone is centred half an edge
+     * in front of the anchor.
+     *
+     * @param array|null $def environment_registry definition, or null for an uploaded environment
+     * @return float zone edge in metres
+     */
+    public static function zone_size(?array $def): float {
+        if ($def === null || !isset($def['zonesize']) || !is_numeric($def['zonesize'])) {
+            return environment_registry::ZONE_SIZE;
+        }
+        return max(environment_registry::MIN_ZONE_SIZE, min(environment_registry::ZONE_SIZE, (float)$def['zonesize']));
     }
 
     /**

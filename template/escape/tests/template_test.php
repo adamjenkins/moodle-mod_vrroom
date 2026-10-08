@@ -494,6 +494,34 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
+     * A small room (testpack/d: 'small', 'zonesize' 2, two anchors, no exit): 2 m puzzle zones 1 m in
+     * front, two puzzles at most.
+     */
+    public function test_compile_small_room(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $this->use_test_pack();
+        $context = $this->make_context();
+        $compiled = (new template())->compile($this->make_config([[], []], ['environment' => 'testpack/d']), $context);
+        $this->assert_valid($compiled);
+        $zones = $this->by_id($compiled->scenes[0]['zones']);
+        // Puzzle 1 sits at anchor (-1.1, 0, 0), yaw 0 (front +Z).
+        $this->assertSame([-1.1, 1.5, 1.0], $zones['z-pz1']['center']);
+        $this->assertSame([2.0, 3.0, 2.0], $zones['z-pz1']['size']);
+        $this->assertSame([1.1, 1.5, 1.0], $zones['z-pz2']['center']);
+
+        $course = $this->getDataGenerator()->create_course();
+        $errors = (new template())->validation(
+            ['escape_environment' => 'testpack/d', 'escape_title' => ['One', 'Two', 'Three']],
+            [],
+            (int)$course->id
+        );
+        $this->assertSame(get_string('errortoomanypuzzles', 'vrroomtemplate_escape', 2), $errors['escape_environment']);
+        $this->expectException(\moodle_exception::class);
+        (new template())->compile($this->make_config(array_fill(0, 3, []), ['environment' => 'testpack/d']), $context);
+    }
+
+    /**
      * Validation limits the puzzles to the pack room's anchors.
      */
     public function test_pack_room_validation(): void {

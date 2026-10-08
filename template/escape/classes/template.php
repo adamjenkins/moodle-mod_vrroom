@@ -17,6 +17,7 @@
 namespace vrroomtemplate_escape;
 
 use vrroomtemplate_escape\local\layout;
+use mod_vrroom\form\environment_preview;
 use mod_vrroom\local\questions\bank;
 use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
@@ -126,14 +127,17 @@ class template extends \mod_vrroom\local\template\base {
         // Presets and installed pack rooms grouped by category; a stored room this site lacks stays a
         // choice (selectgroups drops any submitted value that is not an option).
         $storedenvironment = $config !== null && is_string($config->environment ?? null) ? $config->environment : null;
-        $mform->addElement(
-            'selectgroups',
-            'escape_environment',
-            get_string('environment', self::COMPONENT),
-            environment_registry::get_choices($storedenvironment)
-        );
+        $environments = environment_registry::get_choices($storedenvironment);
+        $mform->addElement('selectgroups', 'escape_environment', get_string('environment', self::COMPONENT), $environments);
         $mform->setDefault('escape_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('escape_environment', 'environment', self::COMPONENT);
+        environment_preview::add(
+            $mform,
+            'escape_environment',
+            $environments,
+            $storedenvironment ?? self::DEFAULT_ENVIRONMENT,
+            ['previewplaces', self::COMPONENT]
+        );
 
         $mform->addElement('textarea', 'escape_story', get_string('story', self::COMPONENT), ['rows' => 3, 'cols' => 60]);
         $mform->setType('escape_story', PARAM_TEXT);
@@ -622,6 +626,8 @@ class template extends \mod_vrroom\local\template\base {
         $environment = $preset['environment'];
         $spawn = layout::spawn($preset);
         $anchors = layout::anchors($preset, $count);
+        $zone = layout::zone_size($preset);
+        $zoneoffset = $zone / 2;
 
         $zones = [];
         $props = [];
@@ -654,8 +660,12 @@ class template extends \mod_vrroom\local\template\base {
             $zones[] = [
                 'id' => $zoneid,
                 'name' => $title,
-                'center' => [layout::round3($a[0] + 1.2 * $front[0]), 1.5, layout::round3($a[2] + 1.2 * $front[2])],
-                'size' => [2.4, 3.0, 2.4],
+                'center' => [
+                    layout::round3($a[0] + $zoneoffset * $front[0]),
+                    1.5,
+                    layout::round3($a[2] + $zoneoffset * $front[2]),
+                ],
+                'size' => [$zone, 3.0, $zone],
             ];
             $props[] = [
                 'id' => "p-{$pid}",

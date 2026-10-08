@@ -127,6 +127,19 @@ final class layout_test extends \advanced_testcase {
     }
 
     /**
+     * Zone edge: 3 m for an upload or a room without 'zonesize', else the room's value clamped to 1.5-3 m.
+     */
+    public function test_zone_size(): void {
+        $this->assertSame(3.0, layout::zone_size(null));
+        $this->assertSame(3.0, layout::zone_size([]));
+        $this->assertSame(3.0, layout::zone_size(['zonesize' => 3.0]));
+        $this->assertSame(2.0, layout::zone_size(['zonesize' => 2.0]));
+        $this->assertSame(2.0, layout::zone_size(['zonesize' => 2]));
+        $this->assertSame(1.5, layout::zone_size(['zonesize' => 1.0]));
+        $this->assertSame(3.0, layout::zone_size(['zonesize' => 4.0]));
+    }
+
+    /**
      * Front vectors for the cardinal yaws, without floating-point noise.
      */
     public function test_front(): void {

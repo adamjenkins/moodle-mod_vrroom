@@ -48,6 +48,18 @@ final class layout_test extends \advanced_testcase {
     }
 
     /**
+     * Puzzle zone edge: the room's zone size clamped to 1.5-3 m, and never more than 2.4 m.
+     */
+    public function test_zone_size(): void {
+        $this->resetAfterTest();
+        $this->assertSame(2.4, layout::zone_size(presets::get('escape-room')));
+        $this->assertSame(2.4, layout::zone_size(['zonesize' => 3.0]));
+        $this->assertSame(2.0, layout::zone_size(['zonesize' => 2.0]));
+        $this->assertSame(1.5, layout::zone_size(['zonesize' => 1.0]));
+        $this->assertSame(2.4, layout::zone_size([]));
+    }
+
+    /**
      * Front vectors are (sin yaw, 0, cos yaw) without floating-point noise.
      */
     public function test_front(): void {

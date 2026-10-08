@@ -16,6 +16,8 @@
 
 namespace vrroomtemplate_escape\local;
 
+use mod_vrroom\local\scene\environment_registry;
+
 /**
  * Puzzle and exit placement for the Escape chain template.
  *
@@ -30,6 +32,9 @@ namespace vrroomtemplate_escape\local;
 final class layout {
     /** @var float Distance from the spawn point to an exit placed without a preset exit anchor, in metres. */
     public const EXIT_FALLBACK_DISTANCE = 2.0;
+
+    /** @var float Largest edge of a puzzle's square zone, in metres. */
+    public const ZONE_SIZE = 2.4;
 
     /**
      * The first $count anchors of a preset, rounded and with normalised yaws.
@@ -49,6 +54,22 @@ final class layout {
             $anchors[] = self::clean_anchor($anchor);
         }
         return $anchors;
+    }
+
+    /**
+     * Edge in metres of the square zone in front of each puzzle.
+     *
+     * The room's 'zonesize' (default 3 m) clamped to the registry's range (1.5 to 3 m), and never
+     * more than ZONE_SIZE (2.4 m). The zone is centred half an edge in front of the anchor.
+     *
+     * @param array $def definition from \mod_vrroom\local\scene\environment_registry (preset or pack room)
+     * @return float zone edge in metres
+     */
+    public static function zone_size(array $def): float {
+        $zone = isset($def['zonesize']) && is_numeric($def['zonesize'])
+            ? max(environment_registry::MIN_ZONE_SIZE, min(environment_registry::ZONE_SIZE, (float)$def['zonesize']))
+            : environment_registry::ZONE_SIZE;
+        return min(self::ZONE_SIZE, $zone);
     }
 
     /**

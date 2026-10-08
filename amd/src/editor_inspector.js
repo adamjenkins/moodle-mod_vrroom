@@ -45,7 +45,7 @@ const STRINGKEYS = [
     'editorenvironmentmodel', 'editorsky', 'editorarscale', 'editorarscalehint', 'editorrenamescene',
     'editoraddhotspot', 'editoraddmodel', 'editoraddimage', 'editoraddtext', 'editoraddzone', 'editoraddspawn',
     'editoraddportal', 'editoraddgrabbable', 'editoraddmedia', 'editoraddprop', 'editorquestionunavailable',
-    'editorenvironmentmissing',
+    'editorenvironmentmissing', 'envpreviewmissing', 'envpreviewmodel', 'envpreviewnone',
 ];
 
 /** Core text format strings. */
@@ -269,6 +269,27 @@ const start = (container, model, context, str) => {
                 const entry = context.presets[envkey];
                 extra.hint = entry && !entry.missing && entry.creditlabel ? entry.creditlabel : str.editorenvironmentmissing;
                 extra.hintid = 'vrroom-insp-environment-hint';
+            }
+            // A picture of the chosen room; the inspector re-renders on every change, so it follows the select.
+            if (env.type === 'model') {
+                extra.preview = {url: null, alt: '', caption: String((env.file && env.file.filename) || ''),
+                    placeholder: str.envpreviewmodel};
+            } else {
+                let previewkey = null;
+                if (envkey !== null) {
+                    previewkey = envkey;
+                } else if (env.type === 'preset') {
+                    previewkey = env.preset;
+                }
+                const entry = previewkey !== null && Object.prototype.hasOwnProperty.call(context.presets, previewkey)
+                    ? context.presets[previewkey] : null;
+                const url = entry && !entry.missing && entry.previewurl ? String(entry.previewurl) : null;
+                const name = entry ? String(entry.name || previewkey) : String(previewkey || '');
+                let placeholder = '';
+                if (!url) {
+                    placeholder = (!entry || entry.missing) ? str.envpreviewmissing : str.envpreviewnone;
+                }
+                extra.preview = {url: url, alt: name, caption: name, placeholder: placeholder};
             }
             fields.push(field('environment', str.editorenvironment, 'environment', 'envsource', extra));
             fields.push(field('environment-sky', str.editorsky, 'environment.sky', 'colour',

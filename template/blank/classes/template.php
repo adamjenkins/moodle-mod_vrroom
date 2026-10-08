@@ -16,6 +16,7 @@
 
 namespace vrroomtemplate_blank;
 
+use mod_vrroom\form\environment_preview;
 use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\template\compiled_activity;
 
@@ -64,14 +65,11 @@ class template extends \mod_vrroom\local\template\base {
         // Presets and installed pack rooms grouped by category; a stored room this site lacks stays a
         // choice (selectgroups drops any submitted value that is not an option).
         $storedenvironment = $config !== null && is_string($config->environment ?? null) ? $config->environment : null;
-        $mform->addElement(
-            'selectgroups',
-            'blank_environment',
-            get_string('environment', self::COMPONENT),
-            environment_registry::get_choices($storedenvironment)
-        );
+        $environments = environment_registry::get_choices($storedenvironment);
+        $mform->addElement('selectgroups', 'blank_environment', get_string('environment', self::COMPONENT), $environments);
         $mform->setDefault('blank_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('blank_environment', 'environment', self::COMPONENT);
+        environment_preview::add($mform, 'blank_environment', $environments, $storedenvironment ?? self::DEFAULT_ENVIRONMENT);
 
         return ['blank_environment'];
     }

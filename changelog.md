@@ -16,6 +16,15 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Added
 
+- A preview figure under the environment selector of the Gallery walk, Escape chain and Empty room
+  forms (`\mod_vrroom\form\environment_preview`, template `mod_vrroom/environment_preview`, AMD
+  module `mod_vrroom/environment_preview`) and in the room editor's environment field. Simple-room
+  previews are `pix/environments/<id>.jpg`; pack rooms use their manifest preview.
+  `environment_registry::preview_url()`.
+- Small rooms in `vrroom-envpack/1`: optional `zonesize` (1.5 to 3 m, default 3) and `small`
+  (2 to 20 anchors instead of 4 to 20). Gallery and escape zones use the room's zone size;
+  snapshots store both keys. `$plugin->version` 2026100804 (so a room pack can depend on small-room
+  support; no schema or web-service change).
 - Sub-plugin type `vrroomenv` (directory `environment/`, room packs) with
   `\mod_vrroom\local\scene\environment_registry` (presets and pack rooms in one key space,
   manifest schema `vrroom-envpack/1`), scene environment type `pack`, the file endpoint

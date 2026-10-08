@@ -1,0 +1,67 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrroom/environment_preview
+
+    A picture of the chosen room under an environment selector of the activity settings, with the
+    room's name, credit and number of places. The AMD module mod_vrroom/environment_preview swaps it
+    when another room is chosen, before saving. Without a picture a placeholder text is shown.
+
+    Classes required for JS:
+    * d-none - hides the image, the placeholder or an empty caption line
+
+    Data attributes required for JS:
+    * data-region="vrroom-envpreview" on the figure, with data-previews (JSON map key => {name, url,
+      credit, places, placeholder}) and data-none (placeholder text when a choice has none)
+    * data-region="image", "placeholder", "placeholdertext", "name", "credit", "places"
+
+    Context variables required for this template:
+    * uniqid - id of the figure
+    * previewsjson - JSON map of every choice
+    * none - placeholder text for a choice without a picture
+    * name - room name (also the image's alt text)
+    * url - preview image URL, or null
+    * credit - credit line, or empty
+    * places - "Places for N stations" line, or empty
+    * placeholder - placeholder text shown when there is no url
+
+    Example context (json):
+    {
+        "uniqid": "vrroom-envpreview1",
+        "previewsjson": "{\"gallery-hall\":{\"name\":\"Gallery hall\",\"url\":\"https://example.com/gallery-hall.jpg\",\"credit\":\"\",\"places\":\"Places for 10 stations\",\"placeholder\":\"\"} }",
+        "none": "No preview for this room.",
+        "name": "Gallery hall",
+        "url": "https://example.com/gallery-hall.jpg",
+        "credit": "",
+        "places": "Places for 10 stations",
+        "placeholder": ""
+    }
+}}
+<figure class="vrroom-envpreview mb-0" id="{{uniqid}}" data-region="vrroom-envpreview"
+        data-previews="{{previewsjson}}" data-none="{{none}}">
+    <img class="img-fluid rounded border{{^url}} d-none{{/url}}" data-region="image"
+         {{#url}}src="{{url}}" {{/url}}alt="{{name}}" width="640" height="360">
+    <div class="ratio ratio-16x9 rounded border bg-body-secondary{{#url}} d-none{{/url}}" data-region="placeholder">
+        <div class="d-flex align-items-center justify-content-center text-body-secondary small p-3 text-center"
+             data-region="placeholdertext">{{placeholder}}</div>
+    </div>
+    <figcaption class="small text-body-secondary mt-1" aria-live="polite">
+        <span class="fw-semibold{{^name}} d-none{{/name}}" data-region="name">{{name}}</span>
+        <span class="d-block{{^credit}} d-none{{/credit}}" data-region="credit">{{credit}}</span>
+        <span class="d-block{{^places}} d-none{{/places}}" data-region="places">{{places}}</span>
+    </figcaption>
+</figure>

@@ -188,6 +188,9 @@ final class editor_manager_test extends \advanced_testcase {
         $presets = json_decode($loaded['presetsjson'], true);
         $this->assertArrayHasKey('gallery-hall', $presets);
         $this->assertSame(get_string('preset_galleryhall', 'mod_vrroom'), $presets['gallery-hall']['name']);
+        // Presets carry the URL of their preview picture (pix/environments/<id>.jpg).
+        $this->assertStringContainsString('environments/gallery-hall', $presets['gallery-hall']['previewurl']);
+        $this->assertStringContainsString('environments/courtyard', $presets['courtyard']['previewurl']);
         $this->assertIsArray(json_decode($loaded['questionsjson'], true));
 
         $info = json_decode($loaded['infojson'], true);
@@ -212,7 +215,10 @@ final class editor_manager_test extends \advanced_testcase {
         // The fixture's invalid room c is reported once.
         $this->assertDebuggingCalled();
         $presets = json_decode($loaded['presetsjson'], true);
-        $this->assertSame(['gallery-hall', 'courtyard', 'escape-room', 'testpack/a', 'testpack/b'], array_keys($presets));
+        $this->assertSame(
+            ['gallery-hall', 'courtyard', 'escape-room', 'testpack/a', 'testpack/b', 'testpack/d'],
+            array_keys($presets)
+        );
         $this->assertSame('preset', $presets['gallery-hall']['kind']);
         $this->assertSame(get_string('envgroup_builtin', 'mod_vrroom'), $presets['gallery-hall']['group']);
         $a = $presets['testpack/a'];
@@ -244,6 +250,8 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertTrue($presets['testpack/a']['missing']);
         $this->assertSame(get_string('envgroup_missing', 'mod_vrroom'), $presets['testpack/a']['group']);
         $this->assertSame($stored['bounds'], $presets['testpack/a']['bounds']);
+        $this->assertArrayHasKey('previewurl', $presets['testpack/a']);
+        $this->assertNull($presets['testpack/a']['previewurl']);
 
         // And it can still be saved (the validator checks the shape only).
         $document = $this->load_document($fx);

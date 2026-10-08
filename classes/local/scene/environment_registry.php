@@ -26,7 +26,9 @@ namespace mod_vrroom\local\scene;
  *
  * Definitions of both kinds have the same layout keys as a preset ('spawn', 'bounds', 'anchors',
  * 'exit', 'sky', 'lights'), so the templates' layout code accepts either unchanged, plus 'key',
- * 'kind', 'name', 'group', 'category' and the 'environment' block a scene stores.
+ * 'kind', 'name', 'group', 'category', the 'environment' block a scene stores, and the small-room
+ * keys 'zonesize' (station zone edge in metres, MIN_ZONE_SIZE to ZONE_SIZE, default ZONE_SIZE) and
+ * 'small' (true allows MIN_ANCHORS_SMALL anchors instead of MIN_ANCHORS).
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -49,12 +51,14 @@ final class environment_registry {
     public const LICENCES = ['CC0-1.0', 'PD', 'CC-BY-3.0', 'CC-BY-4.0', 'MPL-2.0', 'MIT', 'Apache-2.0'];
     /** @var int Fewest station anchors of a room. */
     public const MIN_ANCHORS = 4;
+    /** @var int Fewest station anchors of a small room ('small' => true). */
+    public const MIN_ANCHORS_SMALL = 2;
     /** @var int Most station anchors of a room. */
     public const MAX_ANCHORS = 20;
-    /** @var float Gallery zone edge in metres (the gallery template's zones are 3 × 3 × 3 m). */
+    /** @var float Default and largest gallery zone edge in metres (zones are squares centred half an edge in front). */
     public const ZONE_SIZE = 3.0;
-    /** @var float Distance of a gallery zone's centre in front of its anchor. */
-    public const ZONE_OFFSET = 1.5;
+    /** @var float Smallest gallery zone edge in metres a room may declare ('zonesize'). */
+    public const MIN_ZONE_SIZE = 1.5;
     /** @var string File name of a room's model. */
     public const MODEL_NAME = 'room.glb';
     /** @var string[] Accepted file names of a room's preview image. */
@@ -170,6 +174,11 @@ final class environment_registry {
         if (isset($snap['exit'])) {
             $layout['exit'] = $snap['exit'];
         }
+        foreach (['zonesize', 'small'] as $field) {
+            if (isset($snap[$field])) {
+                $layout[$field] = $snap[$field];
+            }
+        }
         self::check_layout($layout, $errors);
         if (isset($snap['sky']) && !self::is_colour($snap['sky'])) {
             $errors[] = 'sky';
@@ -193,6 +202,8 @@ final class environment_registry {
             'spawn' => $snap['spawn'],
             'bounds' => $snap['bounds'],
             'anchors' => array_values($snap['anchors']),
+            'zonesize' => (float)($snap['zonesize'] ?? self::ZONE_SIZE),
+            'small' => !empty($snap['small']),
             'sky' => $sky,
             'lights' => $lights,
             'environment' => self::pack_environment($pack, $room, $sky, $lights, $snap['bounds']),
@@ -232,10 +243,37 @@ final class environment_registry {
             'spawn' => $def['spawn'],
             'bounds' => $def['bounds'],
             'anchors' => $def['anchors'],
+            'zonesize' => (float)($def['zonesize'] ?? self::ZONE_SIZE),
+            'small' => !empty($def['small']),
             'exit' => $def['exit'] ?? null,
             'sky' => $def['sky'],
             'lights' => $def['lights'],
         ];
+    }
+
+    /**
+     * URL of an environment's preview image, for the settings forms and the room editor.
+     *
+     * A pack room's preview is served by envfile.php; a preset's is pix/environments/<id>.jpg of
+     * this plugin, served by the theme image script. A room without one (a missing pack room, a
+     * preset without a picture) has none.
+     *
+     * @param array $def a definition from get(), get_all() or resolve()
+     * @return string|null the URL, or null when there is no preview
+     */
+    public static function preview_url(array $def): ?string {
+        global $OUTPUT;
+        if (($def['kind'] ?? null) === 'pack') {
+            return isset($def['previewurl']) && is_string($def['previewurl']) ? $def['previewurl'] : null;
+        }
+        $key = (string)($def['key'] ?? '');
+        if ($key === '' || preg_match('/^[a-z0-9][a-z0-9-]*$/', $key) !== 1) {
+            return null;
+        }
+        if (!is_readable(dirname(__DIR__, 3) . "/pix/environments/{$key}.jpg")) {
+            return null;
+        }
+        return $OUTPUT->image_url('environments/' . $key, 'mod_vrroom')->out(false);
     }
 
     /**
@@ -564,14 +602,28 @@ final class environment_registry {
             $errors[] = 'exit must have a position of 3 finite numbers and a yaw';
         }
 
+        $zone = self::ZONE_SIZE;
+        if (array_key_exists('zonesize', $room)) {
+            $value = $room['zonesize'];
+            if (!self::is_number($value) || $value < self::MIN_ZONE_SIZE || $value > self::ZONE_SIZE) {
+                $errors[] = 'zonesize must be a number from ' . self::MIN_ZONE_SIZE . ' to ' . self::ZONE_SIZE;
+            } else {
+                $zone = (float)$value;
+            }
+        }
+        if (array_key_exists('small', $room) && !is_bool($room['small'])) {
+            $errors[] = 'small must be true or false';
+        }
+        $min = !empty($room['small']) && is_bool($room['small']) ? self::MIN_ANCHORS_SMALL : self::MIN_ANCHORS;
+
         $anchors = $room['anchors'] ?? null;
         if (!is_array($anchors) || !array_is_list($anchors)) {
             $errors[] = 'anchors must be a list';
             return;
         }
         $count = count($anchors);
-        if ($count < self::MIN_ANCHORS || $count > self::MAX_ANCHORS) {
-            $errors[] = 'anchors must list ' . self::MIN_ANCHORS . ' to ' . self::MAX_ANCHORS . " anchors, not {$count}";
+        if ($count < $min || $count > self::MAX_ANCHORS) {
+            $errors[] = 'anchors must list ' . $min . ' to ' . self::MAX_ANCHORS . " anchors, not {$count}";
         }
         $zones = [];
         foreach ($anchors as $i => $anchor) {
@@ -582,9 +634,9 @@ final class environment_registry {
             if ($okbounds && !$inbounds($anchor['position'])) {
                 $errors[] = "anchors[{$i}] is outside bounds";
             }
-            $zones[$i] = self::zone_centre($anchor);
+            $zones[$i] = self::zone_centre($anchor, $zone);
         }
-        $edge = self::ZONE_SIZE - 1e-6;
+        $edge = $zone - 1e-6;
         $indexes = array_keys($zones);
         foreach ($indexes as $a => $i) {
             foreach (array_slice($indexes, $a + 1) as $j) {
@@ -596,16 +648,18 @@ final class environment_registry {
     }
 
     /**
-     * Centre (x, z) of the gallery zone of an anchor: ZONE_OFFSET metres along its front (sin θ, 0, cos θ).
+     * Centre (x, z) of the gallery zone of an anchor: half a zone edge along its front (sin θ, 0, cos θ).
      *
      * @param array $anchor ['position' => [x, y, z], 'yaw' => degrees]
+     * @param float $zone zone edge in metres
      * @return float[] [x, z]
      */
-    private static function zone_centre(array $anchor): array {
+    private static function zone_centre(array $anchor, float $zone): array {
         $rad = deg2rad((float)$anchor['yaw']);
+        $offset = $zone / 2;
         return [
-            (float)$anchor['position'][0] + self::ZONE_OFFSET * sin($rad),
-            (float)$anchor['position'][2] + self::ZONE_OFFSET * cos($rad),
+            (float)$anchor['position'][0] + $offset * sin($rad),
+            (float)$anchor['position'][2] + $offset * cos($rad),
         ];
     }
 
@@ -631,6 +685,8 @@ final class environment_registry {
             'lights' => $preset['lights'],
             'bounds' => $preset['bounds'],
         ];
+        $def['zonesize'] = self::ZONE_SIZE;
+        $def['small'] = false;
         $def['missing'] = false;
         return $def;
     }
@@ -657,6 +713,8 @@ final class environment_registry {
             'spawn' => $raw['start'],
             'bounds' => $raw['bounds'],
             'anchors' => $raw['anchors'],
+            'zonesize' => (float)($raw['zonesize'] ?? self::ZONE_SIZE),
+            'small' => !empty($raw['small']),
             'sky' => $sky,
             'lights' => $lights,
             'environment' => self::pack_environment($pack, $room, $sky, $lights, $raw['bounds']),

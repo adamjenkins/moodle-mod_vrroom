@@ -30,7 +30,8 @@
     * heading - what is selected
     * fields - list of fields: id, label, path, type, value, step, min, max, checked, isnumber, istext, istextarea,
       isselect, ischeckbox, iscolour, options (value, label, selected), optgroups (label, options), hint, hintid,
-      uploadkind
+      uploadkind, preview (url, alt, caption, placeholder: a picture of the chosen room, or a placeholder text
+      when url is empty)
     * canduplicate, candelete - which buttons to show
 
     Example context (json):
@@ -42,7 +43,11 @@
             {"id": "center-0", "label": "Centre X", "path": "center.0", "type": "number", "isnumber": true,
              "value": "-3", "step": "0.1"},
             {"id": "zone", "label": "Zone", "path": "zone", "type": "select", "isselect": true,
-             "options": [{"value": "", "label": "No zone", "selected": true}]}
+             "options": [{"value": "", "label": "No zone", "selected": true}]},
+            {"id": "environment", "label": "Environment", "path": "environment", "type": "envsource", "isselect": true,
+             "options": [{"value": "preset:gallery-hall", "label": "Gallery hall", "selected": true}],
+             "preview": {"url": "https://example.com/gallery-hall.jpg", "alt": "Gallery hall", "caption": "Gallery hall",
+             "placeholder": ""} }
         ],
         "canduplicate": true,
         "candelete": true
@@ -93,6 +98,21 @@
             {{/optgroups}}
         </select>
         {{/isselect}}
+        {{#preview}}
+        <figure class="vrroom-envpreview mt-2 mb-0">
+            {{#url}}
+            <img class="img-fluid rounded border" src="{{url}}" alt="{{alt}}" width="640" height="360">
+            {{/url}}
+            {{^url}}
+            <div class="ratio ratio-16x9 rounded border bg-body-secondary">
+                <div class="d-flex align-items-center justify-content-center text-body-secondary small p-3 text-center">{{placeholder}}</div>
+            </div>
+            {{/url}}
+            {{#caption}}
+            <figcaption class="small text-body-secondary mt-1">{{caption}}</figcaption>
+            {{/caption}}
+        </figure>
+        {{/preview}}
         {{/ischeckbox}}
         {{#hint}}
         <p class="form-text small mb-0" id="{{hintid}}">{{hint}}</p>

@@ -96,12 +96,14 @@ spatial analytics and Moodle app support.
 A room pack is a sub-plugin of type `vrroomenv`, installed at `mod/vrroom/environment/<name>`. It
 holds 3D rooms (a GLB model and a preview image each) and an `environments.json` manifest
 (schema `vrroom-envpack/1`) giving each room's start point, walkable area, places for stations and
-credit line. The bundled pack `vrroomenv_rooms` ("Bundled rooms", 18 rooms) is a separate
-repository; VR room works without it.
+credit line. The bundled pack `vrroomenv_rooms` ("Bundled rooms", 20 rooms) is a separate
+repository; VR room works without it. A small room may declare smaller station areas
+(`zonesize`, 1.5 to 3 m) and as few as 2 places for stations (`small`).
 
 Teachers pick a room in the activity form (Gallery walk, Escape chain, Empty room) or in the room
-editor; rooms are grouped by category. Room files are served to logged-in users by
-`envfile.php`. If a room's pack is not installed (for example after a restore onto another site),
+editor; rooms are grouped by category. A picture of the chosen room, with its credit and number of
+places, is shown under the list and changes as soon as another room is chosen, before saving.
+Room files are served to logged-in users by `envfile.php`. If a room's pack is not installed (for example after a restore onto another site),
 students see a plain hall of the same size and teachers see a warning on the activity page. The
 credits of the rooms an activity uses are shown on its activity page.
 

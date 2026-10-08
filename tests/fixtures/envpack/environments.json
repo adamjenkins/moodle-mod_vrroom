@@ -58,6 +58,24 @@
         {"position": [8, 0, 0], "yaw": -90},
         {"position": [0, 0, -8], "yaw": 0}
       ]
+    },
+    "d": {
+      "name": "room_d",
+      "category": "home",
+      "file": "rooms/d/room.glb",
+      "preview": "rooms/d/preview.jpg",
+      "bytes": 1540,
+      "licence": "CC0-1.0",
+      "credit": "\"Test room D\" by <b>VR room tests</b> & \"friends\", CC0-1.0",
+      "source": "https://example.com/rooms/d",
+      "start": {"position": [0, 0, -3], "yaw": 180},
+      "bounds": {"min": [-4, 0, -4], "max": [4, 0, 4]},
+      "anchors": [
+        {"position": [-1.1, 0, 0], "yaw": 0},
+        {"position": [1.1, 0, 0], "yaw": 0}
+      ],
+      "zonesize": 2.0,
+      "small": true
     }
   }
 }

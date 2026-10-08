@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The activity settings and the room editor show a picture of the chosen room before saving.
+- Room packs may include small rooms (smaller station areas, 2 or more stations).
 - Room packs: a new sub-plugin type (`vrroomenv`) for packs of ready-made 3D rooms. The activity
   form and the room editor list them by category next to the simple rooms, the activity page shows
   their credits, and an activity whose room pack is missing shows a plain hall (with a warning for

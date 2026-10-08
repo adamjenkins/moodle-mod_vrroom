@@ -70,3 +70,10 @@
         max-height: none;
     }
 }
+
+/* Room preview under the environment selector of the activity settings (mod_vrroom/environment_preview).
+   Unscoped: the settings form (course/modedit.php) is not a .path-mod-vrroom page. */
+
+.vrroom-envpreview {
+    max-width: 640px;
+}
