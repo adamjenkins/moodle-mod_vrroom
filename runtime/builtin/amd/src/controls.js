@@ -62,13 +62,14 @@ const MOVES = {
  *
  * Options: bounds {min, max}; eyeHeight (default 1.6); stick (HTMLElement of the virtual stick);
  * rig (THREE.Object3D that holds the camera; optional); onClick(ndc {x, y}) → true when the click
- * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen).
+ * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen);
+ * invertX, invertY (reverse the drag-to-look direction on that axis).
  *
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
  * @param {Object} options Options.
  * @returns {Object} {update(dt), teleport(position, yaw), getPosition(), getYaw(), setBounds(bounds),
- *     setEnabled(enabled), detach()}
+ *     setInvert(x, y), setEnabled(enabled), detach()}
  */
 export const attach = (camera, canvas, options = {}) => {
     const eye = Number.isFinite(options.eyeHeight) ? options.eyeHeight : 1.6;
@@ -78,6 +79,8 @@ export const attach = (camera, canvas, options = {}) => {
     const position = new THREE.Vector3(0, 0, 0);
     let yaw = 0;
     let pitch = 0;
+    let invertx = !!options.invertX;
+    let inverty = !!options.invertY;
     let target = null;
     const keys = new Set();
     let turn = 0;
@@ -211,8 +214,8 @@ export const attach = (camera, canvas, options = {}) => {
         drag.lasty = e.clientY;
         drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
         if (drag.moved >= CLICK) {
-            yaw -= dx * LOOK;
-            pitch = Math.max(-PITCH, Math.min(PITCH, pitch - dy * LOOK));
+            yaw -= (invertx ? -dx : dx) * LOOK;
+            pitch = Math.max(-PITCH, Math.min(PITCH, pitch - (inverty ? -dy : dy) * LOOK));
         }
     });
     const endDrag = (e, cancelled) => {
@@ -390,6 +393,17 @@ export const attach = (camera, canvas, options = {}) => {
             clamp(position);
             target = null;
             apply();
+        },
+
+        /**
+         * Reverse (or restore) the drag-to-look direction of each axis.
+         *
+         * @param {boolean} x Reverse left/right.
+         * @param {boolean} y Reverse up/down.
+         */
+        setInvert(x, y) {
+            invertx = !!x;
+            inverty = !!y;
         },
 
         /**

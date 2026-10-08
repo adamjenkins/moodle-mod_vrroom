@@ -41,7 +41,11 @@ use mod_vrroom\local\questions\usage;
 class provider implements
     \core_privacy\local\metadata\provider,
     \core_privacy\local\request\core_userlist_provider,
-    \core_privacy\local\request\plugin\provider {
+    \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\request\user_preference_provider {
+    /** @var string[] The user preferences VR room stores. */
+    private const PREFERENCES = ['mod_vrroom_invertx', 'mod_vrroom_inverty'];
+
     /** @var string This component. */
     private const COMPONENT = 'mod_vrroom';
 
@@ -52,6 +56,9 @@ class provider implements
      * @return collection
      */
     public static function get_metadata(collection $collection): collection {
+        foreach (self::PREFERENCES as $name) {
+            $collection->add_user_preference($name, 'privacy:metadata:preference:' . $name);
+        }
         $collection->add_database_table('vrroom_attempts', [
             'userid' => 'privacy:metadata:vrroom_attempts:userid',
             'attempt' => 'privacy:metadata:vrroom_attempts:attempt',
@@ -123,6 +130,26 @@ class provider implements
         $userlist->add_from_sql('userid', $sql, ['modname' => 'vrroom', 'cmid' => $context->instanceid]);
 
         \core_xapi\privacy\provider::add_userids_for_context($userlist);
+    }
+
+    /**
+     * Export the user's VR room preferences (reversed drag directions).
+     *
+     * @param int $userid the user
+     * @return void
+     */
+    public static function export_user_preferences(int $userid): void {
+        foreach (self::PREFERENCES as $name) {
+            $value = get_user_preferences($name, null, $userid);
+            if ($value !== null) {
+                writer::export_user_preference(
+                    self::COMPONENT,
+                    $name,
+                    transform::yesno((bool)$value),
+                    get_string('privacy:metadata:preference:' . $name, self::COMPONENT)
+                );
+            }
+        }
     }
 
     /**

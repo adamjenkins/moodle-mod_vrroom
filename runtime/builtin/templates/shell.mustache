@@ -19,7 +19,8 @@
 
     The frame of the built-in viewer: launch buttons, message region, live room panel (filled by
     vrroomruntime_builtin/liveroom when live mode is on), 3D stage (with the VR, AR and mixed reality
-    buttons, which stay hidden until the device is known to support them), list view, progress
+    buttons, which stay hidden until the device is known to support them) inside a viewport that
+    also holds the bar under the room (fullscreen, reversed drag directions), list view, progress
     panel and the live region for screen readers.
 
     Classes required for JS:
@@ -55,6 +56,7 @@
     </div>
     <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="vrroom-message" role="status">{{#nolaunch}}{{#str}}nolaunch, vrroomruntime_builtin{{/str}}{{/nolaunch}}</div>
     <section class="vrroom-liveroom d-none mb-3" data-region="vrroom-liveroom" aria-label="{{#str}}liveroom, vrroomruntime_builtin{{/str}}"></section>
+    <div class="vrroom-viewport" data-region="vrroom-viewport">
     <div class="vrroom-stage d-none" data-region="vrroom-stage">
         <canvas class="vrroom-canvas" data-region="vrroom-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, vrroomruntime_builtin{{/str}}" aria-describedby="vrroom-controlshelp-{{cmid}}"></canvas>
         <p class="visually-hidden" id="vrroom-controlshelp-{{cmid}}">{{#str}}controlshelp, vrroomruntime_builtin{{/str}}</p>
@@ -72,6 +74,18 @@
             <p class="vrroom-xr-note small text-muted d-none" data-region="vrroom-xr-note"></p>
         </div>
         <div class="vrroom-overlay" data-region="vrroom-overlay"></div>
+    </div>
+    <div class="vrroom-stagebar" data-region="vrroom-stagebar">
+        <button type="button" class="btn btn-secondary btn-sm d-none" data-action="vrroom-fullscreen" aria-pressed="false">{{#str}}fullscreen, vrroomruntime_builtin{{/str}}</button>
+        <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="vrroom-invertx-{{cmid}}" data-action="vrroom-invertx">
+            <label class="form-check-label" for="vrroom-invertx-{{cmid}}">{{#str}}invertlookx, vrroomruntime_builtin{{/str}}</label>
+        </div>
+        <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="vrroom-inverty-{{cmid}}" data-action="vrroom-inverty">
+            <label class="form-check-label" for="vrroom-inverty-{{cmid}}">{{#str}}invertlooky, vrroomruntime_builtin{{/str}}</label>
+        </div>
+    </div>
     </div>
     <div class="vrroom-list d-none" data-region="vrroom-list"></div>
     <aside class="vrroom-progress d-none" id="vrroom-progress-{{cmid}}" data-region="vrroom-progress"></aside>

@@ -37,6 +37,7 @@ import {detect, createXr, createWristPanel} from 'vrroomruntime_builtin/xr';
 import {createXrInput} from 'vrroomruntime_builtin/xrinput';
 import {createXrPanels} from 'vrroomruntime_builtin/xrpanel';
 import {createAvatarLayer} from 'vrroomruntime_builtin/live/avatars';
+import {createStagebar} from 'vrroomruntime_builtin/stagebar';
 import {region, plainText, announce, showMessage, clearMessage, startScene} from 'vrroomruntime_builtin/util';
 
 /** Distance within which Enter activates the object in the middle of the screen (m). */
@@ -683,6 +684,8 @@ const run = (p) => {
         },
         onTouch: () => stage.classList.add('vrroom-touch'),
     });
+    // The bar under the room: fullscreen and reversed dragging (the user's preferences).
+    const stagebar = createStagebar(root, controls, (p.config && p.config.look) || {});
     if (resume) {
         controls.teleport(resume.position, resume.yaw);
     } else {
@@ -1121,6 +1124,7 @@ const run = (p) => {
             renderer.setAnimationLoop(null);
             observer.disconnect();
             controls.detach();
+            stagebar.dispose();
             unsubscribe();
             stage.removeEventListener('click', onHudClick);
             stage.removeEventListener('beforexrselect', onBeforeXrSelect);

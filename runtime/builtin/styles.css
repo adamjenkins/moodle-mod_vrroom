@@ -15,6 +15,38 @@
     border-radius: 0.375rem;
 }
 
+/* The bar under the room (fullscreen, reversed drag); hidden whenever the stage is. */
+.vrroom-stagebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    padding: 0.5rem 0;
+}
+
+.vrroom-stage.d-none + .vrroom-stagebar {
+    display: none;
+}
+
+/* Fullscreen: the viewport fills the screen, the room takes all but the bar. */
+.vrroom-viewport:fullscreen {
+    display: flex;
+    flex-direction: column;
+    background-color: #20242a;
+}
+
+.vrroom-viewport:fullscreen .vrroom-stage {
+    flex: 1 1 auto;
+    height: auto;
+    max-height: none;
+    border-radius: 0;
+}
+
+.vrroom-viewport:fullscreen .vrroom-stagebar {
+    padding: 0.5rem 1rem;
+    color: #fff;
+}
+
 .vrroom-canvas {
     display: block;
     width: 100%;

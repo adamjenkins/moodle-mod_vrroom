@@ -135,6 +135,10 @@ final class config_builder {
                 'stateid' => self::RESUME_STATEID,
             ],
             'finishurl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
+            'look' => [
+                'invertx' => (bool)get_user_preferences('mod_vrroom_invertx', 0, $user),
+                'inverty' => (bool)get_user_preferences('mod_vrroom_inverty', 0, $user),
+            ],
         ];
     }
 

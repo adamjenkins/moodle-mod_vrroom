@@ -30,6 +30,27 @@ use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\reset;
 
 /**
+ * The user preferences of VR room: reversed drag-to-look directions in the 3D view.
+ *
+ * Declaring them lets the viewer save them with core_user's preference web service; only the
+ * user may change their own.
+ *
+ * @return array[] preference name => definition (see \core_user::fill_preferences_cache())
+ */
+function vrroom_user_preferences(): array {
+    $definition = [
+        'type' => PARAM_BOOL,
+        'null' => NULL_NOT_ALLOWED,
+        'default' => 0,
+        'permissioncallback' => [core_user::class, 'is_current_user'],
+    ];
+    return [
+        'mod_vrroom_invertx' => $definition,
+        'mod_vrroom_inverty' => $definition,
+    ];
+}
+
+/**
  * Whether the module supports a feature.
  *
  * @param string $feature FEATURE_xx constant.

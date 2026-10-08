@@ -98,7 +98,7 @@ final class runtime_test extends \advanced_testcase {
         foreach (
             ['schema', 'preview', 'cmid', 'contextid', 'courseid', 'userid', 'attemptid', 'attemptnumber',
                 'activityiri', 'actor', 'extbase', 'verbs', 'maxbatch', 'startscene', 'scenes', 'graph', 'state',
-                'events', 'questions', 'resume', 'finishurl'] as $key
+                'events', 'questions', 'resume', 'finishurl', 'look'] as $key
         ) {
             $this->assertArrayHasKey($key, $config, "Launch config key {$key}");
         }
@@ -109,6 +109,10 @@ final class runtime_test extends \advanced_testcase {
         $this->assertEquals($student->id, $config['userid']);
         $this->assertNotEmpty($config['scenes']);
         $this->assertSame('vrroom-graph/1', $config['graph']['schema']);
+        $this->assertSame(['invertx' => false, 'inverty' => false], $config['look']);
+        set_user_preference('mod_vrroom_inverty', 1, $student);
+        $look = $runtime->launch($cm, $attempt, $student)->config['look'];
+        $this->assertSame(['invertx' => false, 'inverty' => true], $look);
 
         // The live block (live mode is off in a new activity).
         $this->assertSame(['available', 'canjoin', 'reason', 'transport', 'transportmodule', 'cmid', 'attemptid',
