@@ -1,0 +1,430 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+namespace mod_mavr\local\attempt;
+
+use mod_mavr\event\attempt_deleted;
+use mod_mavr\event\attempt_finished;
+use mod_mavr\event\attempt_started;
+use mod_mavr\local\grading\grader;
+use mod_mavr\local\graph\evaluation_result;
+use mod_mavr\local\graph\evaluator;
+use mod_mavr\local\instance_manager;
+use mod_mavr\local\questions\slots;
+use mod_mavr\local\questions\usage;
+
+/**
+ * Attempts: start, resume, server replay of the task graph, finish and deletion.
+ *
+ * The server never accepts scores from a client: every recompute replays the attempt's stored
+ * events through the graph version the attempt was started under.
+ *
+ * @package    mod_mavr
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+final class attempt_manager {
+
+    /** @var string Attempt in progress. */
+    public const STATE_INPROGRESS = 'inprogress';
+
+    /** @var string Attempt finished. */
+    public const STATE_FINISHED = 'finished';
+
+    /** @var string Attempt abandoned (reserved). */
+    public const STATE_ABANDONED = 'abandoned';
+
+    /**
+     * Return the user's attempt in progress, or start a new one.
+     *
+     * @param \cm_info $cm course module
+     * @param \stdClass $mavr mavr row
+     * @param int $userid user id
+     * @param int|null $timenow current time
+     * @return array{0: \stdClass, 1: bool} [attempt, resumed]
+     * @throws \moodle_exception errornomoreattempts
+     */
+    public static function start_or_resume(\cm_info $cm, \stdClass $mavr, int $userid, ?int $timenow = null): array {
+        global $DB;
+        $timenow = $timenow ?? time();
+
+        $open = $DB->get_records('mavr_attempts',
+            ['mavrid' => $mavr->id, 'userid' => $userid, 'state' => self::STATE_INPROGRESS], 'attempt DESC', '*', 0, 1);
+        if ($open) {
+            return [reset($open), true];
+        }
+
+        $count = $DB->count_records('mavr_attempts', ['mavrid' => $mavr->id, 'userid' => $userid]);
+        if ((int)$mavr->maxattempts > 0 && $count >= (int)$mavr->maxattempts) {
+            throw new \moodle_exception('errornomoreattempts', 'mod_mavr');
+        }
+        // Attempt numbers continue after the highest one, so a deleted attempt never causes a clash.
+        $last = (int)$DB->get_field_sql('SELECT MAX(attempt) FROM {mavr_attempts} WHERE mavrid = :mavrid AND userid = :userid',
+            ['mavrid' => $mavr->id, 'userid' => $userid]);
+
+        $context = \context_module::instance($cm->id);
+        $transaction = $DB->start_delegated_transaction();
+        [$qubaid, $slotmap] = usage::create($context, slots::get_slots((int)$mavr->id, $context));
+        $attempt = (object) [
+            'mavrid' => (int)$mavr->id,
+            'userid' => $userid,
+            'attempt' => $last + 1,
+            'state' => self::STATE_INPROGRESS,
+            'uniqueid' => (int)$qubaid,
+            'slotmap' => json_encode((object)$slotmap),
+            'graphversion' => (int)$mavr->graphversion,
+            'score' => null,
+            'requireddone' => 0,
+            'timestart' => $timenow,
+            'timefinish' => 0,
+            'timemodified' => $timenow,
+        ];
+        $attempt->id = (int)$DB->insert_record('mavr_attempts', $attempt);
+        event_store::record_server($attempt, 'launched', 'activity', null, null);
+        $transaction->allow_commit();
+
+        $event = attempt_started::create([
+            'objectid' => $attempt->id,
+            'relateduserid' => $userid,
+            'context' => $context,
+            'other' => ['mavrid' => (int)$mavr->id],
+        ]);
+        $event->add_record_snapshot('mavr_attempts', $attempt);
+        $event->trigger();
+
+        return [$attempt, false];
+    }
+
+    /**
+     * Load an attempt.
+     *
+     * @param int $attemptid
+     * @return \stdClass
+     * @throws \dml_missing_record_exception
+     */
+    public static function get_attempt(int $attemptid): \stdClass {
+        global $DB;
+        return $DB->get_record('mavr_attempts', ['id' => $attemptid], '*', MUST_EXIST);
+    }
+
+    /**
+     * Load an attempt that must belong to $userid, be in progress, and be attemptable by them.
+     *
+     * @param int $attemptid
+     * @param int $userid
+     * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, mavr, cm, context]
+     * @throws \moodle_exception errornotyourattempt, errorattemptclosed, or a missing capability
+     */
+    public static function require_own_open_attempt(int $attemptid, int $userid): array {
+        $attempt = self::get_attempt($attemptid);
+        if ((int)$attempt->userid !== $userid) {
+            throw new \moodle_exception('errornotyourattempt', 'mod_mavr');
+        }
+        if ($attempt->state !== self::STATE_INPROGRESS) {
+            throw new \moodle_exception('errorattemptclosed', 'mod_mavr');
+        }
+        [$mavr, $cm, $context] = self::load_activity($attempt);
+        require_capability('mod/mavr:attempt', $context, $userid);
+        return [$attempt, $mavr, $cm, $context];
+    }
+
+    /**
+     * Load the activity of an attempt.
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @return array{0: \stdClass, 1: \cm_info, 2: \context_module} [mavr, cm, context]
+     */
+    public static function load_activity(\stdClass $attempt): array {
+        global $DB;
+        $mavr = $DB->get_record('mavr', ['id' => $attempt->mavrid], '*', MUST_EXIST);
+        [, $cm] = get_course_and_cm_from_instance($mavr->id, 'mavr', $mavr->course);
+        return [$mavr, $cm, \context_module::instance($cm->id)];
+    }
+
+    /**
+     * Replay the attempt's events; persist score and requireddone; record server `completed`
+     * statements for objectives completed for the first time.
+     *
+     * @param \stdClass $attempt mavr_attempts row (score/requireddone/timemodified updated in place)
+     * @return evaluation_result
+     */
+    public static function recompute(\stdClass $attempt): evaluation_result {
+        global $DB;
+        $result = self::evaluate($attempt);
+        $now = time();
+
+        $update = (object) [
+            'id' => (int)$attempt->id,
+            'score' => $result->score,
+            'requireddone' => $result->allrequiredcompleted ? 1 : 0,
+            'timemodified' => $now,
+        ];
+        $DB->update_record('mavr_attempts', $update);
+        $attempt->score = $update->score;
+        $attempt->requireddone = $update->requireddone;
+        $attempt->timemodified = $now;
+
+        $recorded = $DB->get_fieldset_select('mavr_events', 'objectid',
+            'attemptid = :attemptid AND verb = :verb AND objecttype = :type',
+            ['attemptid' => $attempt->id, 'verb' => 'completed', 'type' => 'objective']);
+        $recorded = array_flip(array_map('strval', $recorded));
+        foreach ($result->completed_ids() as $objectiveid) {
+            $objectiveid = (string)$objectiveid;
+            if (isset($recorded[$objectiveid])) {
+                continue;
+            }
+            $earned = (float)($result->objectives[$objectiveid]['earned'] ?? 0);
+            event_store::record_server($attempt, 'completed', 'objective', null, $objectiveid, ['earned' => $earned]);
+            $recorded[$objectiveid] = true;
+        }
+        return $result;
+    }
+
+    /**
+     * Evaluate an attempt without persisting anything.
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @return evaluation_result
+     */
+    public static function evaluate(\stdClass $attempt): evaluation_result {
+        $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
+        return (new evaluator($graph))->evaluate(event_store::get_events((int)$attempt->id));
+    }
+
+    /**
+     * The §4.6 state of an attempt (evaluated, not persisted).
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @return array
+     */
+    public static function get_state(\stdClass $attempt): array {
+        $events = event_store::get_events((int)$attempt->id);
+        $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
+        $result = (new evaluator($graph))->evaluate($events);
+        return self::build_state((int)$attempt->id, (string)$attempt->state, (int)$attempt->graphversion, $result,
+            count($events));
+    }
+
+    /**
+     * Shape an evaluation result as the §4.6 attempt state.
+     *
+     * @param int $attemptid attempt id (0 for a preview)
+     * @param string $state attempt state ('preview' for a preview)
+     * @param int $graphversion graph version evaluated
+     * @param evaluation_result $result evaluation
+     * @param int $eventcount number of events evaluated
+     * @return array
+     */
+    public static function build_state(int $attemptid, string $state, int $graphversion, evaluation_result $result,
+            int $eventcount): array {
+        $objectives = [];
+        foreach ($result->objectives as $id => $objective) {
+            $objectives[] = [
+                'id' => (string)$id,
+                'status' => (string)$objective['status'],
+                'earned' => (float)$objective['earned'],
+                'points' => (float)$objective['points'],
+                'required' => (bool)$objective['required'],
+            ];
+        }
+        return [
+            'attemptid' => $attemptid,
+            'state' => $state,
+            'graphversion' => $graphversion,
+            'eventcount' => $eventcount,
+            'score' => (float)$result->score,
+            'earnedpoints' => (float)$result->earnedpoints,
+            'maxpoints' => (float)$result->maxpoints,
+            'finished' => (bool)$result->finished,
+            'allrequiredcompleted' => (bool)$result->allrequiredcompleted,
+            'objectives' => $objectives,
+            'hidden' => array_values(array_map('strval', $result->hidden)),
+        ];
+    }
+
+    /**
+     * Finish an attempt: close the question usage, replay, grade and update completion.
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @param int|null $timenow current time
+     * @return \stdClass the updated row
+     * @throws \moodle_exception errorattemptclosed when the attempt is not in progress
+     */
+    public static function finish(\stdClass $attempt, ?int $timenow = null): \stdClass {
+        global $CFG, $DB;
+        require_once($CFG->libdir . '/completionlib.php');
+        $timenow = $timenow ?? time();
+
+        $attempt = self::get_attempt((int)$attempt->id);
+        if ($attempt->state !== self::STATE_INPROGRESS) {
+            throw new \moodle_exception('errorattemptclosed', 'mod_mavr');
+        }
+        [$mavr, $cm, $context] = self::load_activity($attempt);
+
+        usage::finish($attempt, $timenow);
+        $result = self::recompute($attempt);
+
+        $DB->update_record('mavr_attempts', (object) [
+            'id' => (int)$attempt->id,
+            'state' => self::STATE_FINISHED,
+            'timefinish' => $timenow,
+            'timemodified' => $timenow,
+        ]);
+        $attempt = self::get_attempt((int)$attempt->id);
+
+        $score = (float)$result->score;
+        $grade = round($score * (float)$mavr->grade, 5);
+        event_store::record_server($attempt, 'completed', 'activity', null, null, ['score' => $score, 'grade' => $grade]);
+        if ((int)$mavr->grade > 0) {
+            $gradepass = grader::get_gradepass($mavr);
+            if ($gradepass > 0) {
+                $verb = $grade >= $gradepass ? 'passed' : 'failed';
+                event_store::record_server($attempt, $verb, 'activity', null, null, ['score' => $score, 'grade' => $grade]);
+            }
+        }
+
+        $event = attempt_finished::create([
+            'objectid' => $attempt->id,
+            'relateduserid' => (int)$attempt->userid,
+            'context' => $context,
+            'other' => ['mavrid' => (int)$mavr->id, 'score' => $score],
+        ]);
+        $event->add_record_snapshot('mavr_attempts', $attempt);
+        $event->trigger();
+
+        grader::update_grades($mavr, (int)$attempt->userid);
+
+        $completion = new \completion_info($cm->get_course());
+        if ($completion->is_enabled($cm) == COMPLETION_TRACKING_AUTOMATIC) {
+            $completion->update_state($cm, COMPLETION_UNKNOWN, (int)$attempt->userid);
+        }
+        return $attempt;
+    }
+
+    /**
+     * Delete one attempt with its question usage and events, then regrade its user.
+     *
+     * @param \stdClass $attempt mavr_attempts row
+     * @return void
+     */
+    public static function delete_attempt(\stdClass $attempt): void {
+        global $DB;
+        [$mavr, , $context] = self::load_activity($attempt);
+
+        $transaction = $DB->start_delegated_transaction();
+        if (!empty($attempt->uniqueid)) {
+            usage::delete([(int)$attempt->uniqueid]);
+        }
+        event_store::delete_for_attempts([(int)$attempt->id]);
+        $DB->delete_records('mavr_attempts', ['id' => $attempt->id]);
+        $transaction->allow_commit();
+
+        if ($attempt->state === self::STATE_INPROGRESS) {
+            // The resume position belonged to the deleted attempt.
+            self::wipe_xapi_states($context, (int)$attempt->userid);
+        }
+
+        $event = attempt_deleted::create([
+            'objectid' => $attempt->id,
+            'relateduserid' => (int)$attempt->userid,
+            'context' => $context,
+            'other' => ['mavrid' => (int)$mavr->id],
+        ]);
+        $event->add_record_snapshot('mavr_attempts', $attempt);
+        $event->trigger();
+
+        grader::update_grades($mavr, (int)$attempt->userid);
+        self::update_completion($mavr, (int)$attempt->userid);
+    }
+
+    /**
+     * Delete the attempts of an activity (all users, or one), their usages, events and xAPI states;
+     * then regrade.
+     *
+     * @param \stdClass $mavr mavr row
+     * @param int|null $userid one user, or null for everyone
+     * @return void
+     */
+    public static function delete_all_for_instance(\stdClass $mavr, ?int $userid = null): void {
+        global $DB;
+        $params = ['mavrid' => $mavr->id];
+        if ($userid !== null) {
+            $params['userid'] = $userid;
+        }
+        $attempts = $DB->get_records('mavr_attempts', $params, '', 'id, userid, uniqueid');
+        if ($attempts) {
+            $transaction = $DB->start_delegated_transaction();
+            $qubaids = [];
+            foreach ($attempts as $attempt) {
+                if (!empty($attempt->uniqueid)) {
+                    $qubaids[] = (int)$attempt->uniqueid;
+                }
+            }
+            if ($qubaids) {
+                usage::delete($qubaids);
+            }
+            event_store::delete_for_attempts(array_keys($attempts));
+            $DB->delete_records('mavr_attempts', $params);
+            $transaction->allow_commit();
+        }
+
+        $cm = get_coursemodule_from_instance('mavr', $mavr->id, $mavr->course, false, IGNORE_MISSING);
+        if ($cm) {
+            self::wipe_xapi_states(\context_module::instance($cm->id), $userid);
+        }
+
+        if ($userid !== null) {
+            grader::update_grades($mavr, $userid);
+        } else {
+            grader::grade_item_update($mavr, 'reset');
+        }
+    }
+
+    /**
+     * Remove MAVR's xAPI states (resume positions) of a module context.
+     *
+     * @param \context_module $context module context
+     * @param int|null $userid one user, or null for everyone
+     * @return void
+     */
+    private static function wipe_xapi_states(\context_module $context, ?int $userid): void {
+        try {
+            \core_xapi\handler::create('mod_mavr')->wipe_states((string)$context->id, $userid);
+        } catch (\Throwable $e) {
+            debugging('Could not remove MAVR xAPI states: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        }
+    }
+
+    /**
+     * Re-evaluate automatic completion of a user.
+     *
+     * @param \stdClass $mavr mavr row
+     * @param int $userid
+     * @return void
+     */
+    private static function update_completion(\stdClass $mavr, int $userid): void {
+        global $CFG;
+        require_once($CFG->libdir . '/completionlib.php');
+        $cm = get_coursemodule_from_instance('mavr', $mavr->id, $mavr->course, false, IGNORE_MISSING);
+        if (!$cm) {
+            return;
+        }
+        $completion = new \completion_info(get_course($mavr->course));
+        if ($completion->is_enabled($cm) == COMPLETION_TRACKING_AUTOMATIC) {
+            $completion->update_state($cm, COMPLETION_INCOMPLETE, $userid);
+        }
+    }
+}

@@ -1,0 +1,13 @@
+/* Activity page (mod_mavr/view_page). The room's own styles live in runtime/builtin/styles.css. */
+
+.path-mod-mavr .mavr-root {
+    margin-top: 1rem;
+}
+
+.path-mod-mavr .mavr-attempts {
+    max-width: 48rem;
+}
+
+.path-mod-mavr .mavr-finalgrade {
+    margin-top: 0.5rem;
+}

@@ -1,0 +1,139 @@
+{
+  "name": "sequence_strict",
+  "intent": "Strict sequences: s1 (a, b, c) is spoiled because b completed before a, so its pointer stays at b; s2 (a, c) completes in order and a rule on it finishes the attempt.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "a",
+        "type": "visit_zone",
+        "title": "Visit A",
+        "zone": "z-a",
+        "points": 0,
+        "required": false
+      },
+      {
+        "id": "b",
+        "type": "visit_zone",
+        "title": "Visit B",
+        "zone": "z-b",
+        "points": 0,
+        "required": false
+      },
+      {
+        "id": "c",
+        "type": "visit_zone",
+        "title": "Visit C",
+        "zone": "z-c",
+        "points": 0,
+        "required": false
+      },
+      {
+        "id": "s1",
+        "type": "sequence",
+        "title": "Visit A, B and C in order",
+        "steps": [
+          "a",
+          "b",
+          "c"
+        ],
+        "points": 2,
+        "required": false
+      },
+      {
+        "id": "s2",
+        "type": "sequence",
+        "title": "Visit A then C",
+        "steps": [
+          "a",
+          "c"
+        ],
+        "points": 1,
+        "required": true
+      }
+    ],
+    "rules": [
+      {
+        "id": "r-done",
+        "on": {
+          "on": "objective_completed",
+          "objective": "s2"
+        },
+        "actions": [
+          {
+            "do": "finish"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-b",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-a",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-b",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-c",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "a": {
+        "status": "completed",
+        "earned": 0
+      },
+      "b": {
+        "status": "completed",
+        "earned": 0
+      },
+      "c": {
+        "status": "completed",
+        "earned": 0
+      },
+      "s1": {
+        "status": "available",
+        "earned": 0
+      },
+      "s2": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 1,
+    "maxpoints": 3,
+    "score": 0.33333,
+    "requireddone": 1,
+    "requiredtotal": 1,
+    "finished": true,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "empty_graph",
+  "intent": "No objectives; events ignored; score 0, nothing required.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "ignored",
+      "ignored",
+      "ignored"
+    ],
+    "objectives": {},
+    "earnedpoints": 0,
+    "maxpoints": 0,
+    "score": 0,
+    "requireddone": 0,
+    "requiredtotal": 0,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": []
+  }
+}

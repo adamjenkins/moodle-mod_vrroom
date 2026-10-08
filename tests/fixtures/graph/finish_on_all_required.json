@@ -1,0 +1,186 @@
+{
+  "name": "finish_on_all_required",
+  "intent": "start rule effect uses event -1; all_required_completed fires once and finishes; open_question, teleport and play_media effects are listed in production order.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit station one",
+        "zone": "z1",
+        "points": 1,
+        "required": true
+      },
+      {
+        "id": "v2",
+        "type": "visit_zone",
+        "title": "Visit station two",
+        "zone": "z2",
+        "points": 1,
+        "required": true
+      },
+      {
+        "id": "q1",
+        "type": "answer_question",
+        "title": "Answer the station one question",
+        "slot": 1,
+        "points": 2,
+        "unlock": {
+          "after": [
+            "v1"
+          ]
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "on": {
+          "on": "start"
+        },
+        "actions": [
+          {
+            "do": "teleport",
+            "target": "spawn-main"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v1"
+        },
+        "actions": [
+          {
+            "do": "open_question",
+            "slot": 1
+          }
+        ]
+      },
+      {
+        "id": "r3",
+        "on": {
+          "on": "all_required_completed"
+        },
+        "actions": [
+          {
+            "do": "finish"
+          },
+          {
+            "do": "teleport",
+            "target": "spawn-exit"
+          }
+        ]
+      },
+      {
+        "id": "r4",
+        "on": {
+          "on": "all_required_completed"
+        },
+        "once": false,
+        "actions": [
+          {
+            "do": "play_media",
+            "target": "m-end"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 1
+      },
+      "v2": {
+        "status": "completed",
+        "earned": 1
+      },
+      "q1": {
+        "status": "completed",
+        "earned": 2
+      }
+    },
+    "earnedpoints": 4,
+    "maxpoints": 4,
+    "score": 1,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": true,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": [
+      {
+        "event": -1,
+        "rule": "r1",
+        "do": "teleport",
+        "target": "spawn-main"
+      },
+      {
+        "event": 0,
+        "rule": "r2",
+        "do": "open_question",
+        "target": "1"
+      },
+      {
+        "event": 1,
+        "rule": "r3",
+        "do": "teleport",
+        "target": "spawn-exit"
+      },
+      {
+        "event": 1,
+        "rule": "r4",
+        "do": "play_media",
+        "target": "m-end"
+      }
+    ]
+  }
+}

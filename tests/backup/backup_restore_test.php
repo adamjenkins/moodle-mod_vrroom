@@ -1,0 +1,235 @@
+<?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+namespace mod_mavr\backup;
+
+use backup;
+use backup_controller;
+use mod_mavr\local\instance_manager;
+use restore_controller;
+
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
+require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
+require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/backup_mavr_activity_task.class.php');
+require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_activity_task.class.php');
+
+/**
+ * Backup and restore of MAVR activities into a new course.
+ *
+ * @package    mod_mavr
+ * @category   test
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+#[\PHPUnit\Framework\Attributes\CoversClass(\backup_mavr_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_task::class)]
+final class backup_restore_test extends \advanced_testcase {
+
+    /**
+     * A course with a question bank, a two-station gallery walk (one question) and a student
+     * attempt with a visit, an answer and a finish.
+     *
+     * @return array [course, mavr row, cm, question, student, attempt]
+     */
+    private function create_setup(): array {
+        global $DB;
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $student = $generator->create_and_enrol($course, 'student');
+
+        $qbank = $generator->create_module('qbank', ['course' => $course->id]);
+        $qgen = $generator->get_plugin_generator('core_question');
+        $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
+        $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
+
+        $module = $generator->create_module('mavr', [
+            'course' => $course->id,
+            'name' => 'Museum walk',
+            'stationtitles' => 'Vase|Portrait',
+            'stationquestions' => 'Q1|',
+        ]);
+        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_id('mavr', $module->cmid, 0, false, MUST_EXIST);
+
+        /** @var \mod_mavr_generator $mavrgen */
+        $mavrgen = $generator->get_plugin_generator('mod_mavr');
+        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
+        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
+        $mavrgen->record_event($attempt, 'answered', 'question', null, '1', false,
+            ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]);
+
+        return [$course, $mavr, $cm, $question, $student, $attempt];
+    }
+
+    /**
+     * Back up a course (optionally with user data) and restore it into a new course.
+     *
+     * @param \stdClass $course the course
+     * @param \stdClass $cm the MAVR course module (its userinfo setting is forced too)
+     * @param bool $users include user data
+     * @return int new course id
+     */
+    private function backup_and_restore(\stdClass $course, \stdClass $cm, bool $users): int {
+        global $USER;
+        $bc = new backup_controller(backup::TYPE_1COURSE, $course->id, backup::FORMAT_MOODLE,
+            backup::INTERACTIVE_NO, backup::MODE_IMPORT, $USER->id);
+        $bc->get_plan()->get_setting('users')->set_status(\backup_setting::NOT_LOCKED);
+        $bc->get_plan()->get_setting('users')->set_value($users);
+        // In import mode the activity's userinfo setting does not follow the root setting.
+        $activitysetting = $bc->get_plan()->get_setting('mavr_' . $cm->id . '_userinfo');
+        $activitysetting->set_status(\backup_setting::NOT_LOCKED);
+        $activitysetting->set_value($users);
+        $backupid = $bc->get_backupid();
+        $bc->execute_plan();
+        $bc->destroy();
+
+        $newcourseid = \restore_dbops::create_new_course('Restored course', 'restored_' . $course->id, $course->category);
+        $rc = new restore_controller($backupid, $newcourseid, backup::INTERACTIVE_NO, backup::MODE_GENERAL,
+            $USER->id, backup::TARGET_NEW_COURSE);
+        $rc->get_plan()->get_setting('users')->set_status(\backup_setting::NOT_LOCKED);
+        $rc->get_plan()->get_setting('users')->set_value($users);
+        $this->assertTrue($rc->execute_precheck());
+        $rc->execute_plan();
+        $rc->destroy();
+
+        return (int)$newcourseid;
+    }
+
+    /**
+     * The restored MAVR activity of a course.
+     *
+     * @param int $courseid course id
+     * @return array [mavr row, cm_info]
+     */
+    private function get_restored(int $courseid): array {
+        global $DB;
+        $instances = get_fast_modinfo($courseid)->get_instances_of('mavr');
+        $this->assertCount(1, $instances);
+        $cm = reset($instances);
+        return [$DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST), $cm];
+    }
+
+    /**
+     * With user data: settings, scenes, graphs, slots, remapped references, attempts, usages and events.
+     */
+    public function test_backup_restore_with_user_data(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $mavr, $cm, $question, $student, $attempt] = $this->create_setup();
+
+        $newcourseid = $this->backup_and_restore($course, $cm, true);
+        [$new, $newcm] = $this->get_restored($newcourseid);
+        $newcontext = \context_module::instance($newcm->id);
+
+        // Activity settings and the graph are identical; ids are uuids, so nothing was remapped.
+        $this->assertSame($mavr->name, $new->name);
+        $this->assertSame($mavr->runtime, $new->runtime);
+        $this->assertSame($mavr->template, $new->template);
+        $this->assertEquals($mavr->graphversion, $new->graphversion);
+        $this->assertSame($mavr->graphjson, $new->graphjson);
+        $this->assertEquals(
+            $DB->get_records_menu('mavr_graphs', ['mavrid' => $mavr->id], 'version', 'version, graphjson'),
+            $DB->get_records_menu('mavr_graphs', ['mavrid' => $new->id], 'version', 'version, graphjson'));
+        $this->assertEquals(
+            $DB->get_records_menu('mavr_scenes', ['mavrid' => $mavr->id], 'sortorder', 'idnumber, scenejson'),
+            $DB->get_records_menu('mavr_scenes', ['mavrid' => $new->id], 'sortorder', 'idnumber, scenejson'));
+
+        // The slot and its reference point at the new activity and a remapped bank entry.
+        $slots = $DB->get_records('mavr_slots', ['mavrid' => $new->id]);
+        $this->assertCount(1, $slots);
+        $slot = reset($slots);
+        $this->assertEquals(1, $slot->slot);
+        $reference = $DB->get_record('question_references',
+            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id], '*', MUST_EXIST);
+        $this->assertEquals($newcontext->id, $reference->usingcontextid);
+        $this->assertNotEquals($question->questionbankentryid, $reference->questionbankentryid);
+        $bankcontextid = $DB->get_field_sql(
+            "SELECT qc.contextid
+               FROM {question_bank_entries} qbe
+               JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
+              WHERE qbe.id = :id", ['id' => $reference->questionbankentryid], MUST_EXIST);
+        $bankcontext = \context::instance_by_id($bankcontextid);
+        $this->assertSame((int)$newcourseid, (int)$bankcontext->get_course_context()->instanceid);
+
+        // The template config names the remapped entry too.
+        $config = json_decode($new->templateconfig);
+        $this->assertEquals($reference->questionbankentryid, $config->stations[0]->questionbankentryid);
+
+        // The attempt, its usage and its events came across.
+        $attempts = $DB->get_records('mavr_attempts', ['mavrid' => $new->id]);
+        $this->assertCount(1, $attempts);
+        $newattempt = reset($attempts);
+        $this->assertEquals($student->id, $newattempt->userid);
+        $this->assertEquals(1, $newattempt->attempt);
+        $this->assertSame($attempt->slotmap, $newattempt->slotmap);
+        $this->assertEquals($attempt->graphversion, $newattempt->graphversion);
+        $this->assertNotEquals($attempt->uniqueid, $newattempt->uniqueid);
+        $usage = $DB->get_record('question_usages', ['id' => $newattempt->uniqueid], '*', MUST_EXIST);
+        $this->assertSame('mod_mavr', $usage->component);
+        $this->assertEquals($newcontext->id, $usage->contextid);
+        $this->assertEquals(1, $DB->count_records('question_attempts', ['questionusageid' => $usage->id]));
+
+        $oldevents = $DB->get_records('mavr_events', ['attemptid' => $attempt->id], 'id ASC');
+        $newevents = $DB->get_records('mavr_events', ['attemptid' => $newattempt->id], 'id ASC');
+        $this->assertSame(array_column($oldevents, 'verb'), array_column($newevents, 'verb'));
+        $this->assertSame(array_column($oldevents, 'objectid'), array_column($newevents, 'objectid'));
+        $this->assertSame(array_column($oldevents, 'clientasserted'), array_column($newevents, 'clientasserted'));
+        // Same site: every statement id collided with the original and was renewed.
+        $this->assertEmpty(array_intersect(array_column($oldevents, 'statementid'),
+            array_column($newevents, 'statementid')));
+
+        // A replay of the restored attempt gives the same score.
+        $this->assertEqualsWithDelta((float)$attempt->score, (float)$newattempt->score, 1e-6);
+        $restoredresult = \mod_mavr\local\attempt\attempt_manager::evaluate($newattempt);
+        $this->assertEqualsWithDelta((float)$attempt->score, $restoredresult->score, 1e-6);
+    }
+
+    /**
+     * Without user data no attempts, events or usages are restored, but the activity is complete.
+     */
+    public function test_backup_restore_without_user_data(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $mavr, $cm] = $this->create_setup();
+
+        $newcourseid = $this->backup_and_restore($course, $cm, false);
+        [$new, $newcm] = $this->get_restored($newcourseid);
+
+        $this->assertSame($mavr->graphjson, $new->graphjson);
+        $this->assertEquals(1, $DB->count_records('mavr_slots', ['mavrid' => $new->id]));
+        $this->assertEquals(0, $DB->count_records('mavr_attempts', ['mavrid' => $new->id]));
+        $this->assertEquals(0, $DB->count_records('question_usages',
+            ['component' => 'mod_mavr', 'contextid' => \context_module::instance($newcm->id)->id]));
+    }
+
+    /**
+     * Content links in the intro are encoded on backup.
+     */
+    public function test_encode_content_links(): void {
+        global $CFG;
+        $this->resetAfterTest();
+        $content = $CFG->wwwroot . '/mod/mavr/view.php?id=12 and ' . $CFG->wwwroot . '/mod/mavr/index.php?id=3';
+        $encoded = \backup_mavr_activity_task::encode_content_links($content);
+        $this->assertSame('$@MAVRVIEWBYID*12@$ and $@MAVRINDEX*3@$', $encoded);
+    }
+}

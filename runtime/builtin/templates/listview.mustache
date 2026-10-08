@@ -1,0 +1,109 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mavrruntime_builtin/listview
+
+    The accessible list view: every station of the room as a section that can be opened with the
+    keyboard, with its texts, images and questions.
+
+    Context variables required for this template:
+    * stations - list of stations (zones) with their items and question slots
+    * hasothers - whether items outside any station exist
+    * others - those items
+    * canswitch - show the button that switches to the 3D room
+
+    Item fields: id, title (plain text), html (server-formatted), text (plain text),
+    imageurl, ismodel, hidden.
+
+    Example context (json):
+    {
+        "canswitch": true,
+        "stations": [
+            {
+                "zoneid": "z-1",
+                "name": "The Vase",
+                "statuslabel": "To do",
+                "badgeclass": "bg-info text-dark",
+                "hidden": false,
+                "items": [
+                    {"id": "h-1", "title": "The Vase", "html": "<p>Made in 1720.</p>", "text": "", "imageurl": "", "ismodel": false, "hidden": false},
+                    {"id": "m-1", "title": "The Vase", "html": "", "text": "", "imageurl": "", "ismodel": true, "hidden": false}
+                ],
+                "slots": [{"slot": 1}]
+            }
+        ],
+        "hasothers": true,
+        "others": [
+            {"id": "t-3", "title": "Notice", "html": "", "text": "Welcome", "imageurl": "", "ismodel": false, "hidden": false}
+        ]
+    }
+}}
+<div class="mavr-listview" data-region="mavr-listview">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h2 class="h4 mb-0">{{#str}}listviewheading, mavrruntime_builtin{{/str}}</h2>
+        {{#canswitch}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-switch-3d">{{#str}}switchto3d, mavrruntime_builtin{{/str}}</button>{{/canswitch}}
+    </div>
+    <ol class="list-unstyled">
+        {{#stations}}
+        <li{{#hidden}} hidden{{/hidden}} data-region="mavr-station-item" data-zone="{{zoneid}}">
+            <section class="mavr-station card mb-3" data-region="mavr-station" data-zone="{{zoneid}}" aria-labelledby="mavr-station-{{zoneid}}">
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <h3 class="h5 mb-0" id="mavr-station-{{zoneid}}">{{name}}</h3>
+                        <span class="badge {{badgeclass}}" data-region="mavr-station-status">{{statuslabel}}</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm mt-2" data-action="mavr-open-station" data-zone="{{zoneid}}" aria-expanded="false" aria-controls="mavr-station-body-{{zoneid}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
+                    <p class="text-muted mt-2 mb-0" data-region="mavr-station-locked" hidden>{{#str}}stationlocked, mavrruntime_builtin{{/str}}</p>
+                    <div class="mavr-station-body mt-2" id="mavr-station-body-{{zoneid}}" data-region="mavr-station-body" hidden>
+                        {{#items}}
+                        <div class="mb-2" data-interactable="{{id}}"{{#hidden}} hidden{{/hidden}}>
+                            <h4 class="h6">{{title}}</h4>
+                            {{{html}}}
+                            {{#text}}<p>{{text}}</p>{{/text}}
+                            {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
+                            {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
+                        </div>
+                        {{/items}}
+                        {{#slots}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slots}}
+                    </div>
+                </div>
+            </section>
+        </li>
+        {{/stations}}
+    </ol>
+    {{#hasothers}}
+    <h3 class="h5">{{#str}}otheritems, mavrruntime_builtin{{/str}}</h3>
+    <ul class="list-unstyled">
+        {{#others}}
+        <li class="mavr-otheritem card mb-3" data-interactable="{{id}}"{{#hidden}} hidden{{/hidden}}>
+            <div class="card-body">
+                <h4 class="h6" id="mavr-item-{{id}}">{{title}}</h4>
+                <button type="button" class="btn btn-secondary btn-sm" data-action="mavr-open-item" data-item="{{id}}" aria-expanded="false" aria-controls="mavr-item-body-{{id}}" aria-describedby="mavr-item-{{id}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
+                <div class="mt-2" id="mavr-item-body-{{id}}" data-region="mavr-item-body" hidden>
+                    {{{html}}}
+                    {{#text}}<p>{{text}}</p>{{/text}}
+                    {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
+                    {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
+                    {{#slot}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slot}}
+                </div>
+            </div>
+        </li>
+        {{/others}}
+    </ul>
+    {{/hasothers}}
+    <div data-region="mavr-list-progress"></div>
+</div>

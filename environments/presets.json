@@ -1,0 +1,47 @@
+{
+  "schema": "mavr-presets/1",
+  "presets": {
+    "gallery-hall": {
+      "string": "preset_galleryhall",
+      "shape": {"kind": "hall", "width": 12, "length": 30, "height": 5,
+                "wallcolor": "#e8e4dc", "floorcolor": "#8a7f72", "ceiling": true},
+      "sky": "#20242a",
+      "lights": [{"type": "ambient", "intensity": 0.7},
+                 {"type": "directional", "intensity": 0.9, "position": [4, 10, 6]}],
+      "bounds": {"min": [-5.6, 0, -14.6], "max": [5.6, 0, 14.6]},
+      "spawn": {"position": [0, 0, 13], "yaw": 0},
+      "anchors": [
+        {"position": [-4.5, 0, 9], "yaw": 90},
+        {"position": [4.5, 0, 9], "yaw": -90},
+        {"position": [-4.5, 0, 3], "yaw": 90},
+        {"position": [4.5, 0, 3], "yaw": -90},
+        {"position": [-4.5, 0, -3], "yaw": 90},
+        {"position": [4.5, 0, -3], "yaw": -90},
+        {"position": [-4.5, 0, -9], "yaw": 90},
+        {"position": [4.5, 0, -9], "yaw": -90},
+        {"position": [-2, 0, -13.5], "yaw": 0},
+        {"position": [2, 0, -13.5], "yaw": 0}
+      ]
+    },
+    "courtyard": {
+      "string": "preset_courtyard",
+      "shape": {"kind": "courtyard", "radius": 14, "wallheight": 1.2,
+                "groundcolor": "#7d9a5b", "pathcolor": "#c9b48a", "pathinner": 7.5, "pathouter": 10.5},
+      "sky": "#9cc9ef",
+      "lights": [{"type": "hemisphere", "intensity": 0.8, "skycolor": "#cfe8ff", "groundcolor": "#4a5a3a"},
+                 {"type": "directional", "intensity": 0.8, "position": [-6, 12, 4]}],
+      "bounds": {"min": [-13, 0, -13], "max": [13, 0, 13]},
+      "spawn": {"position": [0, 0, 0], "yaw": 0},
+      "anchors": [
+        {"position": [0, 0, -9], "yaw": 0},
+        {"position": [6.364, 0, -6.364], "yaw": -45},
+        {"position": [9, 0, 0], "yaw": -90},
+        {"position": [6.364, 0, 6.364], "yaw": -135},
+        {"position": [0, 0, 9], "yaw": 180},
+        {"position": [-6.364, 0, 6.364], "yaw": 135},
+        {"position": [-9, 0, 0], "yaw": 90},
+        {"position": [-6.364, 0, -6.364], "yaw": 45}
+      ]
+    }
+  }
+}

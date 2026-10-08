@@ -1,0 +1,93 @@
+{
+  "name": "visit_then_question",
+  "intent": "A visit unlocks a question and opens it; a partial answer earns points x fraction (0.5 x 2 = 1).",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit the vase",
+        "zone": "z1",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "q1",
+        "type": "answer_question",
+        "title": "Answer the vase question",
+        "slot": 1,
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v1"
+          ]
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v1"
+        },
+        "actions": [
+          {
+            "do": "open_question",
+            "slot": 1
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0.5
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 0
+      },
+      "q1": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 1,
+    "maxpoints": 2,
+    "score": 0.5,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": [
+      {
+        "event": 0,
+        "rule": "r1",
+        "do": "open_question",
+        "target": "1"
+      }
+    ]
+  }
+}

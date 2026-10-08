@@ -1,0 +1,47 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mavrruntime_builtin/question
+
+    A question-bank question rendered by the question engine, with a submit button until it has
+    been answered. The html is rendered by the server's question renderer.
+
+    Context variables required for this template:
+    * slot - question slot
+    * html - question HTML from the server
+    * answered - true once the question engine has graded it
+    * locked - show the locked notice instead of the question
+    * lockedmessage - plain-text notice for locked or preview questions
+
+    Example context (json):
+    {
+        "slot": 1,
+        "html": "<div class=\"que multichoice\"><div class=\"qtext\">Which century?</div></div>",
+        "answered": false,
+        "locked": false,
+        "lockedmessage": ""
+    }
+}}
+{{#locked}}
+<p class="text-muted" data-region="mavr-question-locked">{{lockedmessage}}</p>
+{{/locked}}
+{{^locked}}
+<form class="mavr-question-form" data-region="mavr-question-form" data-slot="{{slot}}" data-double-submit-protection="off" novalidate>
+    <div data-region="mavr-question-html">{{{html}}}</div>
+    {{^answered}}<button type="submit" class="btn btn-primary mt-2" data-action="mavr-submit-question">{{#str}}submitanswer, mavrruntime_builtin{{/str}}</button>{{/answered}}
+</form>
+{{/locked}}

@@ -1,0 +1,83 @@
+{
+  "name": "interacted_zone_counts",
+  "intent": "List-view interacted on a zone completes visit_zone; exited and object events on the same id do not.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit station one",
+        "zone": "z1",
+        "points": 1,
+        "required": true
+      },
+      {
+        "id": "v2",
+        "type": "visit_zone",
+        "title": "Visit station two",
+        "zone": "z2",
+        "points": 1,
+        "required": true
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "interacted",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "exited",
+      "type": "zone",
+      "id": "z2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "z2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z2",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "ignored",
+      "ignored",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 1
+      },
+      "v2": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 2,
+    "maxpoints": 2,
+    "score": 1,
+    "requireddone": 2,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

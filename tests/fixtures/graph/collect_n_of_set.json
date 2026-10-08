@@ -1,0 +1,92 @@
+{
+  "name": "collect_n_of_set",
+  "intent": "collect count 2 of 3; repeating the same target counts once; a zone event with a target's id does not count.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "c1",
+        "type": "collect",
+        "title": "Touch two exhibits",
+        "targets": [
+          "o1",
+          "o2",
+          "o3"
+        ],
+        "count": 2,
+        "points": 3,
+        "required": true
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o9",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "o2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o2",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o3",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "ignored",
+      "ignored",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "c1": {
+        "status": "completed",
+        "earned": 3
+      }
+    },
+    "earnedpoints": 3,
+    "maxpoints": 3,
+    "score": 1,
+    "requireddone": 1,
+    "requiredtotal": 1,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

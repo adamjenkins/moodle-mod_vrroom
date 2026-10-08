@@ -1,0 +1,63 @@
+{
+  "name": "single_visit",
+  "intent": "One required visit_zone; entered completes it; allrequiredcompleted true.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit the vase",
+        "zone": "z1",
+        "points": 1,
+        "required": true
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z9",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "ignored",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 1,
+    "maxpoints": 1,
+    "score": 1,
+    "requireddone": 1,
+    "requiredtotal": 1,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

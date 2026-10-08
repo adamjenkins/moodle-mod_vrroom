@@ -1,0 +1,52 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mavrruntime_builtin/panel
+
+    The overlay panel that opens for a hotspot in the 3D room.
+
+    Context variables required for this template:
+    * uid - unique id for the heading
+    * id - interactable id
+    * title - plain-text title (escaped here)
+    * html - content already formatted by the server (format_text)
+    * images - list of {url, alt}
+    * hasquestion - whether a question region is added
+    * slot - question slot
+
+    Example context (json):
+    {
+        "uid": "a1b2",
+        "id": "h-1",
+        "title": "The Vase",
+        "html": "<p>Made in 1720.</p>",
+        "images": [{"url": "https://example.com/pluginfile.php/1/mod_mavr/media/1/vase.jpg", "alt": "The Vase"}],
+        "hasquestion": true,
+        "slot": 1
+    }
+}}
+<section class="mavr-panel card shadow" role="dialog" aria-modal="false" aria-labelledby="mavr-panel-title-{{uid}}" data-region="mavr-panel" data-interactable="{{id}}">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+            <h3 class="h5" id="mavr-panel-title-{{uid}}" tabindex="-1">{{title}}</h3>
+            <button type="button" class="btn-close" data-action="mavr-close-panel" aria-label="{{#str}}closebuttontitle{{/str}}"></button>
+        </div>
+        <div data-region="mavr-panel-content">{{{html}}}</div>
+        <div data-region="mavr-panel-media">{{#images}}<img class="img-fluid" src="{{url}}" alt="{{alt}}">{{/images}}</div>
+        {{#hasquestion}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/hasquestion}}
+    </div>
+</section>

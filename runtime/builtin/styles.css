@@ -1,0 +1,135 @@
+/* MAVR built-in viewer (mavrruntime_builtin). */
+
+.mavr-shell {
+    position: relative;
+}
+
+.mavr-stage {
+    position: relative;
+    width: 100%;
+    height: min(75vh, 720px);
+    min-height: 320px;
+    overflow: hidden;
+    background-color: #20242a;
+    border-radius: 0.375rem;
+}
+
+.mavr-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+}
+
+.mavr-canvas:focus-visible {
+    outline: 3px solid #f0ad4e;
+    outline-offset: -3px;
+}
+
+.mavr-hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.mavr-hud-buttons {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    pointer-events: auto;
+}
+
+.mavr-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    margin: -6px 0 0 -6px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.mavr-stick {
+    display: none;
+    position: absolute;
+    left: 1rem;
+    bottom: 1rem;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.mavr-touch .mavr-stick {
+    display: block;
+}
+
+@media (pointer: coarse) {
+    .mavr-stick {
+        display: block;
+    }
+}
+
+.mavr-stick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.75);
+}
+
+.mavr-overlay {
+    position: absolute;
+    top: 3rem;
+    right: 0.5rem;
+    width: min(420px, calc(100% - 1rem));
+    max-height: calc(100% - 3.5rem);
+    overflow-y: auto;
+}
+
+.mavr-overlay:empty {
+    display: none;
+}
+
+.mavr-panel img {
+    margin-top: 0.5rem;
+}
+
+.mavr-mode-3d .mavr-progress {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.175);
+    border-radius: 0.375rem;
+}
+
+.mavr-launchbar.d-none + .alert {
+    margin-bottom: 0.75rem;
+}
+
+.mavr-question-form .que {
+    margin-bottom: 0.5rem;
+}
+
+.mavr-question-form .que .info {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    .mavr-overlay {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 60%;
+    }
+}

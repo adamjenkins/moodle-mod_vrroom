@@ -1,0 +1,163 @@
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * A question-bank question inside a panel or a list-view station: fetched from the server,
+ * rendered by the question engine, submitted and shown with its feedback.
+ *
+ * @module     mavrruntime_builtin/question
+ * @copyright  2026 Adam Jenkins <adam@wisecat.net>
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+import Fragment from 'core/fragment';
+import Notification from 'core/notification';
+import Pending from 'core/pending';
+import Templates from 'core/templates';
+import {getString} from 'core/str';
+
+/**
+ * Render a template into the host and run the question's JavaScript.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} context Template context.
+ * @param {string} javascript Collected question JavaScript from the server.
+ * @returns {Promise}
+ */
+const place = (host, context, javascript) => Templates.renderForPromise('mavrruntime_builtin/question', context)
+    .then(({html, js}) => {
+        Templates.replaceNodeContents(host, html, js);
+        if (javascript) {
+            Templates.runTemplateJS(Fragment.processCollectedJavascript(javascript));
+        }
+        return undefined;
+    });
+
+/**
+ * Show a plain notice instead of the question.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {number} slot Slot.
+ * @param {string} key String key in mavrruntime_builtin.
+ * @returns {Promise}
+ */
+const notice = (host, slot, key) => getString(key, 'mavrruntime_builtin')
+    .then((text) => place(host, {slot: slot, html: '', answered: true, locked: true, lockedmessage: text}, ''));
+
+/**
+ * Wire the submit handler of a rendered question form.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} session The session.
+ * @param {number} slot Slot.
+ */
+const wire = (host, session, slot) => {
+    const form = host.querySelector('[data-region="mavr-question-form"]');
+    if (!form) {
+        return;
+    }
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const button = form.querySelector('[data-action="mavr-submit-question"]');
+        if (button) {
+            if (button.disabled) {
+                return;
+            }
+            button.disabled = true;
+        }
+        const pending = new Pending('mavrruntime_builtin/question:submit');
+        session.submitQuestion(slot, form)
+            .then((result) => place(host, {
+                slot: slot,
+                html: result.html,
+                answered: result.answered,
+                locked: false,
+                lockedmessage: '',
+            }, result.javascript).then(() => {
+                if (!result.answered) {
+                    wire(host, session, slot);
+                }
+                const heading = host.querySelector('[data-region="mavr-question-html"]');
+                if (heading) {
+                    heading.setAttribute('tabindex', '-1');
+                    heading.focus({preventScroll: false});
+                }
+                return undefined;
+            }))
+            .catch((error) => {
+                if (button) {
+                    button.disabled = false;
+                }
+                Notification.exception(error);
+            })
+            .then(() => pending.resolve());
+    });
+};
+
+/**
+ * Render a slot's question into a host element.
+ *
+ * Preview: a notice only. Locked slot: the locked notice. Otherwise the server-rendered
+ * question; once answered, the graded question with feedback and no submit button.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} session The session.
+ * @param {number|string} slot Slot number.
+ * @returns {Promise}
+ */
+export const renderQuestion = (host, session, slot) => {
+    const n = Number(slot);
+    host.dataset.slot = String(n);
+    const pending = new Pending('mavrruntime_builtin/question:render');
+    let promise;
+    if (session.preview) {
+        host.dataset.mavrQuestionState = 'preview';
+        promise = notice(host, n, 'questionpreview');
+    } else if (!session.isSlotAvailable(n)) {
+        host.dataset.mavrQuestionState = 'locked';
+        promise = notice(host, n, 'questionlocked');
+    } else {
+        host.dataset.mavrQuestionState = 'loading';
+        promise = session.getQuestion(n)
+            .then((result) => place(host, {
+                slot: n,
+                html: result.html,
+                answered: !!result.answered,
+                locked: false,
+                lockedmessage: '',
+            }, result.javascript).then(() => {
+                host.dataset.mavrQuestionState = result.answered ? 'answered' : 'open';
+                if (!result.answered) {
+                    wire(host, session, n);
+                }
+                return undefined;
+            }))
+            .catch((error) => {
+                if (error && error.errorcode === 'errorquestionlocked') {
+                    host.dataset.mavrQuestionState = 'locked';
+                    return notice(host, n, 'questionlocked');
+                }
+                host.dataset.mavrQuestionState = 'error';
+                return Notification.exception(error);
+            });
+    }
+    return promise.then(() => {
+        pending.resolve();
+        return undefined;
+    }, (error) => {
+        pending.resolve();
+        throw error;
+    });
+};

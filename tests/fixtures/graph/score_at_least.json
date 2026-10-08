@@ -1,0 +1,149 @@
+{
+  "name": "score_at_least",
+  "intent": "Objective c unlocks only when earnedpoints >= 2 (reached exactly 2); d needs 3 and stays locked; the objective_unlocked trigger fires on the event that unlocks c.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "a",
+        "type": "visit_zone",
+        "title": "Visit A",
+        "zone": "z-a",
+        "points": 1,
+        "required": false
+      },
+      {
+        "id": "b",
+        "type": "visit_zone",
+        "title": "Visit B",
+        "zone": "z-b",
+        "points": 1,
+        "required": false
+      },
+      {
+        "id": "c",
+        "type": "interact",
+        "title": "Open the cabinet",
+        "target": "o-c",
+        "points": 0,
+        "unlock": {
+          "score_at_least": 2
+        }
+      },
+      {
+        "id": "d",
+        "type": "interact",
+        "title": "Open the door",
+        "target": "o-d",
+        "points": 0,
+        "unlock": {
+          "after": [],
+          "score_at_least": 3
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "on": {
+          "on": "objective_unlocked",
+          "objective": "c"
+        },
+        "actions": [
+          {
+            "do": "teleport",
+            "target": "spawn-c"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-c",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-a",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-c",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-b",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-c",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-d",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "applied",
+      "locked",
+      "applied",
+      "applied",
+      "locked"
+    ],
+    "objectives": {
+      "a": {
+        "status": "completed",
+        "earned": 1
+      },
+      "b": {
+        "status": "completed",
+        "earned": 1
+      },
+      "c": {
+        "status": "completed",
+        "earned": 0
+      },
+      "d": {
+        "status": "locked",
+        "earned": 0
+      }
+    },
+    "earnedpoints": 2,
+    "maxpoints": 2,
+    "score": 1,
+    "requireddone": 0,
+    "requiredtotal": 0,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": [
+      {
+        "event": 3,
+        "rule": "r1",
+        "do": "teleport",
+        "target": "spawn-c"
+      }
+    ]
+  }
+}

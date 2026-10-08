@@ -1,0 +1,99 @@
+{
+  "name": "zero_points_required_ratio",
+  "intent": "maxpoints 0, so score = requireddone / requiredtotal (2/3 = 0.66667).",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit one",
+        "zone": "z1",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "v2",
+        "type": "visit_zone",
+        "title": "Visit two",
+        "zone": "z2",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "v3",
+        "type": "visit_zone",
+        "title": "Visit three",
+        "zone": "z3",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "v4",
+        "type": "visit_zone",
+        "title": "Visit four",
+        "zone": "z4",
+        "points": 0,
+        "required": false
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z4",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z3",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 0
+      },
+      "v2": {
+        "status": "available",
+        "earned": 0
+      },
+      "v3": {
+        "status": "completed",
+        "earned": 0
+      },
+      "v4": {
+        "status": "completed",
+        "earned": 0
+      }
+    },
+    "earnedpoints": 0,
+    "maxpoints": 0,
+    "score": 0.66667,
+    "requireddone": 2,
+    "requiredtotal": 3,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": []
+  }
+}

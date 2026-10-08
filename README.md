@@ -1,0 +1,88 @@
+# MAVR — Mixed, Augmented and Virtual Reality for Moodle
+
+MAVR is a Moodle activity that puts students in a 3D room they explore in the browser, on a
+computer or a phone. Students walk between stations, look at models, images and texts, and answer
+questions from the course question bank. Everything they do is recorded as xAPI statements, and
+the grade and activity completion are calculated from those statements on the server, so the
+activity runs without a teacher present.
+
+Every activity also has a **list view** that shows the same stations, texts and questions as an
+ordinary page section. It works with a keyboard and a screen reader, and it is used automatically
+when a browser cannot show 3D.
+
+## Requirements
+
+- Moodle 5.2 (`$plugin->supported = [502, 502]`).
+- A browser with WebGL for the 3D room. The list view needs nothing special.
+- No external services: the 3D viewer (three.js) is bundled in the plugin and makes no calls to
+  other sites.
+
+## Installation
+
+1. Copy this repository to `public/mod/mavr` in your Moodle code (Moodle 5.x keeps plugins under
+   `public/`).
+2. Visit *Site administration > Notifications* to install it.
+3. Optionally review *Site administration > Plugins > Activity modules > MAVR*: maximum model file
+   size, statements per request, statements per attempt and the launch token lifetime.
+
+The plugin includes two sub-plugins that install with it:
+
+| Sub-plugin | Path | Purpose |
+|---|---|---|
+| `mavrruntime_builtin` | `runtime/builtin` | The built-in viewer: 3D room and list view, inside Moodle. |
+| `mavrtemplate_gallery` | `template/gallery` | The *Gallery walk* template. |
+
+On installation the plugin registers the `.glb` file type (`model/gltf-binary`) if the site does
+not have it yet, so teachers can upload 3D models. Uninstalling the plugin removes it again.
+
+## Using it
+
+1. In a course, add a **MAVR** activity.
+2. Choose the **Gallery walk** template and an environment (*Gallery hall*, *Courtyard*, or your own
+   GLB model).
+3. Add stations: a title, a text, optionally a 3D model or an image, and optionally a question from
+   the course question banks. Mark stations as required and give them points.
+4. Choose a grading method (highest, average or last attempt), the number of attempts, and the
+   completion rule *Complete all required objectives* if wanted.
+
+Students open the activity, enter the 3D room (or the list view), visit the stations and answer the
+questions. A question opens once its station has been visited. When they finish the attempt the
+grade goes to the gradebook and completion is updated. Teachers see each student's attempts,
+objectives and recorded statements under *Reports* and can delete attempts there.
+
+### Controls in the 3D room
+
+- Computer: W, A, S, D or the arrow keys to move (Shift to go faster), drag to look around, click
+  the floor to walk there, click a station's marker to open it, Enter to open what is in the middle
+  of the screen.
+- Touch screen: the stick at the bottom left to move, drag to look around, tap to walk or open.
+
+## Phase 1 scope (this release)
+
+Included:
+
+- The activity with scenes, task graph (objectives and rules), attempts, grading and completion.
+- The built-in single-user viewer for desktop and phone browsers, and the accessible list view.
+- The Gallery walk template with two bundled procedural environments and uploaded GLB rooms.
+- Question-bank questions graded by Moodle's question engine.
+- xAPI statements through Moodle's xAPI web service, validated and stored by the activity.
+- Teacher reports, privacy provider, backup and restore, course reset and clean uninstall.
+
+Not yet included (planned for later phases): scene editor, escape-chain template, WebXR
+(VR, AR and MR headsets), live multi-user rooms, the companion service and Hubs integration,
+spatial analytics and Moodle app support.
+
+## Trust model
+
+The browser only reports what the student did (entered a station, opened an object). It never sends
+scores. The server replays the attempt's recorded actions through the activity's task graph to
+compute objectives and the grade, rejects actions on objectives that are still locked, and grades
+questions only with the question engine. Actions reported by the browser are labelled as such in the
+reports.
+
+## Licence
+
+GNU GPL v3 or later; see `LICENSE`. Bundled third-party code is listed in
+`runtime/builtin/thirdpartylibs.xml`. Some grading and reporting code was adapted from
+[mod_gear](https://moodle.org/plugins/mod_gear) by Boban Blagojevic (GPL v3); the files concerned
+carry his copyright line.

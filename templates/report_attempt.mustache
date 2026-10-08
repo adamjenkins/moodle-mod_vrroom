@@ -1,0 +1,141 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_mavr/report_attempt
+
+    One attempt in the MAVR report: summary, objectives and statement timeline.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * none
+
+    Context variables required for this template:
+    * heading, user, state, score, grade, timestart, timefinish - plain text
+    * objectives - rows: id, title (HTML-safe), status, statuslabel, badgeclass, required, earned, points
+    * statements - rows: time, verb, objecttype, objectname (HTML-safe), result, clientasserted, source
+    * clienthelp - rendered help icon (HTML)
+    * backurl, candelete, deleteurl
+
+    Example context (json):
+    {
+        "cmid": 12,
+        "attemptid": 7,
+        "heading": "Attempt 1 by Student One",
+        "user": "Student One",
+        "state": "Finished",
+        "score": "75.00 %",
+        "grade": "75.00",
+        "timestart": "Thursday, 8 October 2026, 10:00 AM",
+        "timefinish": "Thursday, 8 October 2026, 10:20 AM",
+        "hasobjectives": true,
+        "objectives": [
+            {"id": "v-1", "title": "Visit The Vase", "status": "completed", "statuslabel": "Completed",
+             "badgeclass": "bg-success", "required": true, "earned": "0.00", "points": "0.00"}
+        ],
+        "hasstatements": true,
+        "statements": [
+            {"time": "Thursday, 8 October 2026, 10:01 AM", "verb": "entered", "objecttype": "station",
+             "objectname": "The Vase", "result": "", "clientasserted": true, "source": "Browser"},
+            {"time": "Thursday, 8 October 2026, 10:02 AM", "verb": "answered", "objecttype": "question",
+             "objectname": "Answer the question at The Vase", "result": "1.00 / 1.00", "clientasserted": false,
+             "source": "Server"}
+        ],
+        "clienthelp": "",
+        "backurl": "https://example.com/mod/mavr/report.php?id=12",
+        "candelete": true,
+        "deleteurl": "https://example.com/mod/mavr/report.php?id=12&delete=7"
+    }
+}}
+<div class="mod-mavr-report" data-region="mavr-report-attempt" data-attemptid="{{attemptid}}">
+    <h3>{{heading}}</h3>
+    <dl class="row">
+        <dt class="col-sm-3">{{#str}}reportstate, mod_mavr{{/str}}</dt>
+        <dd class="col-sm-9">{{state}}</dd>
+        <dt class="col-sm-3">{{#str}}reportscore, mod_mavr{{/str}}</dt>
+        <dd class="col-sm-9">{{score}}</dd>
+        <dt class="col-sm-3">{{#str}}reportgrade, mod_mavr{{/str}}</dt>
+        <dd class="col-sm-9">{{grade}}</dd>
+        <dt class="col-sm-3">{{#str}}reporttimestart, mod_mavr{{/str}}</dt>
+        <dd class="col-sm-9">{{timestart}}</dd>
+        <dt class="col-sm-3">{{#str}}reporttimefinish, mod_mavr{{/str}}</dt>
+        <dd class="col-sm-9">{{timefinish}}</dd>
+    </dl>
+
+    <h4>{{#str}}reportobjectives, mod_mavr{{/str}}</h4>
+    {{#hasobjectives}}
+    <div class="table-responsive">
+        <table class="table table-sm generaltable" data-region="mavr-report-objectives">
+            <thead>
+                <tr>
+                    <th scope="col">{{#str}}reportobjective, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportobjectivestatus, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportpoints, mod_mavr{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#objectives}}
+                <tr data-objective="{{id}}" data-status="{{status}}">
+                    <td>{{{title}}}{{#required}} <span class="badge bg-light text-dark">{{#str}}required{{/str}}</span>{{/required}}</td>
+                    <td><span class="badge {{badgeclass}}">{{statuslabel}}</span></td>
+                    <td>{{earned}} / {{points}}</td>
+                </tr>
+                {{/objectives}}
+            </tbody>
+        </table>
+    </div>
+    {{/hasobjectives}}
+
+    <h4>{{#str}}reportstatements, mod_mavr{{/str}}</h4>
+    {{#hasstatements}}
+    <div class="table-responsive">
+        <table class="table table-sm generaltable" data-region="mavr-report-statements">
+            <thead>
+                <tr>
+                    <th scope="col">{{#str}}reporttime, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportverb, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportobject, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportresult, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportsource, mod_mavr{{/str}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#statements}}
+                <tr>
+                    <td>{{time}}</td>
+                    <td>{{verb}}</td>
+                    <td>{{objecttype}}: {{{objectname}}}</td>
+                    <td>{{result}}</td>
+                    <td>
+                        {{#clientasserted}}<span class="badge bg-warning text-dark">{{source}}</span> {{{clienthelp}}}{{/clientasserted}}
+                        {{^clientasserted}}<span class="badge bg-secondary">{{source}}</span>{{/clientasserted}}
+                    </td>
+                </tr>
+                {{/statements}}
+            </tbody>
+        </table>
+    </div>
+    {{/hasstatements}}
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <a href="{{backurl}}" class="btn btn-secondary">{{#str}}reportoverview, mod_mavr{{/str}}</a>
+        {{#candelete}}
+        <a href="{{deleteurl}}" class="btn btn-outline-danger">{{#str}}reportdeleteattempt, mod_mavr{{/str}}</a>
+        {{/candelete}}
+    </div>
+</div>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="mod/mavr/db" VERSION="2026100800" COMMENT="XMLDB file for Moodle mod/mavr"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="mavr" COMMENT="One row per MAVR activity.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="course" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The course this activity is in."/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Activity name."/>
+        <FIELD NAME="intro" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Activity description."/>
+        <FIELD NAME="introformat" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Format of the intro field."/>
+        <FIELD NAME="runtime" TYPE="char" LENGTH="40" NOTNULL="true" DEFAULT="builtin" SEQUENCE="false" COMMENT="Short name of the mavrruntime sub-plugin that delivers the room."/>
+        <FIELD NAME="template" TYPE="char" LENGTH="40" NOTNULL="true" DEFAULT="gallery" SEQUENCE="false" COMMENT="Short name of the mavrtemplate sub-plugin that built the room. Fixed after creation."/>
+        <FIELD NAME="templateconfig" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON configuration of the template, so the form can be edited again."/>
+        <FIELD NAME="graphjson" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Current task graph (mavr-graph/1), a copy of the latest mavr_graphs row."/>
+        <FIELD NAME="graphversion" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Current graph version (mavr_graphs.version)."/>
+        <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="100" SEQUENCE="false" COMMENT="Maximum grade (points only; 0 = no grade)."/>
+        <FIELD NAME="grademethod" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="How attempt scores combine: 1 highest, 2 average, 3 last."/>
+        <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attempts allowed per user; 0 = unlimited."/>
+        <FIELD NAME="completionobjectives" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: all required objectives completed in a finished attempt."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="course" TYPE="foreign" FIELDS="course" REFTABLE="course" REFFIELDS="id"/>
+      </KEYS>
+    </TABLE>
+    <TABLE NAME="mavr_scenes" COMMENT="Scene documents (mavr-scene/1) of an activity.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="idnumber" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Scene id (uuid) used in the scene document and in statement IRIs."/>
+        <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="Scene name."/>
+        <FIELD NAME="sortorder" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Order of the scene; the first is the start scene."/>
+        <FIELD NAME="scenejson" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="The scene document as JSON."/>
+        <FIELD NAME="schemaversion" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="mavr-scene/1" SEQUENCE="false" COMMENT="Schema of scenejson."/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="mavrid-idnumber" UNIQUE="true" FIELDS="mavrid, idnumber"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="mavr_graphs" COMMENT="Every version of an activity's task graph (mavr-graph/1), so old attempts can be replayed.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="version" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Graph version, 1 upwards per activity."/>
+        <FIELD NAME="graphjson" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="The graph document as JSON."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="mavrid-version" UNIQUE="true" FIELDS="mavrid, version"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="mavr_slots" COMMENT="Question slots of an activity. question_references.itemid points at these rows.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="slot" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Slot number used by the graph, 1..n."/>
+        <FIELD NAME="objectiveid" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="The answer_question objective this slot belongs to."/>
+        <FIELD NAME="maxmark" TYPE="number" LENGTH="12" NOTNULL="true" DEFAULT="1" SEQUENCE="false" DECIMALS="7" COMMENT="Mark the question is out of."/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="mavrid-slot" UNIQUE="true" FIELDS="mavrid, slot"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="mavr_attempts" COMMENT="One row per attempt of a user at an activity.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The user making the attempt."/>
+        <FIELD NAME="attempt" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attempt number per user, 1 upwards."/>
+        <FIELD NAME="state" TYPE="char" LENGTH="16" NOTNULL="true" DEFAULT="inprogress" SEQUENCE="false" COMMENT="inprogress, finished or abandoned."/>
+        <FIELD NAME="uniqueid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The question usage of this attempt."/>
+        <FIELD NAME="slotmap" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON map from graph slot number to question usage slot number."/>
+        <FIELD NAME="graphversion" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Graph version the attempt is played under."/>
+        <FIELD NAME="score" TYPE="number" LENGTH="10" NOTNULL="false" SEQUENCE="false" DECIMALS="5" COMMENT="Score as a fraction 0..1, recomputed from the events."/>
+        <FIELD NAME="requireddone" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when every required objective has been completed."/>
+        <FIELD NAME="timestart" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timefinish" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+        <KEY NAME="uniqueid" TYPE="foreign-unique" FIELDS="uniqueid" REFTABLE="question_usages" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="mavrid-userid-attempt" UNIQUE="true" FIELDS="mavrid, userid, attempt"/>
+        <INDEX NAME="state" UNIQUE="false" FIELDS="state"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="mavr_events" COMMENT="Accepted xAPI statements of an attempt, in order of acceptance.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="attemptid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The attempt."/>
+        <FIELD NAME="statementid" TYPE="char" LENGTH="36" NOTNULL="true" SEQUENCE="false" COMMENT="Statement id (lowercase uuid); unique, so a resend is ignored."/>
+        <FIELD NAME="verb" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="Short verb of the mavr-vocab/1 vocabulary."/>
+        <FIELD NAME="objecttype" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="activity, scene, zone, object, question or objective."/>
+        <FIELD NAME="sceneid" TYPE="char" LENGTH="36" NOTNULL="false" SEQUENCE="false" COMMENT="Scene id, when the object is in a scene."/>
+        <FIELD NAME="objectid" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false" COMMENT="Object id; null for the activity."/>
+        <FIELD NAME="resultjson" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Result calculated by the server, as JSON."/>
+        <FIELD NAME="clientasserted" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when the browser reported the statement."/>
+        <FIELD NAME="timestamp" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the client says it happened (clamped)."/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the server recorded it."/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="attemptid" TYPE="foreign" FIELDS="attemptid" REFTABLE="mavr_attempts" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="statementid" UNIQUE="true" FIELDS="statementid"/>
+        <INDEX NAME="attemptid-verb" UNIQUE="false" FIELDS="attemptid, verb"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>

@@ -1,0 +1,10 @@
+{
+    "subplugintypes": {
+        "mavrruntime": "runtime",
+        "mavrtemplate": "template"
+    },
+    "plugintypes": {
+        "mavrruntime": "mod/mavr/runtime",
+        "mavrtemplate": "mod/mavr/template"
+    }
+}

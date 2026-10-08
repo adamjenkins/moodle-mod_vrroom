@@ -1,0 +1,290 @@
+{
+  "name": "gallery_ordered",
+  "intent": "Realistic 3-station ordered gallery compile (visit chain, questions, sequence, finish rule) with a full walk-through including server events (launched, completed objective) and early locked attempts.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "hidden": [],
+    "objectives": [
+      {
+        "id": "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+        "type": "visit_zone",
+        "title": "Visit Vase",
+        "zone": "z-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+        "points": 0,
+        "required": true,
+        "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11"
+      },
+      {
+        "id": "q-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+        "type": "answer_question",
+        "title": "Answer the question at Vase",
+        "slot": 1,
+        "points": 2,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b"
+          ]
+        }
+      },
+      {
+        "id": "v-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+        "type": "visit_zone",
+        "title": "Visit Portrait",
+        "zone": "z-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+        "points": 1,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b"
+          ]
+        },
+        "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11"
+      },
+      {
+        "id": "v-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+        "type": "visit_zone",
+        "title": "Visit Tapestry",
+        "zone": "z-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+        "points": 0,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e"
+          ]
+        },
+        "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11"
+      },
+      {
+        "id": "q-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+        "type": "answer_question",
+        "title": "Answer the question at Tapestry",
+        "slot": 2,
+        "points": 3,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0"
+          ]
+        }
+      },
+      {
+        "id": "s-order",
+        "type": "sequence",
+        "title": "Visit the stations in order",
+        "steps": [
+          "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+          "v-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+          "v-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0"
+        ],
+        "points": 0,
+        "required": false
+      }
+    ],
+    "rules": [
+      {
+        "id": "r-open-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b"
+        },
+        "actions": [
+          {
+            "do": "open_question",
+            "slot": 1
+          }
+        ]
+      },
+      {
+        "id": "r-open-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+        "on": {
+          "on": "objective_completed",
+          "objective": "v-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0"
+        },
+        "actions": [
+          {
+            "do": "open_question",
+            "slot": 2
+          }
+        ]
+      },
+      {
+        "id": "r-finish",
+        "on": {
+          "on": "all_required_completed"
+        },
+        "actions": [
+          {
+            "do": "finish"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "launched",
+      "type": "activity",
+      "id": "",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "initialized",
+      "type": "activity",
+      "id": "",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "scene",
+      "id": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "h-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0.75
+    },
+    {
+      "verb": "completed",
+      "type": "objective",
+      "id": "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "2",
+      "scene": null,
+      "fraction": 1
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "exited",
+      "type": "zone",
+      "id": "z-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+      "scene": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
+      "fraction": null
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "2",
+      "scene": null,
+      "fraction": 0.5
+    },
+    {
+      "verb": "terminated",
+      "type": "activity",
+      "id": "",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "ignored",
+      "ignored",
+      "ignored",
+      "locked",
+      "applied",
+      "ignored",
+      "applied",
+      "ignored",
+      "locked",
+      "applied",
+      "ignored",
+      "applied",
+      "applied",
+      "ignored"
+    ],
+    "objectives": {
+      "v-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b": {
+        "status": "completed",
+        "earned": 0
+      },
+      "q-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b": {
+        "status": "completed",
+        "earned": 1.5
+      },
+      "v-8b7c6d5e-4f3a-4b2c-8d1e-0f9a8b7c6d5e": {
+        "status": "completed",
+        "earned": 1
+      },
+      "v-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0": {
+        "status": "completed",
+        "earned": 0
+      },
+      "q-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0": {
+        "status": "completed",
+        "earned": 1.5
+      },
+      "s-order": {
+        "status": "completed",
+        "earned": 0
+      }
+    },
+    "earnedpoints": 4,
+    "maxpoints": 6,
+    "score": 0.66667,
+    "requireddone": 5,
+    "requiredtotal": 5,
+    "finished": true,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": [
+      {
+        "event": 4,
+        "rule": "r-open-3f2a9c1e-7b4d-4e8a-9c21-5d6e7f809a1b",
+        "do": "open_question",
+        "target": "1"
+      },
+      {
+        "event": 11,
+        "rule": "r-open-c4d3e2f1-a0b9-4c8d-b7e6-f5a4b3c2d1e0",
+        "do": "open_question",
+        "target": "2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "name": "answer_while_locked",
+  "intent": "An answered event before the visit is locked and earns nothing.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit the vase",
+        "zone": "z1",
+        "points": 0,
+        "required": true
+      },
+      {
+        "id": "q1",
+        "type": "answer_question",
+        "title": "Answer the vase question",
+        "slot": 1,
+        "points": 1,
+        "required": true,
+        "unlock": {
+          "after": [
+            "v1"
+          ]
+        }
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "applied"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 0
+      },
+      "q1": {
+        "status": "available",
+        "earned": 0
+      }
+    },
+    "earnedpoints": 0,
+    "maxpoints": 1,
+    "score": 0,
+    "requireddone": 1,
+    "requiredtotal": 2,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": []
+  }
+}

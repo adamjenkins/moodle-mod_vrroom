@@ -1,0 +1,144 @@
+{
+  "name": "unlock_action_cascade",
+  "intent": "A rule unlock action forces a locked objective available, which fires an objective_unlocked rule; objectives available at initialisation fire no objective_unlocked trigger; a once rule does not re-fire.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit the vault",
+        "zone": "z1",
+        "points": 1,
+        "required": false
+      },
+      {
+        "id": "x",
+        "type": "interact",
+        "title": "Open the chest",
+        "target": "o-x",
+        "points": 1,
+        "unlock": {
+          "after": [
+            "v1"
+          ]
+        }
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "on": {
+          "on": "event",
+          "verb": "interacted",
+          "type": "object",
+          "id": "o-key"
+        },
+        "actions": [
+          {
+            "do": "unlock",
+            "objective": "x"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "on": {
+          "on": "objective_unlocked",
+          "objective": "x"
+        },
+        "actions": [
+          {
+            "do": "play_media",
+            "target": "m-fanfare"
+          }
+        ]
+      },
+      {
+        "id": "r3",
+        "on": {
+          "on": "objective_unlocked",
+          "objective": "v1"
+        },
+        "actions": [
+          {
+            "do": "teleport",
+            "target": "spawn-never"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-x",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-key",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-x",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o-key",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "ignored",
+      "applied",
+      "applied",
+      "ignored"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 1
+      },
+      "x": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 2,
+    "maxpoints": 2,
+    "score": 1,
+    "requireddone": 0,
+    "requiredtotal": 0,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": [
+      {
+        "event": 1,
+        "rule": "r2",
+        "do": "play_media",
+        "target": "m-fanfare"
+      }
+    ]
+  }
+}

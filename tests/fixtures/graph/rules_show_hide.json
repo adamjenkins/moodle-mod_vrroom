@@ -1,0 +1,137 @@
+{
+  "name": "rules_show_hide",
+  "intent": "Initial hidden list; show/hide via event rules (ignored events still trigger rules); once false re-fires; a once rule with wildcard verb and id fires only for the first object event; hidden output is sorted.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "hidden": [
+      "t-9",
+      "t-2",
+      "t-1"
+    ],
+    "objectives": [
+      {
+        "id": "v1",
+        "type": "visit_zone",
+        "title": "Visit the hall",
+        "zone": "z1",
+        "points": 0,
+        "required": false
+      }
+    ],
+    "rules": [
+      {
+        "id": "r1",
+        "on": {
+          "on": "event",
+          "verb": "entered",
+          "type": "zone",
+          "id": "z1"
+        },
+        "once": false,
+        "actions": [
+          {
+            "do": "show",
+            "target": "t-1"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "on": {
+          "on": "event",
+          "verb": "exited",
+          "type": "zone",
+          "id": "z1"
+        },
+        "once": false,
+        "actions": [
+          {
+            "do": "hide",
+            "target": "t-1"
+          }
+        ]
+      },
+      {
+        "id": "r3",
+        "on": {
+          "on": "event",
+          "type": "object"
+        },
+        "actions": [
+          {
+            "do": "show",
+            "target": "t-2"
+          },
+          {
+            "do": "hide",
+            "target": "t-3"
+          }
+        ]
+      }
+    ]
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "exited",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z1",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o5",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "interacted",
+      "type": "object",
+      "id": "o6",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "ignored",
+      "applied",
+      "ignored",
+      "ignored"
+    ],
+    "objectives": {
+      "v1": {
+        "status": "completed",
+        "earned": 0
+      }
+    },
+    "earnedpoints": 0,
+    "maxpoints": 0,
+    "score": 0,
+    "requireddone": 0,
+    "requiredtotal": 0,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [
+      "t-3",
+      "t-9"
+    ],
+    "effects": []
+  }
+}

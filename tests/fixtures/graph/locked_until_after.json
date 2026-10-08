@@ -1,0 +1,80 @@
+{
+  "name": "locked_until_after",
+  "intent": "Visit B before A is locked; after A, B applies.",
+  "graph": {
+    "schema": "mavr-graph/1",
+    "objectives": [
+      {
+        "id": "a",
+        "type": "visit_zone",
+        "title": "Visit A",
+        "zone": "z-a",
+        "points": 1,
+        "required": false
+      },
+      {
+        "id": "b",
+        "type": "visit_zone",
+        "title": "Visit B",
+        "zone": "z-b",
+        "points": 1,
+        "required": false,
+        "unlock": {
+          "after": [
+            "a"
+          ]
+        }
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-b",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-a",
+      "scene": null,
+      "fraction": null
+    },
+    {
+      "verb": "entered",
+      "type": "zone",
+      "id": "z-b",
+      "scene": null,
+      "fraction": null
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "locked",
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "a": {
+        "status": "completed",
+        "earned": 1
+      },
+      "b": {
+        "status": "completed",
+        "earned": 1
+      }
+    },
+    "earnedpoints": 2,
+    "maxpoints": 2,
+    "score": 1,
+    "requireddone": 0,
+    "requiredtotal": 0,
+    "finished": false,
+    "allrequiredcompleted": false,
+    "hidden": [],
+    "effects": []
+  }
+}
