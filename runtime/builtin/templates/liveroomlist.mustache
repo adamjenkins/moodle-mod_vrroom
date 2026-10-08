@@ -1,0 +1,97 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template vrroomruntime_builtin/liveroomlist
+
+    The list of the live rooms of an activity (or of a group) before joining: each room with its
+    occupancy and a Join button (or "(full)"), and in rooms students open the "Start a new room"
+    button with the reason when no more rooms can be opened. Rendered by live/panel into the
+    vrroom-live-roomsbody region of vrroomruntime_builtin/liveroom.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * data-region: vrroom-live-roomlist, vrroom-live-room, vrroom-live-roomname, vrroom-live-occupancy,
+      vrroom-live-roomfull, vrroom-live-noroom, vrroom-live-allfull, vrroom-live-startreason
+    * data-action: vrroom-live-joinroom, vrroom-live-start
+    * data-room: the room number of a room and of its Join button
+
+    Context variables required for this template:
+    * cmid - course module id
+    * rooms - [{number, name, count, capacity, joinable}] the rooms; name is plain text from the server
+    * hasrooms - there is at least one room
+    * dynamic - students open rooms (shows "Start a new room")
+    * norooms - students open rooms and none is open
+    * allfull - fixed rooms, and every room is full
+    * canstart - a new room can be started now
+    * startlimit - no new room can be started because the most rooms are open
+    * maxrooms - the most rooms open at once
+    * busy - a join is running (buttons disabled)
+
+    Example context (json):
+    {
+        "cmid": 12,
+        "rooms": [
+            {"number": 1, "name": "Room 1", "count": 2, "capacity": 2, "joinable": false},
+            {"number": 2, "name": "Room 2", "count": 1, "capacity": 2, "joinable": true}
+        ],
+        "hasrooms": true,
+        "dynamic": true,
+        "norooms": false,
+        "allfull": false,
+        "canstart": false,
+        "startlimit": true,
+        "maxrooms": 2,
+        "busy": false
+    }
+}}
+{{#norooms}}
+<p class="mb-2" data-region="vrroom-live-noroom">{{#str}}livenorooms, vrroomruntime_builtin{{/str}}</p>
+{{/norooms}}
+{{#allfull}}
+<p class="mb-2" data-region="vrroom-live-allfull">{{#str}}liveallfull, vrroomruntime_builtin{{/str}}</p>
+{{/allfull}}
+{{#hasrooms}}
+<ul class="list-group mb-2 vrroom-live-roomlist" data-region="vrroom-live-roomlist">
+    {{#rooms}}
+    <li class="list-group-item d-flex flex-wrap align-items-center gap-2" data-region="vrroom-live-room" data-room="{{number}}">
+        <span data-region="vrroom-live-roomname" id="vrroom-live-roomname-{{cmid}}-{{number}}">{{name}}</span>
+        <span class="text-muted small" data-region="vrroom-live-occupancy">{{#str}}liveroomoccupancy, vrroomruntime_builtin, {"count": {{count}}, "capacity": {{capacity}} }{{/str}}</span>
+        {{#joinable}}
+        <button type="button" class="btn btn-primary btn-sm ms-auto" data-action="vrroom-live-joinroom" data-room="{{number}}" id="vrroom-live-joinroom-{{cmid}}-{{number}}" aria-labelledby="vrroom-live-joinroom-{{cmid}}-{{number}} vrroom-live-roomname-{{cmid}}-{{number}}"{{#busy}} disabled{{/busy}}>{{#str}}liveroomjoin, vrroomruntime_builtin{{/str}}</button>
+        {{/joinable}}
+        {{^joinable}}
+        <span class="text-muted ms-auto" data-region="vrroom-live-roomfull">{{#str}}liveroomfull, vrroomruntime_builtin{{/str}}</span>
+        {{/joinable}}
+    </li>
+    {{/rooms}}
+</ul>
+{{/hasrooms}}
+{{#dynamic}}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    {{#canstart}}
+    <button type="button" class="btn btn-outline-primary" data-action="vrroom-live-start"{{#busy}} disabled{{/busy}}>{{#str}}livestartroom, vrroomruntime_builtin{{/str}}</button>
+    {{/canstart}}
+    {{^canstart}}
+    <button type="button" class="btn btn-outline-primary" data-action="vrroom-live-start" disabled{{#startlimit}} aria-describedby="vrroom-live-startreason-{{cmid}}"{{/startlimit}}>{{#str}}livestartroom, vrroomruntime_builtin{{/str}}</button>
+    {{#startlimit}}
+    <p class="small text-muted mb-0" data-region="vrroom-live-startreason" id="vrroom-live-startreason-{{cmid}}">{{#str}}livestartlimit, vrroomruntime_builtin, {{maxrooms}}{{/str}}</p>
+    {{/startlimit}}
+    {{/canstart}}
+</div>
+{{/dynamic}}

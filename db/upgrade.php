@@ -55,5 +55,16 @@ function xmldb_vrroom_upgrade(int $oldversion): bool {
         upgrade_mod_savepoint(true, 2026100801, 'vrroom');
     }
 
+    if ($oldversion < 2026100803) {
+        // Several live rooms: in fixed mode the number of rooms, in dynamic mode the most open at once.
+        // Existing activities get 1, so live mode 1 keeps today's behaviour: one fixed room.
+        $table = new xmldb_table('vrroom');
+        $field = new xmldb_field('liverooms', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '1', 'livemaxusers');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_mod_savepoint(true, 2026100803, 'vrroom');
+    }
+
     return true;
 }

@@ -71,7 +71,12 @@ final class instance_manager {
         $vrroom->questionmode = mode::clean($data->questionmode ?? mode::ONCE);
         $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty ?? mode::DEFAULT_PENALTY);
         $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
-        $vrroom->livemode = empty($data->livemode) ? 0 : 1;
+        $multi = live_settings::runtime_has_multirooms($runtimename);
+        $vrroom->livemode = live_settings::clean_mode($data->livemode ?? live_settings::MODE_OFF, $multi);
+        $vrroom->liverooms = live_settings::clean_rooms(
+            $data->liverooms ?? live_settings::DEFAULT_ROOMS,
+            $vrroom->livemode
+        );
         $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
         $vrroom->customised = 0;
         $vrroom->timecreated = $now;
@@ -153,10 +158,22 @@ final class instance_manager {
             $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty);
         }
         $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $multi = live_settings::runtime_has_multirooms($vrroom->runtime);
         if (property_exists($data, 'livemode')) {
             // Without these fields (no run mode can run a live room) the stored values stay.
-            $vrroom->livemode = empty($data->livemode) ? 0 : 1;
+            $vrroom->livemode = live_settings::clean_mode($data->livemode, $multi);
+            $vrroom->liverooms = live_settings::clean_rooms(
+                $data->liverooms ?? ($vrroom->liverooms ?? live_settings::DEFAULT_ROOMS),
+                $vrroom->livemode
+            );
             $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? ($vrroom->livemaxusers ?? 6));
+        } else {
+            // The stored values may meet another run mode: one that runs a single room never gets mode 2.
+            $vrroom->livemode = live_settings::clean_mode($vrroom->livemode ?? live_settings::MODE_OFF, $multi);
+            $vrroom->liverooms = live_settings::clean_rooms(
+                $vrroom->liverooms ?? live_settings::DEFAULT_ROOMS,
+                $vrroom->livemode
+            );
         }
         $vrroom->timemodified = time();
 
@@ -182,6 +199,7 @@ final class instance_manager {
                     'completionobjectives' => $vrroom->completionobjectives,
                     'livemode' => $vrroom->livemode,
                     'livemaxusers' => $vrroom->livemaxusers,
+                    'liverooms' => $vrroom->liverooms,
                     'timemodified' => $vrroom->timemodified,
                 ]);
             } else {

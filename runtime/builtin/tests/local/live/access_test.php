@@ -43,6 +43,14 @@ final class access_test extends \advanced_testcase {
         $off->livemode = 0;
         $this->assertFalse(access::is_available($off));
 
+        $dynamic = clone $vrroom;
+        $dynamic->livemode = 2;
+        $this->assertTrue(access::is_available($dynamic));
+
+        $unknown = clone $vrroom;
+        $unknown->livemode = 3;
+        $this->assertFalse(access::is_available($unknown));
+
         $other = clone $vrroom;
         $other->runtime = 'companion';
         $this->assertFalse(access::is_available($other));
@@ -56,6 +64,37 @@ final class access_test extends \advanced_testcase {
         $this->assertSame(2, access::max_peers((object)['livemaxusers' => 2]));
         $this->assertSame(4, access::max_peers((object)['livemaxusers' => 4]));
         $this->assertSame(room_manager::MAX_PEERS, access::max_peers((object)['livemaxusers' => 50]));
+    }
+
+    /**
+     * Number of rooms and room mode, cleaned; an activity from before rooms (no liverooms) has one fixed room.
+     */
+    public function test_max_rooms_and_room_mode(): void {
+        $this->assertSame(1, access::max_rooms((object)['livemode' => 1, 'liverooms' => 0]));
+        $this->assertSame(0, access::max_rooms((object)['livemode' => 2, 'liverooms' => 0]));
+        $this->assertSame(20, access::max_rooms((object)['livemode' => 1, 'liverooms' => 25]));
+        $this->assertSame(20, access::max_rooms((object)['livemode' => 2, 'liverooms' => 25]));
+        $this->assertSame(3, access::max_rooms((object)['livemode' => 1, 'liverooms' => 3]));
+        $this->assertSame(1, access::max_rooms((object)['livemode' => 1]));
+
+        $this->assertSame('fixed', access::room_mode((object)['livemode' => 1]));
+        $this->assertSame('dynamic', access::room_mode((object)['livemode' => 2]));
+        $this->assertSame('fixed', access::room_mode((object)['livemode' => 0]));
+    }
+
+    /**
+     * Room labels: "Room 2", or with the group's plain name in group mode.
+     */
+    public function test_room_label(): void {
+        $this->resetAfterTest();
+        [$cm, $context, , $course] = $this->create_activity(null, SEPARATEGROUPS);
+        $group = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Blue <b>team</b>']);
+
+        $this->assertSame(get_string('liveroomname', 'vrroomruntime_builtin', 2), access::room_label($cm, $context, 0, 2));
+        $this->assertSame(
+            get_string('liveroomnamegroup', 'vrroomruntime_builtin', ['group' => 'Blue team', 'number' => 3]),
+            access::room_label($cm, $context, (int)$group->id, 3)
+        );
     }
 
     /**
@@ -208,10 +247,13 @@ final class access_test extends \advanced_testcase {
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $this->getDataGenerator()->create_group_member(['groupid' => $group->id, 'userid' => $student->id]);
         $attempt = $this->vrroom_generator()->create_attempt((int)$vrroom->id, (int)$student->id);
-        $peer = (object)['vrroomid' => (int)$vrroom->id, 'groupid' => (int)$group->id, 'userid' => (int)$student->id,
-            'kind' => 'attempt', 'attemptid' => (int)$attempt->id];
+        $peer = (object)['vrroomid' => (int)$vrroom->id, 'groupid' => (int)$group->id, 'room' => 1,
+            'userid' => (int)$student->id, 'kind' => 'attempt', 'attemptid' => (int)$attempt->id];
 
         $this->assertTrue(access::still_allowed($peer, $cm, $context, $vrroom));
+
+        // A presence without a room number is never in a room.
+        $this->assertFalse(access::still_allowed((object)(['room' => 0] + (array)$peer), $cm, $context, $vrroom));
 
         // Group 0 in a grouped activity is never a room.
         $this->assertFalse(access::still_allowed((object)(['groupid' => 0] + (array)$peer), $cm, $context, $vrroom));
@@ -239,6 +281,30 @@ final class access_test extends \advanced_testcase {
     }
 
     /**
+     * Fixed rooms above a lowered number of rooms close; lowering the maximum of rooms students open closes nobody.
+     */
+    public function test_still_allowed_rooms(): void {
+        $this->resetAfterTest();
+        [$cm, $context, $vrroom, $course] = $this->create_activity();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $attempt = $this->vrroom_generator()->create_attempt((int)$vrroom->id, (int)$student->id);
+        $peer = (object)['vrroomid' => (int)$vrroom->id, 'groupid' => 0, 'room' => 3, 'userid' => (int)$student->id,
+            'kind' => 'attempt', 'attemptid' => (int)$attempt->id];
+
+        $fixed = clone $vrroom;
+        $fixed->livemode = 1;
+        $fixed->liverooms = 3;
+        $this->assertTrue(access::still_allowed($peer, $cm, $context, $fixed));
+        $fixed->liverooms = 2;
+        $this->assertFalse(access::still_allowed($peer, $cm, $context, $fixed));
+
+        $dynamic = clone $vrroom;
+        $dynamic->livemode = 2;
+        $dynamic->liverooms = 1;
+        $this->assertTrue(access::still_allowed($peer, $cm, $context, $dynamic));
+    }
+
+    /**
      * The launch block when live mode is not available.
      */
     public function test_launch_block_unavailable(): void {
@@ -250,8 +316,10 @@ final class access_test extends \advanced_testcase {
 
         $block = access::launch_block($cm, $context, $vrroom, $attempt, $student);
         $this->assertSame(['available', 'canjoin', 'reason', 'transport', 'transportmodule', 'cmid', 'attemptid',
-            'maxpeers', 'groups', 'defaultgroupid', 'selfname'], array_keys($block));
+            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms'], array_keys($block));
         $this->assertFalse($block['available']);
+        $this->assertFalse($block['roomlist']);
+        $this->assertSame('fixed', $block['roommode']);
         $this->assertFalse($block['canjoin']);
         $this->assertSame('', $block['reason']);
         $this->assertSame(0, $block['maxpeers']);
@@ -286,6 +354,16 @@ final class access_test extends \advanced_testcase {
         $this->assertSame([['id' => (int)$group->id, 'name' => 'Group A & co']], $block['groups']);
         $this->assertSame((int)$group->id, $block['defaultgroupid']);
         $this->assertSame('Sam Student', $block['selfname']);
+        $this->assertTrue($block['roomlist']);
+        $this->assertSame('fixed', $block['roommode']);
+        $this->assertSame(1, $block['maxrooms']);
+
+        $dynamic = clone $vrroom;
+        $dynamic->livemode = 2;
+        $dynamic->liverooms = 0;
+        $block = access::launch_block($cm, $context, $dynamic, $attempt, $student);
+        $this->assertSame('dynamic', $block['roommode']);
+        $this->assertSame(0, $block['maxrooms']);
 
         $this->setUser($loner);
         $attempt2 = $this->vrroom_generator()->create_attempt((int)$vrroom->id, (int)$loner->id);

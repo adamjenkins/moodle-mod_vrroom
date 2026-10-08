@@ -23,7 +23,8 @@
  * Events (detail objects):
  * - state       {state, reason}       state one of STATES; reason '', 'full', 'closed', 'replaced',
  *                                      'gone', 'network', 'disabled', 'noroom', 'busy',
- *                                      'notallowed' or 'error'
+ *                                      'notallowed', 'roomgone' (a room students opened has
+ *                                      closed), 'limit' (no more rooms can be opened) or 'error'
  * - peerjoined  {peer}
  * - peerupdated {peer}
  * - peerleft    {peerid, reason}
@@ -161,10 +162,16 @@ export class Transport extends Emitter {
     }
 
     /**
-     * Join the room.
+     * Join a room.
      *
-     * @param {number|{groupid: number}} [groupid] Group room to join; the default room when left out.
-     * @returns {Promise<{self: Object, room: {groupid: number, name: string, maxpeers: number}, peers: Object[]}>}
+     * A transport with several rooms per activity (the mesh) takes {groupid, room}: room is the
+     * room number, 0 starts a new room; room.number in the result is the number actually joined.
+     * A transport with one room ignores room.
+     *
+     * @param {number|{groupid: number, room: number}} [groupid] Group whose room to join (the default
+     *     group when left out), or {groupid, room}.
+     * @returns {Promise<{self: Object, room: {groupid: number, number: number, name: string, maxpeers: number},
+     *     peers: Object[]}>}
      */
     join(groupid) { // eslint-disable-line no-unused-vars
         return notImplemented();

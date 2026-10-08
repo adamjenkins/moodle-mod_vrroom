@@ -74,7 +74,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         foreach ([1, 2, 3] as $key) {
             $this->users[$key] = $generator->create_and_enrol($course, 'student');
             $vrroomid = $key === 3 ? $this->othervrroom->id : $this->vrroom->id;
-            $this->peers[$key] = $livegen->create_peer(['vrroomid' => $vrroomid, 'userid' => $this->users[$key]->id]);
+            $this->peers[$key] = $livegen->create_peer(['vrroomid' => $vrroomid, 'userid' => $this->users[$key]->id,
+                'room' => $key + 1]);
         }
 
         $livegen->create_signal([
@@ -137,7 +138,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         );
         $this->assertInstanceOf(\core_privacy\local\metadata\types\external_location::class, $items['livepeers']);
         $this->assertEqualsCanonicalizing(
-            ['userid', 'groupid', 'timejoined', 'timeseen'],
+            ['userid', 'groupid', 'room', 'timejoined', 'timeseen'],
             array_keys($items['vrroomruntime_builtin_peers']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
@@ -206,6 +207,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertCount(1, $data->presence);
         $presence = $data->presence[0];
         $this->assertSame(0, $presence->groupid);
+        $this->assertSame(2, $presence->room);
         $this->assertSame('attempt', $presence->kind);
         $this->assertSame(transform::datetime($this->peers[1]->timejoined), $presence->timejoined);
         $this->assertSame(transform::datetime($this->peers[1]->timeseen), $presence->timeseen);

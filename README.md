@@ -107,12 +107,22 @@ credits of the rooms an activity uses are shown on its activity page.
 
 ## Live mode
 
-A teacher can turn on **Live mode** in the activity settings (*Live mode* section). Then up to six
-people (the teacher chooses 2 to 6) who are working on the activity at the same time can join a
-live room: they see each other as simple avatars in the 3D room or in VR, AR and MR, and can talk
-to each other. Each person still makes their own attempt and gets their own grade; tasks and
-objects are not shared. In group mode each group has its own room, and students join only rooms
-of their own groups.
+A teacher can turn on **Live mode** in the activity settings (*Live mode* section). Then people
+who are working on the activity at the same time can meet in live rooms of up to six (the teacher
+chooses 2 to 6 per room): they see each other as simple avatars in the 3D room or in VR, AR and MR,
+and can talk to each other. Each person still makes their own attempt and gets their own grade;
+tasks and objects are not shared. There are two kinds of live mode:
+
+- **On, fixed rooms**: the activity has the number of rooms the teacher sets (1 to 20). Students
+  choose a room with space from a list that shows how full each room is.
+- **On, students open rooms**: students join a room with space or start a new one, up to the
+  number of rooms the teacher sets (1 to 20, or no limit). A room closes when the last person
+  leaves.
+
+Teachers see the same list, can join any room with space and count towards its occupancy. In
+group mode each group has its own rooms, and students join only rooms of their own groups.
+Activities that had live mode on before rooms existed keep one fixed room. The companion run mode
+has one live room per activity (or group).
 
 Live mode is part of this plugin and **needs no companion service or other server**. The
 companion run mode is only for what live mode does not do well on its own: rooms of up to about 50
@@ -123,7 +133,7 @@ How it works and what it discloses:
 - The browsers connect **directly to each other** (WebRTC). Moodle only passes the connection
   messages between them, through web-service polling; no other service is contacted by default.
   Because the connection is direct, **each participant can see the IP addresses of the others**.
-  The activity page says so next to the *Join the live room* button, and the privacy metadata
+  The activity page says so in its live room panel, and the privacy metadata
   lists it.
 - Without STUN or TURN servers, live mode usually works only when everyone is on the same
   network. An administrator can add STUN and TURN servers (with a TURN REST shared secret, for

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/vrroom/db" VERSION="2026100800" COMMENT="XMLDB file for Moodle mod/vrroom"
+<XMLDB PATH="mod/vrroom/db" VERSION="2026100803" COMMENT="XMLDB file for Moodle mod/vrroom"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -23,8 +23,9 @@
         <FIELD NAME="retrypenalty" TYPE="number" LENGTH="10" NOTNULL="true" DEFAULT="0.3333333" SEQUENCE="false" DECIMALS="7" COMMENT="With questionmode retry: share of a question's points lost for each wrong try before the right answer."/>
         <FIELD NAME="completionobjectives" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: all required objectives completed in a finished attempt."/>
         <FIELD NAME="customised" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time of the first room editor save; 0 while the room is built by its template."/>
-        <FIELD NAME="livemode" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when people can meet in a live room (avatars, voice); every person keeps their own attempt."/>
+        <FIELD NAME="livemode" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 off, 1 on with a fixed number of rooms, 2 on with rooms students open; every person keeps their own attempt."/>
         <FIELD NAME="livemaxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="6" SEQUENCE="false" COMMENT="Maximum people in one live room, 2 upwards; the run mode caps it at what it supports."/>
+        <FIELD NAME="liverooms" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Live rooms: in fixed mode the number of rooms (1-20); in dynamic mode the most rooms open at once (0 = no limit). In group mode per group."/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

@@ -28,6 +28,7 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
 
 use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\live_settings;
 use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\runtime\registry as runtime_registry;
 use mod_vrroom\local\template\registry as template_registry;
@@ -216,12 +217,16 @@ class mod_vrroom_mod_form extends moodleform_mod {
      */
     protected function define_live_mode(\MoodleQuickForm $mform): void {
         $livecapable = [];
+        $singleroom = [];
         $livemax = 0;
         foreach (runtime_registry::get_all() as $runtimename => $runtime) {
-            $max = $runtime->capabilities()->maxusers;
-            if ($max >= 2) {
+            $capabilities = $runtime->capabilities();
+            if ($capabilities->maxusers >= 2) {
                 $livecapable[] = $runtimename;
-                $livemax = max($livemax, $max);
+                $livemax = max($livemax, $capabilities->maxusers);
+                if (!$capabilities->multirooms) {
+                    $singleroom[] = $runtimename;
+                }
             }
         }
         $mform->addElement('header', 'livemodeheader', get_string('livemodeheader', 'vrroom'));
@@ -233,10 +238,22 @@ class mod_vrroom_mod_form extends moodleform_mod {
             'select',
             'livemode',
             get_string('livemode', 'vrroom'),
-            [0 => get_string('livemodeoff', 'vrroom'), 1 => get_string('livemodeon', 'vrroom')]
+            [
+                live_settings::MODE_OFF => get_string('livemodeoff', 'vrroom'),
+                live_settings::MODE_FIXED => get_string('livemodeon', 'vrroom'),
+                live_settings::MODE_DYNAMIC => get_string('livemodedynamic', 'vrroom'),
+            ]
         );
-        $mform->setDefault('livemode', 0);
+        $mform->setDefault('livemode', live_settings::MODE_OFF);
         $mform->addHelpButton('livemode', 'livemode', 'vrroom');
+        $rooms = [0 => get_string('liveroomsnolimit', 'vrroom')];
+        for ($i = 1; $i <= live_settings::MAX_ROOMS; $i++) {
+            $rooms[$i] = $i;
+        }
+        $mform->addElement('select', 'liverooms', get_string('liverooms', 'vrroom'), $rooms);
+        $mform->setDefault('liverooms', live_settings::DEFAULT_ROOMS);
+        $mform->addHelpButton('liverooms', 'liverooms', 'vrroom');
+        $mform->hideIf('liverooms', 'livemode', 'eq', live_settings::MODE_OFF);
         $options = [];
         for ($i = 2; $i <= $livemax; $i++) {
             $options[$i] = $i;
@@ -244,10 +261,15 @@ class mod_vrroom_mod_form extends moodleform_mod {
         $mform->addElement('select', 'livemaxusers', get_string('livemaxusers', 'vrroom'), $options);
         $mform->setDefault('livemaxusers', min(6, $livemax));
         $mform->addHelpButton('livemaxusers', 'livemaxusers', 'vrroom');
-        $mform->hideIf('livemaxusers', 'livemode', 'eq', 0);
+        $mform->hideIf('livemaxusers', 'livemode', 'eq', live_settings::MODE_OFF);
         foreach (array_diff(array_keys(runtime_registry::get_all()), $livecapable) as $other) {
             $mform->hideIf('livemode', 'runtime', 'eq', $other);
+            $mform->hideIf('liverooms', 'runtime', 'eq', $other);
             $mform->hideIf('livemaxusers', 'runtime', 'eq', $other);
+        }
+        // A run mode with one live room only (the companion service) ignores the number of rooms.
+        foreach ($singleroom as $single) {
+            $mform->hideIf('liverooms', 'runtime', 'eq', $single);
         }
     }
 
@@ -268,11 +290,26 @@ class mod_vrroom_mod_form extends moodleform_mod {
             // The live fields are hidden for this run mode, so the error goes on the run mode select.
             return ['runtime' => get_string('errorlivenotsupported', 'vrroom')];
         }
+        $errors = [];
         $users = (int)($data['livemaxusers'] ?? 0);
         if ($users < 2 || $users > $max) {
-            return ['livemaxusers' => get_string('errorlivemaxusers', 'vrroom', $max)];
+            $errors['livemaxusers'] = get_string('errorlivemaxusers', 'vrroom', $max);
         }
-        return [];
+        $mode = (int)$data['livemode'];
+        if (!live_settings::runtime_has_multirooms($runtimename)) {
+            // One room only: the number of rooms is hidden and ignored, dynamic rooms are impossible.
+            if ($mode === live_settings::MODE_DYNAMIC) {
+                $errors['livemode'] = get_string('errorlivedynamicnotsupported', 'vrroom');
+            }
+            return $errors;
+        }
+        $rooms = (int)($data['liverooms'] ?? live_settings::DEFAULT_ROOMS);
+        if ($rooms < 0 || $rooms > live_settings::MAX_ROOMS) {
+            $errors['liverooms'] = get_string('errorliveroomsrange', 'vrroom', live_settings::MAX_ROOMS);
+        } else if ($mode === live_settings::MODE_FIXED && $rooms === 0) {
+            $errors['liverooms'] = get_string('errorliveroomsfixed', 'vrroom', live_settings::MAX_ROOMS);
+        }
+        return $errors;
     }
 
     /**

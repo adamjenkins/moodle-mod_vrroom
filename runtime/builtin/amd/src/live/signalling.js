@@ -48,6 +48,9 @@ const MAX_PER_CALL = 10;
 /** Consecutive poll errors after which the error callback reports trouble. */
 export const RECONNECTING_AFTER = 2;
 
+/** Highest live room number (server room_manager::MAX_ROOM_NUMBER). */
+const MAX_ROOM_NUMBER = 9999;
+
 /**
  * Call one web service.
  *
@@ -94,6 +97,20 @@ const clampInterval = (interval) => {
 };
 
 /**
+ * Clean a room number: a whole number 0..MAX_ROOM_NUMBER (0 starts a new room), or null.
+ *
+ * @param {*} value The value.
+ * @returns {number|null}
+ */
+const cleanRoom = (value) => {
+    const room = Number(value);
+    if (value === undefined || value === null || value === '' || !isFinite(room) || room < 0) {
+        return null;
+    }
+    return Math.min(MAX_ROOM_NUMBER, Math.floor(room));
+};
+
+/**
  * Parse the payload strings of polled signals; signals whose payload is not a JSON object are
  * dropped.
  *
@@ -128,12 +145,15 @@ class Signalling {
     /**
      * Constructor.
      *
-     * @param {Object} liveconfig The launch config live block (cmid, attemptid, defaultgroupid).
+     * @param {Object} liveconfig The launch config live block (cmid, attemptid, defaultgroupid, and
+     *     room: the room number to join, 0 to start a new room).
      */
     constructor(liveconfig) {
         this.cmid = Number(liveconfig.cmid) || 0;
         this.attemptid = Number(liveconfig.attemptid) || 0;
         this.defaultgroupid = Number(liveconfig.defaultgroupid) || 0;
+        const room = cleanRoom(liveconfig.room);
+        this.room = room === null ? 0 : room;
         this.peerid = null;
         this.interval = MIN_INTERVAL;
         this.running = false;
@@ -161,17 +181,26 @@ class Signalling {
     /**
      * Join a room. Stops a running loop first.
      *
-     * @param {number} [groupid] Group room; the default room when left out or 0.
+     * The server checks the group, the room number and the room's capacity again; nothing sent
+     * here is trusted.
+     *
+     * @param {number} [groupid] Group whose rooms to use; the default group when left out or 0.
+     * @param {number} [room] Room number; 0 starts a new room; the configured room when left out.
      * @returns {Promise<Object>} The live_join result; rejects with an Error carrying errorcode.
      */
-    join(groupid) {
+    join(groupid, room) {
         this.stop();
         this.peerid = null;
         const group = Number(groupid);
+        const number = cleanRoom(room);
+        if (number !== null) {
+            this.room = number;
+        }
         const args = {
             cmid: this.cmid,
             attemptid: this.attemptid,
             groupid: isFinite(group) && group > 0 ? Math.floor(group) : this.defaultgroupid,
+            room: this.room,
         };
         return call('vrroomruntime_builtin_live_join', args, false).then((result) => {
             this.peerid = result.peerid;
@@ -452,6 +481,25 @@ class Signalling {
         this.dropQueue();
     }
 }
+
+/**
+ * Fetch the live rooms of an activity (or of a group) with their occupancy. Read only; does not
+ * extend the session.
+ *
+ * @param {number} cmid Course module id.
+ * @param {number} [groupid] Group whose rooms to list; 0 for the default group.
+ * @returns {Promise<Object>} The live_rooms result; rejects with an Error carrying errorcode.
+ */
+export const fetchRooms = (cmid, groupid) => {
+    const group = Number(groupid);
+    const args = {
+        cmid: Number(cmid) || 0,
+        groupid: isFinite(group) && group > 0 ? Math.floor(group) : 0,
+    };
+    return call('vrroomruntime_builtin_live_rooms', args, true).catch((exception) => {
+        throw toError(exception);
+    });
+};
 
 /**
  * Create a signalling client.

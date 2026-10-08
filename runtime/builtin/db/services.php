@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 $functions = [
     'vrroomruntime_builtin_live_join' => [
         'classname' => \vrroomruntime_builtin\external\live_join::class,
-        'description' => 'Join the live room of a VR room activity (or of the user\'s group) and return the people in it.',
+        'description' => 'Join or start a live room of a VR room activity (or of the user\'s group) and return the people in it.',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/vrroom:view',
@@ -36,6 +36,14 @@ $functions = [
         'classname' => \vrroomruntime_builtin\external\live_poll::class,
         'description' => 'Keep a live room presence alive and collect the connection messages addressed to it.',
         'type' => 'write',
+        'ajax' => true,
+        'readonlysession' => true,
+        'capabilities' => 'mod/vrroom:view',
+    ],
+    'vrroomruntime_builtin_live_rooms' => [
+        'classname' => \vrroomruntime_builtin\external\live_rooms::class,
+        'description' => 'List the live rooms of a VR room activity (or of one of the user\'s groups) with their occupancy.',
+        'type' => 'read',
         'ajax' => true,
         'readonlysession' => true,
         'capabilities' => 'mod/vrroom:view',

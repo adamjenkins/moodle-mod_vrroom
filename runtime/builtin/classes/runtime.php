@@ -37,9 +37,10 @@ use mod_vrroom\local\runtime\runtime_capabilities;
 /**
  * Built-in run mode: a three.js viewer inside the Moodle page, small live rooms, browser statements.
  *
- * Every person keeps their own attempt. With live mode on, up to six people can share a live
- * room where their browsers connect directly to each other for avatars and voice; Moodle only
- * relays the connection messages (\vrroomruntime_builtin\local\live\room_manager).
+ * Every person keeps their own attempt. With live mode on, an activity has several live rooms (a
+ * fixed number, or rooms students open) of up to six people each, where their browsers connect
+ * directly to each other for avatars and voice; Moodle only relays the connection messages
+ * (\vrroomruntime_builtin\local\live\room_manager).
  *
  * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -62,9 +63,9 @@ class runtime extends base {
     }
 
     /**
-     * What the built-in viewer can do: small live rooms with voice and avatars while live mode is on
-     * for the site (else one user), immersive VR, AR and mixed reality where the device supports
-     * them (the browser decides at run time), all objective types.
+     * What the built-in viewer can do: several small live rooms per activity with voice and avatars
+     * while live mode is on for the site (else one user), immersive VR, AR and mixed reality where
+     * the device supports them (the browser decides at run time), all objective types.
      *
      * @return runtime_capabilities
      */
@@ -76,6 +77,7 @@ class runtime extends base {
             $live,
             ['vr', 'ar', 'mr'],
             ['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'],
+            $live,
         );
     }
 

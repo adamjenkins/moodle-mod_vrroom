@@ -17,12 +17,14 @@
 namespace vrroomruntime_builtin\local\live;
 
 use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\live_settings;
 
 /**
  * Who may join which live room, and the live block of the launch config.
  *
- * A live room belongs to an activity, or to one group of it when the activity uses groups.
- * Learners join only rooms of groups they are members of, in separate and in visible groups
+ * Live rooms belong to an activity, or to one group of it when the activity uses groups, and are
+ * numbered from 1: a fixed number of rooms (live mode 1) or rooms students open up to a maximum
+ * (live mode 2). Learners join only rooms of groups they are members of, in separate and in visible groups
  * mode; people with moodle/site:accessallgroups may join any group's room. A learner needs an
  * attempt in progress; a teacher previewing needs mod/vrroom:manage.
  *
@@ -39,6 +41,12 @@ final class access {
 
     /** @var string Transport of the built-in live mode. */
     public const TRANSPORT = 'mesh';
+
+    /** @var string Room mode: a fixed number of rooms. */
+    public const ROOMMODE_FIXED = 'fixed';
+
+    /** @var string Room mode: rooms students open. */
+    public const ROOMMODE_DYNAMIC = 'dynamic';
 
     /**
      * Load an activity by course module id.
@@ -76,8 +84,53 @@ final class access {
      */
     public static function is_available(\stdClass $vrroom): bool {
         return config::is_enabled()
-            && (int)($vrroom->livemode ?? 0) === 1
+            && in_array((int)($vrroom->livemode ?? 0), [live_settings::MODE_FIXED, live_settings::MODE_DYNAMIC], true)
             && (string)($vrroom->runtime ?? '') === 'builtin';
+    }
+
+    /**
+     * The room mode of an activity.
+     *
+     * @param \stdClass $vrroom vrroom row.
+     * @return string ROOMMODE_DYNAMIC when students open rooms, else ROOMMODE_FIXED.
+     */
+    public static function room_mode(\stdClass $vrroom): string {
+        return (int)($vrroom->livemode ?? 0) === live_settings::MODE_DYNAMIC ? self::ROOMMODE_DYNAMIC : self::ROOMMODE_FIXED;
+    }
+
+    /**
+     * The number of rooms: fixed rooms 1..N (at least 1), or the most rooms students may open (0 = no limit).
+     *
+     * @param \stdClass $vrroom vrroom row.
+     * @return int
+     */
+    public static function max_rooms(\stdClass $vrroom): int {
+        return live_settings::clean_rooms(
+            $vrroom->liverooms ?? live_settings::DEFAULT_ROOMS,
+            (int)($vrroom->livemode ?? live_settings::MODE_OFF)
+        );
+    }
+
+    /**
+     * The plain label of a room: "Room 2", or "Group A: Room 2" in group mode.
+     *
+     * @param \cm_info $cm Course module.
+     * @param \context_module $context Module context.
+     * @param int $groupid The room's group, 0 without groups.
+     * @param int $room Room number.
+     * @return string
+     */
+    public static function room_label(\cm_info $cm, \context_module $context, int $groupid, int $room): string {
+        if ($groupid > 0) {
+            $group = groups_get_group($groupid, 'id, name, courseid');
+            if ($group && (int)$group->courseid === (int)$cm->course) {
+                return get_string('liveroomnamegroup', 'vrroomruntime_builtin', [
+                    'group' => self::plain((string)$group->name, $context),
+                    'number' => $room,
+                ]);
+            }
+        }
+        return get_string('liveroomname', 'vrroomruntime_builtin', $room);
     }
 
     /**
@@ -173,6 +226,9 @@ final class access {
     /**
      * Whether a presence may stay in its room (checked on every poll and send).
      *
+     * A fixed room above the current number of rooms (the teacher lowered it) is closed; lowering
+     * the maximum of rooms students open closes nobody.
+     *
      * @param \stdClass $peer vrroomruntime_builtin_peers row.
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
@@ -182,6 +238,13 @@ final class access {
     public static function still_allowed(\stdClass $peer, \cm_info $cm, \context_module $context, \stdClass $vrroom): bool {
         global $DB;
         if ((int)$peer->vrroomid !== (int)$vrroom->id || !self::is_available($vrroom)) {
+            return false;
+        }
+        $room = (int)($peer->room ?? 0);
+        if ($room < 1 || $room > room_manager::MAX_ROOM_NUMBER) {
+            return false;
+        }
+        if (self::room_mode($vrroom) === self::ROOMMODE_FIXED && $room > self::max_rooms($vrroom)) {
             return false;
         }
         $userid = (int)$peer->userid;
@@ -213,7 +276,7 @@ final class access {
     }
 
     /**
-     * The live block of the launch config (PHASE3-CONTRACT §3.1).
+     * The live block of the launch config (PHASE3-CONTRACT §3.1, LIVE-ROOMS-CONTRACT §6.1).
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
@@ -241,6 +304,9 @@ final class access {
             'groups' => [],
             'defaultgroupid' => 0,
             'selfname' => '',
+            'roomlist' => false,
+            'roommode' => self::ROOMMODE_FIXED,
+            'maxrooms' => self::max_rooms($vrroom),
         ];
         if (!self::is_available($vrroom)) {
             return $block;
@@ -249,6 +315,8 @@ final class access {
         $block['available'] = true;
         $block['maxpeers'] = self::max_peers($vrroom);
         $block['selfname'] = fullname($user);
+        $block['roomlist'] = true;
+        $block['roommode'] = self::room_mode($vrroom);
 
         if ($attempt) {
             $mayjoin = (int)$attempt->userid === $userid && (int)$attempt->vrroomid === (int)$vrroom->id

@@ -85,6 +85,9 @@ const REASONS = Object.freeze({
     errorlivenoroom: 'noroom',
     errorlivebusy: 'busy',
     errorlivenotallowed: 'notallowed',
+    errorliveroomnotfound: 'noroom',
+    errorliveroomgone: 'roomgone',
+    errorliveroomlimit: 'limit',
     network: 'network',
 });
 
@@ -648,6 +651,8 @@ class MeshTransport extends Transport {
         this.self = null;
         this.room = null;
         this.groupid = Number(this.config.defaultgroupid) || 0;
+        /** Room number to join (0 starts a new room); after a join the number actually joined. */
+        this.roomnumber = Math.max(0, Math.floor(Number(this.config.room) || 0));
         /** @type {Map<string, Object>} peer id → peer */
         this.peers = new Map();
         /** @type {Map<string, Link>} peer id → link */
@@ -721,7 +726,12 @@ class MeshTransport extends Transport {
     joinInfo() {
         return {
             self: this.getSelf(),
-            room: this.room ? {groupid: this.room.groupid, name: this.room.name, maxpeers: this.room.maxpeers} : null,
+            room: this.room ? {
+                groupid: this.room.groupid,
+                number: this.room.number,
+                name: this.room.name,
+                maxpeers: this.room.maxpeers,
+            } : null,
             peers: this.getPeers(),
         };
     }
@@ -729,7 +739,8 @@ class MeshTransport extends Transport {
     /**
      * Join the room.
      *
-     * @param {number|{groupid: number}} [groupid] Group room; the default room when left out.
+     * @param {number|{groupid: number, room: number}} [groupid] Group whose rooms to use (the default
+     *     group when left out), or {groupid, room} with the room number (0 starts a new room).
      * @returns {Promise<Object>} {self, room, peers}; rejects with an Error carrying reason.
      */
     join(groupid) {
@@ -746,12 +757,16 @@ class MeshTransport extends Transport {
         if (requested !== undefined && requested !== null && isFinite(Number(requested))) {
             this.groupid = Number(requested);
         }
+        const room = groupid && typeof groupid === 'object' ? Number(groupid.room) : NaN;
+        if (isFinite(room) && room >= 0) {
+            this.roomnumber = Math.floor(room);
+        }
         if (!this.PeerConnection) {
             this.setState('failed', 'error');
             return Promise.reject(joinError('error'));
         }
         this.setState('joining', '');
-        this.joining = this.signalling.join(this.groupid).then((result) => {
+        this.joining = this.signalling.join(this.groupid, this.roomnumber).then((result) => {
             this.joining = null;
             if (this.disposed || this.state !== 'joining') {
                 // Left while joining: remove the presence the server just made.
@@ -785,7 +800,14 @@ class MeshTransport extends Transport {
             connected: true,
         };
         this.groupid = Number(result.groupid) || 0;
-        this.room = {groupid: this.groupid, name: String(result.roomname || ''), maxpeers: Number(result.maxpeers) || 0};
+        // After a start, the number the server chose: a rejoin re-enters the same room.
+        this.roomnumber = Number(result.room) || this.roomnumber;
+        this.room = {
+            groupid: this.groupid,
+            number: this.roomnumber,
+            name: String(result.roomname || ''),
+            maxpeers: Number(result.maxpeers) || 0,
+        };
         this.iceservers = toIceServers(result.iceservers);
         this.iceexpires = Number(result.iceexpires) || 0;
         this.icerequested = 0;
@@ -984,7 +1006,7 @@ class MeshTransport extends Transport {
         this.rejoining = true;
         this.setState('reconnecting', 'gone');
         Array.from(this.links.keys()).forEach((peerid) => this.closeLink(peerid, true));
-        this.signalling.join(this.groupid).then((result) => {
+        this.signalling.join(this.groupid, this.roomnumber).then((result) => {
             this.rejoining = false;
             if (this.disposed || this.state !== 'reconnecting') {
                 quietLeave(this.signalling);

@@ -75,6 +75,13 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $data = (object)$data;
         $data->course = $this->get_courseid();
         unset($data->id);
+        // Live mode 2 needs a run mode that runs several rooms; old backups have no liverooms (one room).
+        $multi = \mod_vrroom\local\live_settings::runtime_has_multirooms((string)($data->runtime ?? ''));
+        $data->livemode = \mod_vrroom\local\live_settings::clean_mode($data->livemode ?? 0, $multi);
+        $data->liverooms = \mod_vrroom\local\live_settings::clean_rooms(
+            $data->liverooms ?? \mod_vrroom\local\live_settings::DEFAULT_ROOMS,
+            $data->livemode
+        );
 
         $newitemid = $DB->insert_record('vrroom', $data);
         $this->apply_activity_instance($newitemid);

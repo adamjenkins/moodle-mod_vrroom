@@ -26,7 +26,7 @@ use vrroomruntime_builtin\local\live\config;
 use vrroomruntime_builtin\local\live\room_manager;
 
 /**
- * Join the live room of an activity (or of one of the user's groups).
+ * Join a live room of an activity (or of one of the user's groups), or start a new one.
  *
  * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -43,6 +43,12 @@ class live_join extends external_api {
             'cmid' => new external_value(PARAM_INT, 'Course module id'),
             'attemptid' => new external_value(PARAM_INT, 'The attempt in progress, 0 for a teacher preview', VALUE_DEFAULT, 0),
             'groupid' => new external_value(PARAM_INT, 'The group whose room to join, 0 for the default room', VALUE_DEFAULT, 0),
+            'room' => new external_value(
+                PARAM_INT,
+                'The room number to join; 0 starts a new room (students open rooms only)',
+                VALUE_DEFAULT,
+                0
+            ),
         ]);
     }
 
@@ -52,13 +58,14 @@ class live_join extends external_api {
      * @param int $cmid Course module id.
      * @param int $attemptid Attempt id, 0 for a preview.
      * @param int $groupid Group id, 0 for the default room.
+     * @param int $room Room number, 0 to start a new room.
      * @return array
      */
-    public static function execute(int $cmid, int $attemptid = 0, int $groupid = 0): array {
+    public static function execute(int $cmid, int $attemptid = 0, int $groupid = 0, int $room = 0): array {
         global $USER;
         $params = self::validate_parameters(
             self::execute_parameters(),
-            ['cmid' => $cmid, 'attemptid' => $attemptid, 'groupid' => $groupid]
+            ['cmid' => $cmid, 'attemptid' => $attemptid, 'groupid' => $groupid, 'room' => $room]
         );
 
         [$cm, $context, $vrroom] = access::load_by_cmid((int)$params['cmid']);
@@ -70,15 +77,26 @@ class live_join extends external_api {
 
         $userid = (int)$USER->id;
         $kind = access::resolve_kind($cm, $context, $vrroom, (int)$params['attemptid'], $userid);
-        $room = access::resolve_group($cm, $context, $userid, (int)$params['groupid']);
-        $joined = room_manager::join($cm, $context, $vrroom, $userid, $kind['kind'], $kind['attemptid'], $room);
+        $groupid = access::resolve_group($cm, $context, $userid, (int)$params['groupid']);
+        $joined = room_manager::join(
+            $cm,
+            $context,
+            $vrroom,
+            $userid,
+            $kind['kind'],
+            $kind['attemptid'],
+            $groupid,
+            (int)$params['room']
+        );
 
         $peer = $joined['peer'];
+        $number = (int)$joined['room'];
         $ice = config::ice_servers((string)$peer->peerid);
         return [
             'peerid' => (string)$peer->peerid,
-            'groupid' => $room,
-            'roomname' => access::room_name($cm, $context, $vrroom, $room),
+            'groupid' => $groupid,
+            'room' => $number,
+            'roomname' => access::room_label($cm, $context, $groupid, $number),
             'maxpeers' => access::max_peers($vrroom),
             'interval' => (int)$joined['interval'],
             'peers' => $joined['peers'],
@@ -96,7 +114,8 @@ class live_join extends external_api {
         return new external_single_structure([
             'peerid' => new external_value(PARAM_ALPHANUM, 'Own peer id for poll, send and leave'),
             'groupid' => new external_value(PARAM_INT, 'The room\'s group, 0 without groups'),
-            'roomname' => new external_value(PARAM_TEXT, 'Plain name of the room'),
+            'room' => new external_value(PARAM_INT, 'The room number joined (the new number after a start)'),
+            'roomname' => new external_value(PARAM_TEXT, 'Plain label of the room'),
             'maxpeers' => new external_value(PARAM_INT, 'Most people in the room'),
             'interval' => new external_value(PARAM_INT, 'Milliseconds until the first poll'),
             'peers' => new external_multiple_structure(self::peer_structure(), 'The others in the room'),

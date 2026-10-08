@@ -66,6 +66,7 @@ class provider implements
         $collection->add_database_table(self::TABLE_PEERS, [
             'userid' => 'privacy:metadata:peers:userid',
             'groupid' => 'privacy:metadata:peers:groupid',
+            'room' => 'privacy:metadata:peers:room',
             'timejoined' => 'privacy:metadata:peers:timejoined',
             'timeseen' => 'privacy:metadata:peers:timeseen',
         ], 'privacy:metadata:peers');
@@ -158,6 +159,7 @@ class provider implements
                 $peerids[] = (string)$peer->peerid;
                 $presence[] = (object)[
                     'groupid' => (int)$peer->groupid,
+                    'room' => (int)$peer->room,
                     'kind' => (string)$peer->kind,
                     'timejoined' => transform::datetime($peer->timejoined),
                     'timeseen' => transform::datetime($peer->timeseen),

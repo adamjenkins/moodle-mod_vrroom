@@ -29,7 +29,7 @@ use vrroomruntime_builtin\local\live\room_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(purge_live::class)]
 final class purge_live_test extends \advanced_testcase {
     /**
-     * Stale presences with their signals and expired signals go; fresh rows stay.
+     * Stale presences with their signals and expired signals go; fresh rows stay, whatever their room.
      */
     public function test_execute(): void {
         global $DB;
@@ -45,11 +45,13 @@ final class purge_live_test extends \advanced_testcase {
         /** @var \vrroomruntime_builtin_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('vrroomruntime_builtin');
 
-        $stale = $generator->create_peer(['vrroomid' => $one->id, 'userid' => $users[0]->id,
+        $stale = $generator->create_peer(['vrroomid' => $one->id, 'userid' => $users[0]->id, 'room' => 2,
             'timeseen' => $now - room_manager::STALE_AFTER - 5]);
-        $fresh = $generator->create_peer(['vrroomid' => $one->id, 'userid' => $users[1]->id, 'timeseen' => $now]);
-        $otherfresh = $generator->create_peer(['vrroomid' => $two->id, 'userid' => $users[2]->id, 'timeseen' => $now]);
-        $otherfresh2 = $generator->create_peer(['vrroomid' => $two->id, 'userid' => $users[3]->id, 'timeseen' => $now]);
+        $fresh = $generator->create_peer(['vrroomid' => $one->id, 'userid' => $users[1]->id, 'room' => 1, 'timeseen' => $now]);
+        $otherfresh = $generator->create_peer(['vrroomid' => $two->id, 'userid' => $users[2]->id, 'room' => 1,
+            'timeseen' => $now]);
+        $otherfresh2 = $generator->create_peer(['vrroomid' => $two->id, 'userid' => $users[3]->id, 'room' => 3,
+            'timeseen' => $now]);
 
         // From and to the stale peer: removed with it.
         $generator->create_signal(['vrroomid' => $one->id, 'frompeer' => $stale->peerid, 'topeer' => $fresh->peerid,

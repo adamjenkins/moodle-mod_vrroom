@@ -31,6 +31,7 @@ use vrroomruntime_builtin\local\live\room_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(live_poll::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(live_send::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(live_leave::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(live_rooms::class)]
 final class live_services_test extends \advanced_testcase {
     /** @var string TURN secret of the tests. */
     private const SECRET = 'turn-secret-never-sent';
@@ -54,7 +55,8 @@ final class live_services_test extends \advanced_testcase {
         $joina = $this->join($cmid, (int)$attempta->id);
         $this->assertTrue(room_manager::is_peerid($joina['peerid']));
         $this->assertSame(0, $joina['groupid']);
-        $this->assertSame(format_string($vrroom->name), $joina['roomname']);
+        $this->assertSame(1, $joina['room']);
+        $this->assertSame(get_string('liveroomname', 'vrroomruntime_builtin', 1), $joina['roomname']);
         $this->assertSame(6, $joina['maxpeers']);
         $this->assertSame(room_manager::INTERVAL_ACTIVE, $joina['interval']);
         $this->assertSame([], $joina['peers']);
@@ -227,7 +229,129 @@ final class live_services_test extends \advanced_testcase {
         $this->setUser($b);
         $this->expectException(\moodle_exception::class);
         $this->expectExceptionMessage(get_string('errorliveroomfull', 'vrroomruntime_builtin', 2));
-        live_join::execute($cmid, (int)$attemptb->id, 0);
+        live_join::execute($cmid, (int)$attemptb->id, 0, 1);
+    }
+
+    /**
+     * Fixed rooms: the list shows 1..N with counts and whether each can be joined.
+     */
+    public function test_rooms_fixed(): void {
+        $this->resetAfterTest();
+        [$cmid, $course, $vrroom] = $this->create_activity(1, 3, 2);
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
+        [$c] = $this->learner($course, $vrroom);
+
+        $this->setUser($a);
+        $this->join($cmid, (int)$attempta->id, 1);
+        $this->setUser($b);
+        $joinb = $this->join($cmid, (int)$attemptb->id, 1);
+        $this->assertSame(1, $joinb['room']);
+
+        $this->setUser($c);
+        $list = $this->rooms($cmid);
+        $this->assertSame(0, $list['groupid']);
+        $this->assertSame('fixed', $list['roommode']);
+        $this->assertSame(3, $list['maxrooms']);
+        $this->assertSame(2, $list['capacity']);
+        $this->assertFalse($list['canstart']);
+        $this->assertSame('fixed', $list['startreason']);
+        $this->assertSame(room_manager::ROOMS_INTERVAL, $list['interval']);
+        $this->assertSame([1, 2, 3], array_column($list['rooms'], 'number'));
+        $this->assertSame([2, 0, 0], array_column($list['rooms'], 'count'));
+        $this->assertSame([false, true, true], array_column($list['rooms'], 'joinable'));
+        $this->assertSame(get_string('liveroomname', 'vrroomruntime_builtin', 2), $list['rooms'][1]['name']);
+        // Counts only: no names or peer ids of the people in the rooms.
+        $this->assertStringNotContainsString(fullname($a), json_encode($list));
+        $this->assertStringNotContainsString($joinb['peerid'], json_encode($list));
+    }
+
+    /**
+     * Rooms students open: only open rooms are listed; starting is allowed up to the maximum.
+     */
+    public function test_rooms_dynamic(): void {
+        $this->resetAfterTest();
+        [$cmid, $course, $vrroom] = $this->create_activity(2, 2);
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
+        [$c, $attemptc] = $this->learner($course, $vrroom);
+
+        $this->setUser($a);
+        $list = $this->rooms($cmid);
+        $this->assertSame('dynamic', $list['roommode']);
+        $this->assertSame([], $list['rooms']);
+        $this->assertTrue($list['canstart']);
+        $this->assertSame('', $list['startreason']);
+
+        $joina = $this->join($cmid, (int)$attempta->id, 0);
+        $this->assertSame(1, $joina['room']);
+        $this->assertSame(get_string('liveroomname', 'vrroomruntime_builtin', 1), $joina['roomname']);
+        $this->setUser($b);
+        $this->assertSame(2, $this->join($cmid, (int)$attemptb->id, 0)['room']);
+
+        $this->setUser($c);
+        $list = $this->rooms($cmid);
+        $this->assertSame([1, 2], array_column($list['rooms'], 'number'));
+        $this->assertSame([1, 1], array_column($list['rooms'], 'count'));
+        $this->assertFalse($list['canstart']);
+        $this->assertSame('limit', $list['startreason']);
+        try {
+            live_join::execute($cmid, (int)$attemptc->id, 0, 0);
+            $this->fail('A third room was opened with a maximum of two.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorliveroomlimit', $e->errorcode);
+        }
+        try {
+            live_join::execute($cmid, (int)$attemptc->id, 0, 7);
+            $this->fail('A room that is not open was joined.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorliveroomgone', $e->errorcode);
+        }
+        $this->assertSame(2, $this->join($cmid, (int)$attemptc->id, 2)['room']);
+    }
+
+    /**
+     * The room list refuses a group the user is not in, users without attempt or manage, and live mode off.
+     */
+    public function test_rooms_refusals(): void {
+        global $DB;
+        $this->resetAfterTest();
+        [$cmid, $course, $vrroom] = $this->create_activity(1, 2, 6, SEPARATEGROUPS);
+        $groupa = $this->getDataGenerator()->create_group(['courseid' => $course->id, 'name' => 'Group A']);
+        $groupb = $this->getDataGenerator()->create_group(['courseid' => $course->id]);
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        $this->getDataGenerator()->create_group_member(['groupid' => $groupa->id, 'userid' => $a->id]);
+
+        $this->setUser($a);
+        $list = $this->rooms($cmid);
+        $this->assertSame((int)$groupa->id, $list['groupid']);
+        $joina = $this->join($cmid, (int)$attempta->id, 2, (int)$groupa->id);
+        $this->assertSame(
+            get_string('liveroomnamegroup', 'vrroomruntime_builtin', ['group' => 'Group A', 'number' => 2]),
+            $joina['roomname']
+        );
+        try {
+            live_rooms::execute($cmid, (int)$groupb->id);
+            $this->fail('A learner listed the rooms of a group they are not in.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorlivenoroom', $e->errorcode);
+        }
+
+        // Without mod/vrroom:attempt or mod/vrroom:manage.
+        $role = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
+        assign_capability('mod/vrroom:attempt', CAP_PROHIBIT, $role, \context_module::instance($cmid)->id, true);
+        accesslib_clear_all_caches_for_unit_testing();
+        try {
+            live_rooms::execute($cmid, 0);
+            $this->fail('The room list was given to someone who can neither attempt nor manage.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorlivenotallowed', $e->errorcode);
+        }
+
+        $DB->set_field('vrroom', 'livemode', 0, ['id' => $vrroom->id]);
+        $this->expectException(\moodle_exception::class);
+        $this->expectExceptionMessage(get_string('errorlivedisabled', 'vrroomruntime_builtin'));
+        live_rooms::execute($cmid, 0);
     }
 
     /**
@@ -235,10 +359,26 @@ final class live_services_test extends \advanced_testcase {
      *
      * @param int $cmid Course module id.
      * @param int $attemptid Attempt id.
+     * @param int $room Room number, 0 to start a new room.
+     * @param int $groupid Group id, 0 for the default.
      * @return array
      */
-    private function join(int $cmid, int $attemptid): array {
-        return external_api::clean_returnvalue(live_join::execute_returns(), live_join::execute($cmid, $attemptid, 0));
+    private function join(int $cmid, int $attemptid, int $room = 1, int $groupid = 0): array {
+        return external_api::clean_returnvalue(
+            live_join::execute_returns(),
+            live_join::execute($cmid, $attemptid, $groupid, $room)
+        );
+    }
+
+    /**
+     * List the rooms through the service and clean the result.
+     *
+     * @param int $cmid Course module id.
+     * @param int $groupid Group id, 0 for the default.
+     * @return array
+     */
+    private function rooms(int $cmid, int $groupid = 0): array {
+        return external_api::clean_returnvalue(live_rooms::execute_returns(), live_rooms::execute($cmid, $groupid));
     }
 
     /**
@@ -267,13 +407,27 @@ final class live_services_test extends \advanced_testcase {
     /**
      * Create an activity with live mode on.
      *
+     * @param int $livemode 1 fixed rooms, 2 rooms students open.
+     * @param int $liverooms Number of rooms (fixed) or most rooms open (0 = no limit).
+     * @param int $maxusers Room size.
+     * @param int $groupmode Group mode.
      * @return array [cmid, course, vrroom row]
      */
-    private function create_activity(): array {
+    private function create_activity(
+        int $livemode = 1,
+        int $liverooms = 1,
+        int $maxusers = 6,
+        int $groupmode = NOGROUPS
+    ): array {
         global $DB;
         $course = $this->getDataGenerator()->create_course();
         $record = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id]);
-        $DB->update_record('vrroom', (object)['id' => $record->id, 'livemode' => 1, 'livemaxusers' => 6]);
+        $DB->update_record('vrroom', (object)['id' => $record->id, 'livemode' => $livemode, 'livemaxusers' => $maxusers,
+            'liverooms' => $liverooms]);
+        if ($groupmode !== NOGROUPS) {
+            $DB->set_field('course_modules', 'groupmode', $groupmode, ['id' => $record->cmid]);
+            rebuild_course_cache((int)$course->id, true);
+        }
         return [(int)$record->cmid, $course, $DB->get_record('vrroom', ['id' => $record->id], '*', MUST_EXIST)];
     }
 }

@@ -14,8 +14,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The live room panel: notice, group room choice, join and leave, voice controls and the list of
- * the people in the room. It only shows state and reports clicks; live/controller decides.
+ * The live room panel: notice, group room choice, join and leave (or, with several rooms per
+ * activity, the list of rooms with their occupancy), voice controls and the list of the people in
+ * the room. It only shows state and reports clicks; live/controller decides.
  *
  * @module     vrroomruntime_builtin/live/panel
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -44,6 +45,17 @@ const part = (el, name) => el.querySelector(`[data-region="${name}"]`);
 const action = (el, name) => el.querySelector(`[data-action="${name}"]`);
 
 /**
+ * A whole number of at least 0 from a server value.
+ *
+ * @param {*} value The value.
+ * @returns {number}
+ */
+const wholeNumber = (value) => {
+    const number = Number(value);
+    return isFinite(number) && number > 0 ? Math.floor(number) : 0;
+};
+
+/**
  * The live room panel.
  */
 class Panel {
@@ -51,8 +63,8 @@ class Panel {
      * Constructor.
      *
      * @param {HTMLElement} container The vrroom-liveroom section.
-     * @param {Object} options {cmid, live, secure, str(key, a), handlers: {join, leave, mic, mute, ptt,
-     *     talk, mutepeer}}
+     * @param {Object} options {cmid, live, secure, str(key, a), handlers: {join(room), leave, mic, mute,
+     *     ptt, talk, mutepeer, groupchange}}
      */
     constructor(container, options) {
         this.container = container;
@@ -66,6 +78,9 @@ class Panel {
         this.talking = false;
         this.listseq = 0;
         this.listeners = [];
+        this.roomlist = !!(options.live && options.live.roomlist === true);
+        this.roomsseq = 0;
+        this.canstart = false;
     }
 
     /**
@@ -91,6 +106,7 @@ class Panel {
             maxpeers: Number(live.maxpeers) || 0,
             count: 0,
             notice: String(live.notice || ''),
+            roomlist: this.roomlist,
         };
         return Templates.renderForPromise('vrroomruntime_builtin/liveroom', context).then(({html, js}) => {
             Templates.replaceNodeContents(this.container, html, js);
@@ -121,6 +137,15 @@ class Panel {
             if (name === 'vrroom-live-join') {
                 e.preventDefault();
                 this.call('join');
+            } else if (name === 'vrroom-live-joinroom') {
+                e.preventDefault();
+                const room = wholeNumber(button.dataset.room);
+                if (room > 0) {
+                    this.call('join', room);
+                }
+            } else if (name === 'vrroom-live-start') {
+                e.preventDefault();
+                this.call('join', 0);
             } else if (name === 'vrroom-live-leave') {
                 e.preventDefault();
                 this.call('leave');
@@ -138,6 +163,11 @@ class Panel {
                 }
             }
         });
+        if (this.roomlist) {
+            listen(part(this.container, 'vrroom-live-group'), 'change', () => {
+                this.call('groupchange');
+            });
+        }
         listen(part(this.container, 'vrroom-live-ptt'), 'change', (e) => {
             this.call('ptt', !!e.target.checked);
         });
@@ -195,10 +225,14 @@ class Panel {
      * @param {boolean} joined Joined.
      */
     setJoined(joined) {
+        const changed = this.joined !== !!joined;
         this.joined = !!joined;
         if (!this.rendered) {
             return;
         }
+        // Move the focus only when it was in the panel (or nowhere): never out of the 3D room.
+        const active = document.activeElement;
+        const focushere = !active || active === document.body || this.container.contains(active);
         const join = action(this.container, 'vrroom-live-join');
         const leave = action(this.container, 'vrroom-live-leave');
         if (join) {
@@ -213,12 +247,113 @@ class Panel {
         }
         part(this.container, 'vrroom-live-voice').classList.toggle('d-none', !this.joined || this.novoice);
         part(this.container, 'vrroom-live-people').classList.toggle('d-none', !this.joined);
+        const rooms = part(this.container, 'vrroom-live-rooms');
+        if (rooms) {
+            rooms.classList.toggle('d-none', this.joined);
+        }
         if (!this.joined) {
             this.setTalking(false);
             this.listseq++;
             part(this.container, 'vrroom-live-participants').textContent = '';
+            this.setCurrentRoom('');
         }
         this.setBusy(this.busy);
+        if (this.roomlist && changed && focushere) {
+            const target = this.joined ? leave : part(this.container, 'vrroom-live-roomsheading');
+            if (target) {
+                target.focus();
+            }
+        }
+    }
+
+    /**
+     * Show the room one is in ('' hides the line).
+     *
+     * @param {string} text Plain text, for example "You are in Room 2.".
+     */
+    setCurrentRoom(text) {
+        if (!this.rendered) {
+            return;
+        }
+        const current = part(this.container, 'vrroom-live-current');
+        if (current) {
+            current.textContent = text || '';
+            current.classList.toggle('d-none', !text);
+        }
+    }
+
+    /**
+     * Show the list of rooms (a live_rooms answer). Answers that arrive after a later call, or while
+     * joined, are dropped.
+     *
+     * @param {Object} answer live_rooms result {roommode, maxrooms, rooms, canstart, startreason}.
+     * @returns {Promise}
+     */
+    setRooms(answer) {
+        if (!this.rendered || !this.roomlist) {
+            return Promise.resolve();
+        }
+        const seq = ++this.roomsseq;
+        const dynamic = answer && answer.roommode === 'dynamic';
+        const list = answer && Array.isArray(answer.rooms) ? answer.rooms : [];
+        const rooms = list.filter((room) => room && wholeNumber(room.number) > 0)
+            .map((room) => ({
+                number: wholeNumber(room.number),
+                name: String(room.name || ''),
+                count: wholeNumber(room.count),
+                capacity: wholeNumber(room.capacity),
+                joinable: !!room.joinable,
+            }));
+        this.canstart = dynamic && !!answer.canstart;
+        const context = {
+            cmid: this.options.cmid,
+            rooms: rooms,
+            hasrooms: rooms.length > 0,
+            dynamic: dynamic,
+            norooms: dynamic && rooms.length === 0,
+            allfull: !dynamic && rooms.length > 0 && rooms.every((room) => !room.joinable),
+            canstart: this.canstart,
+            startlimit: dynamic && !this.canstart && answer.startreason === 'limit',
+            maxrooms: wholeNumber(answer ? answer.maxrooms : 0),
+            busy: this.busy,
+        };
+        const pending = new Pending('vrroomruntime_builtin/live/panel:rooms');
+        return Templates.renderForPromise('vrroomruntime_builtin/liveroomlist', context).then(({html, js}) => {
+            const body = this.rendered ? part(this.container, 'vrroom-live-roomsbody') : null;
+            if (seq !== this.roomsseq || !body) {
+                return undefined;
+            }
+            // Keep the keyboard focus on the same control when the list is drawn again.
+            const active = document.activeElement;
+            let refocus = null;
+            if (active && body.contains(active) && active.dataset) {
+                refocus = {action: active.dataset.action || '', room: active.dataset.room || ''};
+            }
+            // Template output only: every value is escaped by Mustache.
+            Templates.replaceNodeContents(body, html, js);
+            this.setBusy(this.busy);
+            if (refocus) {
+                let target = null;
+                if (refocus.action === 'vrroom-live-joinroom') {
+                    target = body.querySelector(`[data-action="vrroom-live-joinroom"][data-room="${wholeNumber(refocus.room)}"]`);
+                } else if (refocus.action === 'vrroom-live-start') {
+                    target = action(body, 'vrroom-live-start');
+                }
+                if (!target || target.disabled) {
+                    target = part(this.container, 'vrroom-live-roomsheading');
+                }
+                if (target) {
+                    target.focus();
+                }
+            }
+            return undefined;
+        }).then(() => {
+            pending.resolve();
+            return undefined;
+        }, (error) => {
+            pending.resolve();
+            throw error;
+        });
     }
 
     /**
@@ -250,6 +385,13 @@ class Panel {
                 button.disabled = this.busy;
             }
         });
+        this.container.querySelectorAll('[data-action="vrroom-live-joinroom"]').forEach((button) => {
+            button.disabled = this.busy;
+        });
+        const start = action(this.container, 'vrroom-live-start');
+        if (start) {
+            start.disabled = this.busy || !this.canstart;
+        }
         const select = part(this.container, 'vrroom-live-group');
         if (select) {
             select.disabled = this.joined || this.busy;
@@ -378,6 +520,7 @@ class Panel {
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
         this.listseq++;
+        this.roomsseq++;
         if (this.rendered) {
             this.container.textContent = '';
             this.container.classList.add('d-none');

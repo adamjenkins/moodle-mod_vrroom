@@ -42,6 +42,15 @@ All notable changes to this plugin are documented here. The format follows
 - Site settings of the built-in run mode: live mode on/off, STUN servers, TURN servers, TURN shared
   secret and TURN credential lifetime (all servers empty by default).
 - Group and grouping support: one live room per group; reports filtered by group.
+- Several live rooms per activity (or group) for the built-in run mode: activity setting *Live
+  mode* gains *On, students open rooms* (`vrroom.livemode` 2) next to *On, fixed rooms* (1), and
+  the new setting *Number of rooms* (`vrroom.liverooms`, default 1: the number of fixed rooms, 1 to
+  20, or the most rooms students may open, 0 for no limit), backed up and restored. New web
+  service `vrroomruntime_builtin_live_rooms` (the rooms with their occupancy); `_live_join` takes
+  a room number (0 starts a new room) and returns it. Presences record their room
+  (`vrroomruntime_builtin_peers.room`). Run mode capability `multirooms`; run modes without it
+  (the companion) keep one room and never store mode 2. `$plugin->version` 2026100803 for
+  `mod_vrroom` and 2026100801 for `vrroomruntime_builtin` (schema changes, with upgrade steps).
 
 ### Changed
 

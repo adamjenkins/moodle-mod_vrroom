@@ -28,6 +28,12 @@
 - Group mode: the activity now supports groups and groupings. Live rooms are per group, and the
   reports show only the attempts of the teacher's groups in separate groups mode.
 - Site settings are now a category: *General settings* and one page per run mode.
+- Several live rooms with the built-in viewer: a teacher sets the number of rooms (1 to 20) and
+  the people per room (2 to 6), and students choose a room with space from a list that shows how
+  full each room is. Or students open rooms themselves: they join a room with space or start a new
+  one, up to a maximum the teacher sets (or no limit), and a room closes when the last person
+  leaves. In group mode every group has its own rooms. Activities that already had live mode on
+  keep one room. The companion run mode keeps one room.
 
 ## 0.1.0 (2026-10-08) — ALPHA
 

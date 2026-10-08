@@ -59,6 +59,7 @@ final class runtime_test extends \advanced_testcase {
         $this->assertTrue($caps->avatars);
         $this->assertSame(['vr', 'ar', 'mr'], $caps->xrmodes);
         $this->assertSame(['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'], $caps->objectivetypes);
+        $this->assertTrue($caps->multirooms);
 
         // Live mode off for the site: one user.
         set_config('liveenabled', 0, 'vrroomruntime_builtin');
@@ -66,6 +67,7 @@ final class runtime_test extends \advanced_testcase {
         $this->assertSame(1, $caps->maxusers);
         $this->assertFalse($caps->voice);
         $this->assertFalse($caps->avatars);
+        $this->assertFalse($caps->multirooms);
         set_config('liveenabled', 1, 'vrroomruntime_builtin');
 
         $this->assertSame('browser', $runtime->statement_channel());
@@ -117,8 +119,9 @@ final class runtime_test extends \advanced_testcase {
 
         // The live block (live mode is off in a new activity).
         $this->assertSame(['available', 'canjoin', 'reason', 'transport', 'transportmodule', 'cmid', 'attemptid',
-            'maxpeers', 'groups', 'defaultgroupid', 'selfname'], array_keys($config['live']));
+            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms'], array_keys($config['live']));
         $this->assertFalse($config['live']['available']);
+        $this->assertFalse($config['live']['roomlist']);
         $this->assertSame((int)$attempt->id, $config['live']['attemptid']);
 
         // The descriptor serialises the way start_attempt sends it.
@@ -154,7 +157,7 @@ final class runtime_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         [$cm, $vrroom, $student, $teacher] = $this->create_activity();
-        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'livemode' => 1, 'livemaxusers' => 3]);
+        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'livemode' => 2, 'livemaxusers' => 3, 'liverooms' => 4]);
 
         /** @var \mod_vrroom_generator $generator */
         $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrroom');
@@ -169,6 +172,9 @@ final class runtime_test extends \advanced_testcase {
         $this->assertSame(3, $live['maxpeers']);
         $this->assertSame([], $live['groups']);
         $this->assertSame(fullname($student), $live['selfname']);
+        $this->assertTrue($live['roomlist']);
+        $this->assertSame('dynamic', $live['roommode']);
+        $this->assertSame(4, $live['maxrooms']);
 
         $this->setUser($teacher);
         $live = registry::get('builtin')->preview($cm, $teacher)->config['live'];

@@ -32,6 +32,7 @@ final class runtime_capabilities {
      * @param bool $avatars Whether other users are shown as avatars.
      * @param string[] $xrmodes Supported XR modes ('vr', 'ar', 'mr').
      * @param string[] $objectivetypes Objective types the run mode can report events for.
+     * @param bool $multirooms Whether the run mode can run several live rooms per activity (or group).
      */
     public function __construct(
         /** @var int Maximum users per room. */
@@ -44,6 +45,8 @@ final class runtime_capabilities {
         public readonly array $xrmodes,
         /** @var string[] Objective types the run mode can report events for. */
         public readonly array $objectivetypes,
+        /** @var bool Whether the run mode can run several live rooms per activity (or group). */
+        public readonly bool $multirooms = false,
     ) {
     }
 }

@@ -19,13 +19,16 @@
 
     The live room panel of the built-in viewer: the notice about what joining shares (IP address
     included), the group room choice, join and leave, the voice controls and the people in the room.
+    With roomlist, the single Join button is replaced by the list of rooms
+    (vrroomruntime_builtin/liveroomlist, rendered into vrroom-live-roomsbody by live/panel).
 
     Classes required for JS:
     * none
 
     Data attributes required for JS:
     * data-region: vrroom-live-notice, vrroom-live-group, vrroom-live-status, vrroom-live-voice, vrroom-live-ptt,
-      vrroom-live-insecure, vrroom-live-people, vrroom-live-participants, vrroom-live-count
+      vrroom-live-insecure, vrroom-live-people, vrroom-live-participants, vrroom-live-count, vrroom-live-current,
+      vrroom-live-rooms, vrroom-live-roomsheading, vrroom-live-roomsbody
     * data-action: vrroom-live-join, vrroom-live-leave, vrroom-live-mic, vrroom-live-mute, vrroom-live-talk
 
     Context variables required for this template:
@@ -38,6 +41,7 @@
     * maxpeers - most people in one room
     * count - people in the room shown in the heading (0 before joining)
     * notice - plain-text notice to show instead of the default (optional)
+    * roomlist - show the list of rooms instead of the single Join button (several rooms per activity)
 
     Example context (json):
     {
@@ -49,7 +53,8 @@
         "groups": [{"id": 7, "name": "Group A", "selected": true}, {"id": 8, "name": "Group B", "selected": false}],
         "maxpeers": 6,
         "count": 0,
-        "notice": ""
+        "notice": "",
+        "roomlist": true
     }
 }}
 <h3 class="h5" id="vrroom-liveroom-heading-{{cmid}}">{{#str}}liveroom, vrroomruntime_builtin{{/str}}</h3>
@@ -69,9 +74,20 @@
         </select>
     </div>
     {{/hasgroups}}
+    {{^roomlist}}
     <button type="button" class="btn btn-primary" data-action="vrroom-live-join">{{#str}}livejoin, vrroomruntime_builtin{{/str}}</button>
+    {{/roomlist}}
+    {{#roomlist}}
+    <p class="vrroom-live-current fw-bold mb-0 align-self-center d-none" data-region="vrroom-live-current"></p>
+    {{/roomlist}}
     <button type="button" class="btn btn-secondary d-none" data-action="vrroom-live-leave">{{#str}}liveleave, vrroomruntime_builtin{{/str}}</button>
 </div>
+{{#roomlist}}
+<div class="vrroom-live-rooms mb-2" data-region="vrroom-live-rooms">
+    <h4 class="h6" id="vrroom-live-roomsheading-{{cmid}}" tabindex="-1" data-region="vrroom-live-roomsheading">{{#str}}liverooms, vrroomruntime_builtin{{/str}}</h4>
+    <div data-region="vrroom-live-roomsbody"></div>
+</div>
+{{/roomlist}}
 {{/canjoin}}
 <p class="vrroom-live-status mb-2" data-region="vrroom-live-status" role="status"></p>
 <div class="vrroom-live-voice d-none mb-2" data-region="vrroom-live-voice">

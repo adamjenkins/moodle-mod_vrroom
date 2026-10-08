@@ -227,6 +227,12 @@
     display: none;
 }
 
+/* A long list of rooms students opened scrolls instead of pushing the panel down. */
+.vrroom-live-roomlist {
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
 .vrroom-live-speaking {
     display: inline-block;
     width: 0.625rem;

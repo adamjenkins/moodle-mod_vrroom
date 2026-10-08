@@ -36,7 +36,7 @@ class vrroomruntime_builtin_generator extends component_generator_base {
     /**
      * Create a presence in a live room.
      *
-     * Required: vrroomid, userid. Defaults: groupid 0, a new random peerid, kind 'attempt',
+     * Required: vrroomid, userid. Defaults: groupid 0, room 1, a new random peerid, kind 'attempt',
      * attemptid 0, timejoined/timeseen/lastsignal/ratewindow = time(), counters 0.
      *
      * @param array $record the row values
@@ -55,6 +55,7 @@ class vrroomruntime_builtin_generator extends component_generator_base {
         $row = (object)[
             'vrroomid' => (int)$record['vrroomid'],
             'groupid' => (int)($record['groupid'] ?? 0),
+            'room' => (int)($record['room'] ?? 1),
             'userid' => (int)$record['userid'],
             'peerid' => (string)($record['peerid'] ?? bin2hex(random_bytes(16))),
             'kind' => (string)($record['kind'] ?? 'attempt'),

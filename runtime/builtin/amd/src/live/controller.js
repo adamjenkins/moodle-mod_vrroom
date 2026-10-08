@@ -31,18 +31,20 @@ import {getStrings} from 'core/str';
 import {Emitter} from 'vrroomruntime_builtin/live/transport';
 import {createMeshTransport} from 'vrroomruntime_builtin/live/mesh';
 import {createVoice} from 'vrroomruntime_builtin/live/voice';
+import {fetchRooms} from 'vrroomruntime_builtin/live/signalling';
 import {createPanel} from 'vrroomruntime_builtin/live/panel';
 import {region, announce, plainText, startScene} from 'vrroomruntime_builtin/util';
 
 /** Strings of the live room (all in vrroomruntime_builtin). */
 const STRINGS = [
-    'errorlivebusy', 'errorlivedisabled', 'errorlivenoroom', 'errorlivenotallowed',
-    'livealone', 'liveclosed', 'liveconnectfailed', 'liveconnecting', 'livefull', 'livejoined',
+    'errorlivebusy', 'errorlivedisabled', 'errorlivenoroom', 'errorlivenotallowed', 'errorliveroomgone',
+    'errorliveroomlimit', 'errorliveroomnotfound',
+    'livealone', 'liveclosed', 'liveconnectfailed', 'liveconnecting', 'livecurrentroom', 'livefull', 'livejoined',
     'livejoinfailed', 'livejoining', 'liveleft', 'livemicdenied', 'livemicinsecure', 'livemicoff',
     'livemicon', 'livemicstate_muted', 'livemicstate_off', 'livemicstate_on', 'livemute',
     'livemutepeer', 'liveparticipants', 'livepeerjoined', 'livepeerleft', 'livereconnecting',
-    'livereplaced', 'liveunmute', 'liveunmutepeer', 'livewhere3d', 'livewherear', 'livewherelist',
-    'livewheremr', 'livewhereroom', 'livewherevr', 'liveyou',
+    'livereplaced', 'liveroomslistfailed', 'liveunmute', 'liveunmutepeer', 'livewhere3d', 'livewherear',
+    'livewherelist', 'livewheremr', 'livewhereroom', 'livewherevr', 'liveyou',
 ];
 
 /** Transports by config.live.transport. */
@@ -89,6 +91,11 @@ const SPEAKING_INTERVAL = 250;
 /** After this long without a connection, a person is shown as "could not connect" (ms). */
 const CONNECT_TIMEOUT = 20000;
 
+/** How often the list of rooms is loaded again while not joined, by default and at most/least (ms). */
+const ROOMS_INTERVAL = 5000;
+const ROOMS_MIN_INTERVAL = 3000;
+const ROOMS_MAX_INTERVAL = 30000;
+
 /** Largest pose sequence number before it wraps. */
 const MAX_SEQ = 2147483647;
 
@@ -107,6 +114,23 @@ const ERRORCODES = {
     errorlivenoroom: 'noroom',
     errorlivebusy: 'busy',
     errorlivenotallowed: 'notallowed',
+    errorliveroomnotfound: 'noroom',
+    errorliveroomgone: 'roomgone',
+    errorliveroomlimit: 'limit',
+};
+
+/**
+ * Clamp the interval a live_rooms answer asks for.
+ *
+ * @param {*} interval Milliseconds from the server.
+ * @returns {number}
+ */
+const roomsInterval = (interval) => {
+    const value = Number(interval);
+    if (!isFinite(value) || value <= 0) {
+        return ROOMS_INTERVAL;
+    }
+    return Math.min(ROOMS_MAX_INTERVAL, Math.max(ROOMS_MIN_INTERVAL, Math.round(value)));
 };
 
 /**
@@ -161,6 +185,13 @@ class LiveController extends Emitter {
         this.speakingtimer = null;
         this.refreshtimer = null;
         this.refreshpending = null;
+        // The list of rooms (several rooms per activity): shown and refreshed while not joined.
+        this.roomlist = this.liveconfig.roomlist === true;
+        this.roomstimer = null;
+        this.roomsseq = 0;
+        this.roomsfailed = false;
+        this.failureshown = false;
+        this.roomname = '';
 
         this.voice.on('micstate', () => {
             this.sendState();
@@ -208,6 +239,17 @@ class LiveController extends Emitter {
         document.addEventListener('keydown', this.onKeyDown);
         document.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('blur', this.onBlur);
+
+        this.onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                this.refreshRooms();
+            } else {
+                this.stopRoomsTimer();
+            }
+        };
+        if (this.roomlist) {
+            document.addEventListener('visibilitychange', this.onVisibilityChange);
+        }
     }
 
     /**
@@ -238,7 +280,8 @@ class LiveController extends Emitter {
         }
         const pending = new Pending('vrroomruntime_builtin/live/controller:render');
         const handlers = {
-            join: () => this.join().catch(Notification.exception),
+            join: (room) => this.join(room).catch(Notification.exception),
+            groupchange: () => this.refreshRooms(),
             leave: () => this.leave().catch(Notification.exception),
             mic: () => this.toggleMic(),
             mute: () => this.toggleMute(),
@@ -260,6 +303,7 @@ class LiveController extends Emitter {
             return this.panel.render();
         }).then(() => {
             this.updateVoiceControls();
+            this.refreshRooms();
             pending.resolve();
             return undefined;
         }, (error) => {
@@ -269,14 +313,102 @@ class LiveController extends Emitter {
     }
 
     /**
-     * Join the room. Call inside the Join click: it also starts the audio context.
+     * Load the list of rooms now, then again after the interval the server asks for. Runs only in
+     * room-list mode, while not joined or joining and while the page is visible.
+     */
+    refreshRooms() {
+        this.stopRoomsTimer();
+        if (!this.roomlist || !this.panel || this.destroyed || this.joined || this.joining || !this.liveconfig.canjoin) {
+            return;
+        }
+        if (document.visibilityState && document.visibilityState !== 'visible') {
+            // Loaded again when the page is shown (visibilitychange).
+            return;
+        }
+        const seq = ++this.roomsseq;
+        const groupid = this.panel.getGroupId() || Number(this.liveconfig.defaultgroupid) || 0;
+        const pending = new Pending('vrroomruntime_builtin/live/controller:rooms');
+        const current = () => seq === this.roomsseq && !!this.panel && !this.destroyed && !this.joined && !this.joining;
+        let interval = ROOMS_INTERVAL;
+        fetchRooms(Number(this.liveconfig.cmid) || 0, groupid).then((answer) => {
+            if (!current()) {
+                return undefined;
+            }
+            interval = roomsInterval(answer ? answer.interval : 0);
+            if (this.roomsfailed) {
+                this.roomsfailed = false;
+                if (this.statuskey === '' && this.panel) {
+                    this.panel.setStatus('');
+                }
+            }
+            return this.panel.setRooms(answer || {});
+        }).catch(() => {
+            if (!current()) {
+                return undefined;
+            }
+            // Shown on the status line only when it holds nothing else (a join failure stays); the
+            // list is asked for again after the interval.
+            if (this.panel && ((this.statuskey === '' && !this.failureshown) || this.roomsfailed)) {
+                this.statuskey = '';
+                this.roomsfailed = true;
+                this.panel.setStatus(this.str('liveroomslistfailed'));
+            }
+            return undefined;
+        }).then(() => {
+            if (current()) {
+                this.scheduleRooms(interval);
+            }
+            pending.resolve();
+            return undefined;
+        }).catch((error) => {
+            // Only reached when scheduling the next load fails: the earlier catch handles the fetch.
+            pending.resolve();
+            Notification.exception(error);
+        });
+    }
+
+    /**
+     * Load the list of rooms again after a delay.
      *
+     * @param {number} delay Milliseconds.
+     */
+    scheduleRooms(delay) {
+        this.stopRoomsTimer();
+        this.roomstimer = window.setTimeout(() => {
+            this.roomstimer = null;
+            this.refreshRooms();
+        }, delay);
+    }
+
+    /**
+     * Stop loading the list of rooms (answers still on their way are dropped).
+     */
+    stopRoomsTimer() {
+        if (this.roomstimer) {
+            window.clearTimeout(this.roomstimer);
+            this.roomstimer = null;
+        }
+    }
+
+    /**
+     * Join a room. Call inside the Join click: it also starts the audio context.
+     *
+     * @param {number} [room] Room number from the list of rooms; 0 starts a new room. Left out with a
+     *     single room per activity.
      * @returns {Promise}
      */
-    join() {
+    join(room) {
         if (this.destroyed || this.joined || this.joining || !this.liveconfig.canjoin) {
             return Promise.resolve();
         }
+        const number = Number(room);
+        const roomnumber = isFinite(number) && number > 0 ? Math.floor(number) : 0;
+        // Answers of the list that are on their way no longer matter.
+        this.stopRoomsTimer();
+        this.roomsseq++;
+        this.roomsfailed = false;
+        this.failureshown = false;
+        this.roomname = '';
         // Inside the user gesture: browsers start audio only then.
         this.voice.ensureAudio();
         const pending = new Pending('vrroomruntime_builtin/live/controller:join');
@@ -289,6 +421,7 @@ class LiveController extends Emitter {
         const liveconfig = Object.assign({}, this.liveconfig, {
             defaultgroupid: groupid || Number(this.liveconfig.defaultgroupid) || 0,
             groupid: groupid || Number(this.liveconfig.defaultgroupid) || 0,
+            room: roomnumber,
         });
         const giveUp = () => {
             this.joining = false;
@@ -296,6 +429,7 @@ class LiveController extends Emitter {
                 this.panel.setBusy(false);
             }
             this.setStatus('livejoinfailed');
+            this.refreshRooms();
         };
         return loadTransportFactory(this.liveconfig).then((factory) => {
             if (this.destroyed || !this.joining) {
@@ -332,6 +466,9 @@ class LiveController extends Emitter {
             }
             if (result && result.self) {
                 this.names.set(result.self.peerid, String(result.self.name || ''));
+            }
+            if (result && result.room && result.room.name) {
+                this.roomname = String(result.room.name);
             }
             this.onJoined();
             return undefined;
@@ -484,6 +621,9 @@ class LiveController extends Emitter {
         }
         const leaving = this.leave();
         this.destroyed = true;
+        this.stopRoomsTimer();
+        this.roomsseq++;
+        document.removeEventListener('visibilitychange', this.onVisibilityChange);
         window.removeEventListener('pagehide', this.onPageHide);
         document.removeEventListener('keydown', this.onKeyDown);
         document.removeEventListener('keyup', this.onKeyUp);
@@ -574,11 +714,22 @@ class LiveController extends Emitter {
             this.names.set(self.peerid, String(self.name || ''));
         }
         this.transport.getPeers().forEach((peer) => this.rememberPeer(peer));
+        this.stopRoomsTimer();
+        this.roomsseq++;
+        if (typeof this.transport.joinInfo === 'function') {
+            const info = this.transport.joinInfo();
+            if (info && info.room && info.room.name) {
+                this.roomname = String(info.room.name);
+            }
+        }
         if (this.panel) {
             this.panel.setBusy(false);
             this.panel.setJoined(true);
             if (this.transport && this.transport.capabilities && this.transport.capabilities.voice === false) {
                 this.panel.setVoiceAvailable(false);
+            }
+            if (this.roomlist) {
+                this.panel.setCurrentRoom(this.roomname ? this.str('livecurrentroom', this.roomname) : '');
             }
         }
         this.updatePresenceStatus(true);
@@ -599,6 +750,10 @@ class LiveController extends Emitter {
         let text;
         if (reason === 'full') {
             text = this.str('livefull', Number(this.liveconfig.maxpeers) || 0);
+        } else if (reason === 'limit') {
+            text = this.str('errorliveroomlimit', Number(this.liveconfig.maxrooms) || 0);
+        } else if (reason === 'roomgone') {
+            text = this.str('errorliveroomgone');
         } else if (FAILURES[reason]) {
             text = this.str(FAILURES[reason]);
         } else {
@@ -606,6 +761,8 @@ class LiveController extends Emitter {
         }
         this.teardown('');
         this.statuskey = '';
+        this.failureshown = true;
+        this.roomsfailed = false;
         if (this.panel) {
             this.panel.setStatus(text);
         }
@@ -640,12 +797,15 @@ class LiveController extends Emitter {
         this.names.clear();
         this.peerstates.clear();
         this.firstseen.clear();
+        this.roomname = '';
         if (this.panel) {
             this.panel.setBusy(false);
             this.panel.setJoined(false);
             this.updateVoiceControls();
         }
         this.setStatus(statuskey);
+        // Back to the list of rooms, loaded again at once.
+        this.refreshRooms();
     }
 
     /**
@@ -781,6 +941,8 @@ class LiveController extends Emitter {
      */
     setStatus(key) {
         this.statuskey = key || '';
+        this.failureshown = false;
+        this.roomsfailed = false;
         if (this.panel) {
             this.panel.setStatus(key ? this.str(key) : '');
         }

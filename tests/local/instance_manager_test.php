@@ -406,4 +406,127 @@ final class instance_manager_test extends \advanced_testcase {
         $this->assertEquals(0, $after->livemode);
         $this->assertEquals(50, $after->livemaxusers);
     }
+
+    /**
+     * The number of rooms is saved on add and cleaned: at most 20, "no limit" (0) only when
+     * students open rooms, at least 1 with fixed rooms; an unknown live mode is stored as off.
+     */
+    public function test_live_rooms_saved_on_add(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+
+        $cases = [
+            // Each case: livemode given, liverooms given, livemode stored, liverooms stored.
+            [live_settings::MODE_FIXED, 3, live_settings::MODE_FIXED, 3],
+            [live_settings::MODE_FIXED, 25, live_settings::MODE_FIXED, 20],
+            [live_settings::MODE_FIXED, 0, live_settings::MODE_FIXED, 1],
+            [live_settings::MODE_DYNAMIC, 0, live_settings::MODE_DYNAMIC, 0],
+            [live_settings::MODE_DYNAMIC, -1, live_settings::MODE_DYNAMIC, 0],
+            [live_settings::MODE_DYNAMIC, 5, live_settings::MODE_DYNAMIC, 5],
+            [7, 3, live_settings::MODE_OFF, 3],
+        ];
+        foreach ($cases as [$mode, $rooms, $expectedmode, $expectedrooms]) {
+            $module = $this->getDataGenerator()->create_module('vrroom', [
+                'course' => $course->id,
+                'stationtitles' => 'Vase',
+                'livemode' => $mode,
+                'liverooms' => $rooms,
+            ]);
+            $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+            $this->assertEquals($expectedmode, $vrroom->livemode, "livemode {$mode}, liverooms {$rooms}");
+            $this->assertEquals($expectedrooms, $vrroom->liverooms, "livemode {$mode}, liverooms {$rooms}");
+        }
+    }
+
+    /**
+     * A run mode that runs one live room only never gets "students open rooms": it is stored as
+     * "On, fixed rooms" (the companion service relies on this), on add and on update.
+     */
+    public function test_live_dynamic_stored_as_fixed_without_multirooms(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        // With live mode off for the site, the built-in viewer has no live rooms, so no multirooms.
+        set_config('liveenabled', 0, 'vrroomruntime_builtin');
+        $this->assertFalse(live_settings::runtime_has_multirooms('builtin'));
+        $this->assertFalse(live_settings::runtime_has_multirooms('notinstalled'));
+        $course = $this->getDataGenerator()->create_course();
+
+        $module = $this->getDataGenerator()->create_module('vrroom', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase',
+            'livemode' => live_settings::MODE_DYNAMIC,
+            'liverooms' => 0,
+        ]);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        $this->assertEquals(live_settings::MODE_FIXED, $vrroom->livemode);
+        $this->assertEquals(1, $vrroom->liverooms);
+
+        $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, $course->id, false, MUST_EXIST);
+        $data = self::form_data_for_update($vrroom, $cm);
+        $data->livemode = live_settings::MODE_DYNAMIC;
+        $data->liverooms = 4;
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $this->assertEquals(live_settings::MODE_FIXED, $after->livemode);
+        $this->assertEquals(4, $after->liverooms);
+
+        // A stored mode 2 met by an update without the live fields is turned into 1 as well.
+        $DB->set_field('vrroom', 'livemode', live_settings::MODE_DYNAMIC, ['id' => $vrroom->id]);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $data = self::form_data_for_update($after, $cm);
+        unset($data->livemode, $data->liverooms, $data->livemaxusers);
+        instance_manager::update_instance($data);
+        $this->assertEquals(live_settings::MODE_FIXED, $DB->get_field('vrroom', 'livemode', ['id' => $vrroom->id]));
+
+        // With live mode on for the site again, the built-in viewer runs several rooms.
+        set_config('liveenabled', 1, 'vrroomruntime_builtin');
+        $this->assertTrue(live_settings::runtime_has_multirooms('builtin'));
+    }
+
+    /**
+     * The number of rooms is saved on update, also for a room changed in the room editor (the
+     * keeproom path lists its columns); an update without the live fields keeps it.
+     */
+    public function test_live_rooms_saved_on_update(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [, $vrroom, $cm] = $this->create_activity();
+
+        $data = self::form_data_for_update($vrroom, $cm);
+        $data->livemode = live_settings::MODE_DYNAMIC;
+        $data->liverooms = 0;
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $this->assertEquals(live_settings::MODE_DYNAMIC, $after->livemode);
+        $this->assertEquals(0, $after->liverooms);
+
+        // Without the fields the stored values stay.
+        $data = self::form_data_for_update($after, $cm);
+        unset($data->livemode, $data->liverooms, $data->livemaxusers);
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $this->assertEquals(live_settings::MODE_DYNAMIC, $after->livemode);
+        $this->assertEquals(0, $after->liverooms);
+
+        // A customised room: fixed mode cannot keep "no limit", and the number is written.
+        $DB->set_field('vrroom', 'customised', 100, ['id' => $vrroom->id]);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $data = self::form_data_for_update($after, $cm);
+        $data->livemode = live_settings::MODE_FIXED;
+        $data->liverooms = 0;
+        instance_manager::update_instance($data);
+        $after = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
+        $this->assertEquals(100, $after->customised);
+        $this->assertEquals(live_settings::MODE_FIXED, $after->livemode);
+        $this->assertEquals(1, $after->liverooms);
+
+        $data = self::form_data_for_update($after, $cm);
+        $data->liverooms = 7;
+        instance_manager::update_instance($data);
+        $this->assertEquals(7, $DB->get_field('vrroom', 'liverooms', ['id' => $vrroom->id]));
+    }
 }

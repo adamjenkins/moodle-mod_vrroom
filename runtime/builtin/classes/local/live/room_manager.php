@@ -20,10 +20,11 @@ namespace vrroomruntime_builtin\local\live;
  * Live rooms: presences refreshed by polling, and the connection messages between their browsers.
  *
  * A presence (peer) is one row of vrroomruntime_builtin_peers with a random peer id made here. It
- * stays while its browser polls; after STALE_AFTER seconds without a poll it is gone. Signals are
- * only ever stored for a fresh peer of the same activity and the same group room, rebuilt by
- * signal_validator, and deleted when delivered or after SIGNAL_TTL seconds. Every limit is
- * enforced here, on the server.
+ * stays while its browser polls; after STALE_AFTER seconds without a poll it is gone. A room is
+ * (activity, group, room number): fixed rooms 1..N always exist; rooms students open exist while
+ * they have a fresh presence and vanish with the last one. Signals are only ever stored for a fresh
+ * peer of the same activity, group and room, rebuilt by signal_validator, and deleted when
+ * delivered or after SIGNAL_TTL seconds. Every limit is enforced here, on the server.
  *
  * The heartbeat that refreshes a presence row and returns the others active in the last few
  * seconds is adapted from mod_gear's sync_session service.
@@ -64,6 +65,12 @@ final class room_manager {
     public const MAX_DELIVER = 50;
     /** @var int Seconds to wait for the room lock. */
     public const LOCK_TIMEOUT = 5;
+    /** @var int Milliseconds until the client asks for the room list again. */
+    public const ROOMS_INTERVAL = 5000;
+    /** @var int Highest room number (the column is int(4)). */
+    public const MAX_ROOM_NUMBER = 9999;
+    /** @var int Most rooms listed at once (rooms students open). */
+    public const MAX_LISTED_ROOMS = 200;
 
     /** @var string Presence table. */
     public const TABLE_PEERS = 'vrroomruntime_builtin_peers';
@@ -96,7 +103,12 @@ final class room_manager {
     }
 
     /**
-     * Join a room: replace the user's earlier presence in the activity and check the room size.
+     * Join a room: check the room exists and has space, replace the user's earlier presence in the activity.
+     *
+     * Fixed rooms (live mode 1) are numbered 1..access::max_rooms(). With rooms students open (live
+     * mode 2), $room 0 starts a new room with the lowest free number, under an activity-level lock,
+     * refused at the maximum; any other number must be an open room (one with a fresh presence).
+     * Every check runs here, under the locks; nothing the client sends is trusted.
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
@@ -105,9 +117,11 @@ final class room_manager {
      * @param string $kind access::KIND_ATTEMPT or access::KIND_PREVIEW.
      * @param int $attemptid The attempt in progress, 0 for a preview.
      * @param int $groupid The room's group, 0 without groups.
+     * @param int $room The room number, 0 to start a new room (rooms students open only).
      * @param int|null $now Current time.
-     * @return array{peer: \stdClass, peers: array, interval: int}
-     * @throws \moodle_exception errorlivebusy, errorliveroomfull
+     * @return array{peer: \stdClass, peers: array, interval: int, room: int}
+     * @throws \moodle_exception errorlivebusy, errorliveroomfull, errorliveroomnotfound, errorliveroomgone,
+     *     errorliveroomlimit
      */
     public static function join(
         \cm_info $cm,
@@ -117,64 +131,98 @@ final class room_manager {
         string $kind,
         int $attemptid,
         int $groupid,
+        int $room,
         ?int $now = null
     ): array {
-        global $DB;
         $now = $now ?? time();
         $vrroomid = (int)$vrroom->id;
-
-        $factory = \core\lock\lock_config::get_lock_factory(self::LOCK_TYPE);
-        $lock = $factory->get_lock("room_{$vrroomid}_{$groupid}", self::LOCK_TIMEOUT);
-        if (!$lock) {
-            throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
+        if ($room < 0 || $room > self::MAX_ROOM_NUMBER) {
+            throw new \moodle_exception('errorliveroomnotfound', 'vrroomruntime_builtin');
         }
-        try {
-            self::purge_room($vrroomid, $groupid, $now);
+        $template = (object)[
+            'vrroomid' => $vrroomid,
+            'groupid' => $groupid,
+            'userid' => $userid,
+            'kind' => $kind,
+            'attemptid' => $attemptid,
+        ];
+        $max = access::max_peers($vrroom);
 
-            // One presence per user per activity: a new join (another tab, another group) replaces it.
-            $existing = $DB->get_record(self::TABLE_PEERS, ['vrroomid' => $vrroomid, 'userid' => $userid]);
-            if ($existing) {
-                self::remove_peer($existing);
+        if (access::room_mode($vrroom) !== access::ROOMMODE_DYNAMIC) {
+            // Fixed rooms 1..N always exist.
+            if ($room < 1 || $room > access::max_rooms($vrroom)) {
+                throw new \moodle_exception('errorliveroomnotfound', 'vrroomruntime_builtin');
             }
-
-            $max = access::max_peers($vrroom);
-            $count = $DB->count_records_select(
-                self::TABLE_PEERS,
-                'vrroomid = :vrroomid AND groupid = :groupid AND timeseen >= :fresh',
-                ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
-            );
-            if ($count >= $max) {
-                throw new \moodle_exception('errorliveroomfull', 'vrroomruntime_builtin', '', $max);
-            }
-
-            $peer = (object)[
-                'vrroomid' => $vrroomid,
-                'groupid' => $groupid,
-                'userid' => $userid,
-                'peerid' => self::new_peerid(),
-                'kind' => $kind,
-                'attemptid' => $attemptid,
-                'timejoined' => $now,
-                'timeseen' => $now,
-                'lastsignal' => $now,
-                'ratewindow' => $now,
-                'pollcount' => 0,
-                'signalcount' => 0,
-            ];
-            try {
-                $peer->id = (int)$DB->insert_record(self::TABLE_PEERS, $peer);
-            } catch (\dml_write_exception $e) {
-                // A simultaneous join of the same user into another group's room won the unique index.
-                throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
-            }
-        } finally {
-            $lock->release();
+            $peer = self::join_number($template, $room, $max, false, $now);
+        } else if ($room > 0) {
+            // An open room: it must still exist when its lock is held.
+            $peer = self::join_number($template, $room, $max, true, $now);
+        } else {
+            $peer = self::start_room($template, access::max_rooms($vrroom), $now);
         }
 
         return [
             'peer' => $peer,
             'peers' => self::roster($peer, $context, $now),
             'interval' => self::INTERVAL_ACTIVE,
+            'room' => (int)$peer->room,
+        ];
+    }
+
+    /**
+     * The rooms of an activity (or of one group of it) with their occupancy, for the room list.
+     *
+     * A snapshot without locks and without writes: stale presences are left out, not purged.
+     * Counts only, never names.
+     *
+     * @param \stdClass $vrroom vrroom row.
+     * @param int $groupid The group whose rooms to list (already resolved), 0 without groups.
+     * @param int $userid The user asking (never from the client).
+     * @param int|null $now Current time.
+     * @return array{groupid: int, roommode: string, maxrooms: int, capacity: int, rooms: array, canstart: bool,
+     *     startreason: string}
+     */
+    public static function list_rooms(\stdClass $vrroom, int $groupid, int $userid, ?int $now = null): array {
+        $now = $now ?? time();
+        $vrroomid = (int)$vrroom->id;
+        $mode = access::room_mode($vrroom);
+        $maxrooms = access::max_rooms($vrroom);
+        $capacity = access::max_peers($vrroom);
+
+        $all = self::fresh_rooms($vrroomid, $groupid, $now, 0);
+        $others = self::fresh_rooms($vrroomid, $groupid, $now, $userid);
+
+        if ($mode === access::ROOMMODE_DYNAMIC) {
+            $numbers = array_slice(array_keys($all), 0, self::MAX_LISTED_ROOMS);
+            $open = count($others);
+            $canstart = $maxrooms === 0 || $open < $maxrooms;
+            $startreason = $canstart ? '' : 'limit';
+        } else {
+            $numbers = range(1, max(1, $maxrooms));
+            $canstart = false;
+            $startreason = 'fixed';
+        }
+
+        $rooms = [];
+        foreach ($numbers as $number) {
+            $number = (int)$number;
+            $rooms[] = [
+                'number' => $number,
+                'name' => get_string('liveroomname', 'vrroomruntime_builtin', $number),
+                'count' => (int)($all[$number] ?? 0),
+                'capacity' => $capacity,
+                'joinable' => (int)($others[$number] ?? 0) < $capacity,
+            ];
+        }
+
+        return [
+            'groupid' => $groupid,
+            'roommode' => $mode,
+            'maxrooms' => $maxrooms,
+            'capacity' => $capacity,
+            'rooms' => $rooms,
+            'canstart' => $canstart,
+            'startreason' => $startreason,
         ];
     }
 
@@ -355,8 +403,10 @@ final class room_manager {
             if (!array_key_exists($to, $targets)) {
                 $targets[$to] = $DB->record_exists_select(
                     self::TABLE_PEERS,
-                    'peerid = :peerid AND vrroomid = :vrroomid AND groupid = :groupid AND timeseen >= :fresh AND id <> :self',
+                    'peerid = :peerid AND vrroomid = :vrroomid AND groupid = :groupid AND room = :room'
+                        . ' AND timeseen >= :fresh AND id <> :self',
                     ['peerid' => $to, 'vrroomid' => (int)$peer->vrroomid, 'groupid' => (int)$peer->groupid,
+                    'room' => (int)($peer->room ?? 0),
                     'fresh' => $fresh,
                     'self' => (int)$peer->id]
                 );
@@ -431,7 +481,7 @@ final class room_manager {
     }
 
     /**
-     * The other fresh peers of a peer's room, with names made on the server.
+     * The other fresh peers of a peer's room (activity, group and room number), with names made on the server.
      *
      * @param \stdClass $peer The peer whose room it is.
      * @param \context_module $context Module context.
@@ -446,12 +496,14 @@ final class room_manager {
                   JOIN {user} u ON u.id = p.userid {$userfields->joins}
                  WHERE p.vrroomid = :vrroomid
                    AND p.groupid = :groupid
+                   AND p.room = :room
                    AND p.id <> :self
                    AND p.timeseen >= :fresh
               ORDER BY p.timejoined ASC, p.id ASC";
         $rows = $DB->get_records_sql($sql, array_merge($userfields->params, [
             'vrroomid' => (int)$peer->vrroomid,
             'groupid' => (int)$peer->groupid,
+            'room' => (int)($peer->room ?? 0),
             'self' => (int)($peer->id ?? 0),
             'fresh' => $now - self::STALE_AFTER,
         ]));
@@ -484,10 +536,12 @@ final class room_manager {
     }
 
     /**
-     * Remove the stale presences of one room and the expired signals of its activity.
+     * Remove the stale presences of one group's rooms and the expired signals of its activity.
+     *
+     * Rooms students open vanish with their last presence: there is no rooms table.
      *
      * @param int $vrroomid Activity.
-     * @param int $groupid Room's group.
+     * @param int $groupid The rooms' group.
      * @param int $now Current time.
      * @return void
      */
@@ -598,12 +652,230 @@ final class room_manager {
         }
         $newcomer = $DB->record_exists_select(
             self::TABLE_PEERS,
-            'vrroomid = :vrroomid AND groupid = :groupid AND id <> :self AND timejoined > :recent AND timeseen >= :fresh',
-            ['vrroomid' => (int)$peer->vrroomid, 'groupid' => (int)$peer->groupid, 'self' => (int)($peer->id ?? 0),
+            'vrroomid = :vrroomid AND groupid = :groupid AND room = :room AND id <> :self'
+                . ' AND timejoined > :recent AND timeseen >= :fresh',
+            ['vrroomid' => (int)$peer->vrroomid, 'groupid' => (int)$peer->groupid, 'room' => (int)($peer->room ?? 0),
+            'self' => (int)($peer->id ?? 0),
             'recent' => $now - self::ACTIVE_WINDOW,
             'fresh' => $now - self::STALE_AFTER]
         );
         return $newcomer ? self::INTERVAL_ACTIVE : self::INTERVAL_IDLE;
+    }
+
+    /**
+     * Join one room number under its lock.
+     *
+     * A join into a room students open also takes the activity's start lock first (start before room,
+     * as in start_room()): leaving takes no lock, so without it a join that saw the room open just
+     * before its last person left could bring the room back while a start opened another one, and
+     * the maximum of rooms would be passed. Every way a room students open can come into being is
+     * then serialised.
+     *
+     * @param \stdClass $template Presence values: vrroomid, groupid, userid, kind, attemptid.
+     * @param int $room Room number, 1 upwards.
+     * @param int $max Room capacity.
+     * @param bool $mustexist Whether the room must already have a fresh presence (rooms students open).
+     * @param int $now Current time.
+     * @return \stdClass The inserted presence.
+     * @throws \moodle_exception errorlivebusy, errorliveroomgone, errorliveroomfull
+     */
+    private static function join_number(\stdClass $template, int $room, int $max, bool $mustexist, int $now): \stdClass {
+        global $DB;
+        $vrroomid = (int)$template->vrroomid;
+        $groupid = (int)$template->groupid;
+        $startlock = $mustexist ? self::lock("start_{$vrroomid}") : null;
+        try {
+            $lock = self::lock("room_{$vrroomid}_{$groupid}_{$room}");
+        } catch (\moodle_exception $e) {
+            if ($startlock) {
+                $startlock->release();
+            }
+            throw $e;
+        }
+        try {
+            self::purge_room($vrroomid, $groupid, $now);
+            $select = 'vrroomid = :vrroomid AND groupid = :groupid AND room = :room AND timeseen >= :fresh';
+            $params = ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'room' => $room, 'fresh' => $now - self::STALE_AFTER];
+
+            // An open room exists while it has a fresh presence (the caller's own counts too).
+            if ($mustexist && !$DB->record_exists_select(self::TABLE_PEERS, $select, $params)) {
+                throw new \moodle_exception('errorliveroomgone', 'vrroomruntime_builtin');
+            }
+
+            self::remove_own_presence($vrroomid, (int)$template->userid);
+
+            if ($DB->count_records_select(self::TABLE_PEERS, $select, $params) >= $max) {
+                throw new \moodle_exception('errorliveroomfull', 'vrroomruntime_builtin', '', $max);
+            }
+            return self::insert_presence($template, $room, $now);
+        } finally {
+            $lock->release();
+            if ($startlock) {
+                $startlock->release();
+            }
+        }
+    }
+
+    /**
+     * Start a new room (rooms students open): the lowest free number, refused at the maximum.
+     *
+     * Takes the activity's start lock, then the new room's lock (always in this order). Only a
+     * start makes a room come into being and starts are serialised, so two people cannot both open
+     * the last allowed room.
+     *
+     * @param \stdClass $template Presence values: vrroomid, groupid, userid, kind, attemptid.
+     * @param int $maxrooms Most rooms open at once in the group, 0 for no limit.
+     * @param int $now Current time.
+     * @return \stdClass The inserted presence.
+     * @throws \moodle_exception errorlivebusy, errorliveroomlimit
+     */
+    private static function start_room(\stdClass $template, int $maxrooms, int $now): \stdClass {
+        global $DB;
+        $vrroomid = (int)$template->vrroomid;
+        $groupid = (int)$template->groupid;
+        $startlock = self::lock("start_{$vrroomid}");
+        try {
+            self::purge_room($vrroomid, $groupid, $now);
+            // The caller's own presence is removed first, so leaving a room to start one uses no slot.
+            self::remove_own_presence($vrroomid, (int)$template->userid);
+
+            $occupied = self::fresh_rooms($vrroomid, $groupid, $now, 0);
+            if ($maxrooms > 0 && count($occupied) >= $maxrooms) {
+                throw new \moodle_exception('errorliveroomlimit', 'vrroomruntime_builtin', '', $maxrooms);
+            }
+            $room = self::lowest_free(array_keys($occupied));
+            if ($room > self::MAX_ROOM_NUMBER) {
+                throw new \moodle_exception('errorliveroomlimit', 'vrroomruntime_builtin', '', self::MAX_ROOM_NUMBER);
+            }
+
+            $roomlock = self::lock("room_{$vrroomid}_{$groupid}_{$room}");
+            try {
+                $taken = $DB->count_records_select(
+                    self::TABLE_PEERS,
+                    'vrroomid = :vrroomid AND groupid = :groupid AND room = :room AND timeseen >= :fresh',
+                    ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'room' => $room, 'fresh' => $now - self::STALE_AFTER]
+                );
+                if ($taken > 0) {
+                    throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
+                }
+                return self::insert_presence($template, $room, $now);
+            } finally {
+                $roomlock->release();
+            }
+        } finally {
+            $startlock->release();
+        }
+    }
+
+    /**
+     * Take a live room lock.
+     *
+     * @param string $key Lock key: room_{vrroomid}_{groupid}_{room} or start_{vrroomid}.
+     * @return \core\lock\lock
+     * @throws \moodle_exception errorlivebusy when the lock cannot be had in time
+     */
+    private static function lock(string $key): \core\lock\lock {
+        $factory = \core\lock\lock_config::get_lock_factory(self::LOCK_TYPE);
+        $lock = $factory->get_lock($key, self::LOCK_TIMEOUT);
+        if (!$lock) {
+            throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
+        }
+        return $lock;
+    }
+
+    /**
+     * Remove a user's presence in an activity (any group, any room): one presence per user per activity.
+     *
+     * @param int $vrroomid Activity.
+     * @param int $userid User.
+     * @return void
+     */
+    private static function remove_own_presence(int $vrroomid, int $userid): void {
+        global $DB;
+        $existing = $DB->get_record(self::TABLE_PEERS, ['vrroomid' => $vrroomid, 'userid' => $userid]);
+        if ($existing) {
+            self::remove_peer($existing);
+        }
+    }
+
+    /**
+     * Insert a new presence.
+     *
+     * @param \stdClass $template Presence values: vrroomid, groupid, userid, kind, attemptid.
+     * @param int $room Room number.
+     * @param int $now Current time.
+     * @return \stdClass The inserted row with id.
+     * @throws \moodle_exception errorlivebusy when a simultaneous join of the same user won the unique index
+     */
+    private static function insert_presence(\stdClass $template, int $room, int $now): \stdClass {
+        global $DB;
+        $peer = (object)[
+            'vrroomid' => (int)$template->vrroomid,
+            'groupid' => (int)$template->groupid,
+            'room' => $room,
+            'userid' => (int)$template->userid,
+            'peerid' => self::new_peerid(),
+            'kind' => (string)$template->kind,
+            'attemptid' => (int)$template->attemptid,
+            'timejoined' => $now,
+            'timeseen' => $now,
+            'lastsignal' => $now,
+            'ratewindow' => $now,
+            'pollcount' => 0,
+            'signalcount' => 0,
+        ];
+        try {
+            $peer->id = (int)$DB->insert_record(self::TABLE_PEERS, $peer);
+        } catch (\dml_write_exception $e) {
+            // A simultaneous join of the same user into another room won the unique index.
+            throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
+        }
+        return $peer;
+    }
+
+    /**
+     * The open rooms of a group with their fresh presences.
+     *
+     * @param int $vrroomid Activity.
+     * @param int $groupid Group, 0 without groups.
+     * @param int $now Current time.
+     * @param int $excludeuserid A user whose presence is not counted, 0 for none.
+     * @return array<int, int> room number => people, in number order
+     */
+    private static function fresh_rooms(int $vrroomid, int $groupid, int $now, int $excludeuserid): array {
+        global $DB;
+        $params = ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER];
+        $exclude = '';
+        if ($excludeuserid > 0) {
+            $exclude = ' AND userid <> :userid';
+            $params['userid'] = $excludeuserid;
+        }
+        $sql = "SELECT room, COUNT(1) AS people
+                  FROM {" . self::TABLE_PEERS . "}
+                 WHERE vrroomid = :vrroomid AND groupid = :groupid AND timeseen >= :fresh{$exclude}
+              GROUP BY room
+              ORDER BY room ASC";
+        $rooms = [];
+        foreach ($DB->get_records_sql_menu($sql, $params) as $room => $people) {
+            $rooms[(int)$room] = (int)$people;
+        }
+        ksort($rooms);
+        return $rooms;
+    }
+
+    /**
+     * The lowest room number, 1 upwards, not in a list.
+     *
+     * @param int[] $occupied Room numbers in use.
+     * @return int
+     */
+    private static function lowest_free(array $occupied): int {
+        $used = array_flip(array_map('intval', $occupied));
+        $room = 1;
+        while (isset($used[$room])) {
+            $room++;
+        }
+        return $room;
     }
 
     /**

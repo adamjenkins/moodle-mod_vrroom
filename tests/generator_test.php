@@ -56,6 +56,7 @@ final class generator_test extends \advanced_testcase {
         $this->assertSame(0, $DB->count_records('vrroom_slots', ['vrroomid' => $vrroom->id]));
         $this->assertEquals(0, $record->livemode);
         $this->assertEquals(6, $record->livemaxusers);
+        $this->assertEquals(1, $record->liverooms);
     }
 
     /**
@@ -68,12 +69,13 @@ final class generator_test extends \advanced_testcase {
 
         $vrroom = $this->getDataGenerator()->create_module(
             'vrroom',
-            ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4]
+            ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4, 'liverooms' => 3]
         );
 
         $record = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         $this->assertEquals(1, $record->livemode);
         $this->assertEquals(4, $record->livemaxusers);
+        $this->assertEquals(3, $record->liverooms);
     }
 
     /**
