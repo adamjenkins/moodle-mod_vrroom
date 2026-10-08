@@ -2,7 +2,7 @@
 Feature: A teacher builds an escape chain
   In order to give students a chain of puzzles to solve
   As a teacher
-  I need to create a VR room escape chain from its activity chooser entry and its form
+  I need to choose the escape chain template in the activity settings and fill in its form
 
   Background:
     Given the following "users" exist:
@@ -44,10 +44,14 @@ Feature: A teacher builds an escape chain
     And I should see "Desk" in the "[data-region='vrroom-listview']" "css_element"
     And I should see "Safe" in the "[data-region='vrroom-listview']" "css_element"
 
-  Scenario: The activity chooser entry opens the escape chain form only
+  Scenario: Choosing the escape chain template in the settings shows its fields before saving
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
-    When I add a "VR room: Escape chain" to section "1" using the activity chooser
-    Then I should see "Escape chain"
+    When I add a "VR room" to section "1" using the activity chooser
+    Then the field "Template" matches value "Gallery walk"
+    And "gallery_title[0]" "field" should exist
+    When I set the field "Template" to "Escape chain"
+    And I wait until the page is ready
+    Then the field "Template" matches value "Escape chain"
     And "escape_title[0]" "field" should exist
     And "gallery_title[0]" "field" should not exist

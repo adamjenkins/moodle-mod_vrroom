@@ -7,6 +7,9 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Changed
 
+- Template choice moved from per-template activity-chooser entries into the settings form
+  (Template select reloading the form; `instance_manager::template_lock_reason()` locks it once
+  attempts exist or the room is customised, checked again on save). Chooser callbacks removed.
 - Escape chain: the story panel follows the start point's yaw (unchanged for the built-in rooms).
 - The plain-hall fallback of the viewer is centred on the stored bounds.
 - Keyboard: A/D and ←/→ turn; Q/E step sideways (previously the reverse).

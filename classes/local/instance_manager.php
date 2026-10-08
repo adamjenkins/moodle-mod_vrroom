@@ -115,10 +115,12 @@ final class instance_manager {
     /**
      * Update an activity from the form (or generator) data.
      *
-     * The template never changes after creation. While the room has been changed in the room
-     * editor (vrroom.customised > 0), only the activity's own settings are saved and the room is
-     * not rebuilt, unless the form asks for it with vrroom_rebuild, which recompiles the room from
-     * the template's settings and clears the customised flag.
+     * The template may change only while template_lock_reason() is null (no attempts, room not
+     * edited in the room editor); the server checks that again here and otherwise keeps the stored
+     * template, whatever the form sent. While the room has been changed in the room editor
+     * (vrroom.customised > 0), only the activity's own settings are saved and the room is not
+     * rebuilt, unless the form asks for it with vrroom_rebuild, which recompiles the room from the
+     * template's settings and clears the customised flag.
      *
      * @param \stdClass $data Form data; $data->instance and $data->coursemodule are set by core.
      * @param \moodleform_mod|null $form The form, when there is one.
@@ -128,6 +130,16 @@ final class instance_manager {
         global $DB;
 
         $vrroom = $DB->get_record('vrroom', ['id' => $data->instance], '*', MUST_EXIST);
+        $requested = (string)($data->template ?? $vrroom->template);
+        if (
+            $requested !== (string)$vrroom->template
+            && array_key_exists($requested, template_registry::get_all())
+            && self::template_lock_reason($vrroom) === null
+        ) {
+            // A new template builds a new room from its own fields below.
+            $vrroom->template = $requested;
+            $vrroom->templateconfig = null;
+        }
         $template = template_registry::get($vrroom->template);
         $runtimename = (string)($data->runtime ?? $vrroom->runtime);
         runtime_registry::get($runtimename);
@@ -522,6 +534,26 @@ final class instance_manager {
      */
     private static function clean_livemaxusers($value): int {
         return min(50, max(2, (int)$value));
+    }
+
+    /**
+     * Why an activity's template can no longer be changed, or null while it can.
+     *
+     * Changing the template rebuilds the room from the new template, so it is refused once
+     * students have attempts or the room was edited in the room editor.
+     *
+     * @param \stdClass $vrroom The vrroom row (id and customised are read).
+     * @return string|null 'edited', 'attempts' or null.
+     */
+    public static function template_lock_reason(\stdClass $vrroom): ?string {
+        global $DB;
+        if ((int)($vrroom->customised ?? 0) > 0) {
+            return 'edited';
+        }
+        if (!empty($vrroom->id) && $DB->record_exists('vrroom_attempts', ['vrroomid' => (int)$vrroom->id])) {
+            return 'attempts';
+        }
+        return null;
     }
 
     /**

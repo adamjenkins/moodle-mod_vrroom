@@ -41,8 +41,10 @@ not have it yet, so teachers can upload 3D models. Uninstalling the plugin remov
 
 ## Using it
 
-1. In a course, add a **VR room** activity. The activity chooser lists one entry per template:
-   **Gallery walk**, **Escape chain** and **Empty room**.
+1. In a course, add a **VR room** activity and choose its **Template** at the top of the settings:
+   **Gallery walk** (the default), **Escape chain** or **Empty room**. Choosing another template shows
+   its settings straight away. The template can be changed until students have attempts or the room
+   has been edited in the room editor.
 2. Fill in the template's form. For a gallery walk: an environment (*Gallery hall*, *Courtyard*, or
    your own GLB model) and stations with a title, a text, optionally a 3D model or an image, and
    optionally a question from the course question banks. An escape chain has puzzles with key or

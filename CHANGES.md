@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The template is now chosen in the activity settings (one "VR room" entry in the activity
+  chooser). Choosing another template shows its settings straight away, and it can be changed
+  until students have attempts or the room has been edited in the room editor.
 - The activity settings and the room editor show a picture of the chosen room before saving.
 - Room packs may include small rooms (smaller station areas, 2 or more stations).
 - Room packs: a new sub-plugin type (`vrroomenv`) for packs of ready-made 3D rooms. The activity

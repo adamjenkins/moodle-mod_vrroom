@@ -415,29 +415,3 @@ function vrroom_get_file_areas($course, $cm, $context): array {
         'assets' => get_string('area_assets', 'vrroom'),
     ];
 }
-
-/**
- * Activity chooser items for a course: one per installed template.
- *
- * @param \core_course\local\entity\content_item $defaultmodulecontentitem The module's default item.
- * @param \stdClass $user The user the chooser is built for.
- * @param \stdClass $course The course.
- * @return \core_course\local\entity\content_item[]
- */
-function mod_vrroom_get_course_content_items(
-    \core_course\local\entity\content_item $defaultmodulecontentitem,
-    \stdClass $user,
-    \stdClass $course
-): array {
-    return \mod_vrroom\local\template\chooser::content_items($defaultmodulecontentitem);
-}
-
-/**
- * Activity chooser items of the module for every course (admin "recommended activities" and favourites).
- *
- * @param \core_course\local\entity\content_item $defaultmodulecontentitem The module's default item.
- * @return \core_course\local\entity\content_item[]
- */
-function mod_vrroom_get_all_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem): array {
-    return \mod_vrroom\local\template\chooser::content_items($defaultmodulecontentitem);
-}

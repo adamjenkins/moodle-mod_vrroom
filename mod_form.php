@@ -41,6 +41,9 @@ use mod_vrroom\local\template\registry as template_registry;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mod_vrroom_mod_form extends moodleform_mod {
+    /** @var string Template shown first for a new activity. */
+    private const DEFAULT_TEMPLATE = 'gallery';
+
     /** @var string|null|false Resolved template name, null for none, false until resolved. */
     private string|null|false $resolvedtemplate = false;
 
@@ -48,6 +51,7 @@ class mod_vrroom_mod_form extends moodleform_mod {
      * Define the form.
      */
     public function definition() {
+        global $PAGE;
         $mform = $this->_form;
         $courseid = (int)$this->current->course;
 
@@ -82,14 +86,29 @@ class mod_vrroom_mod_form extends moodleform_mod {
             );
         } else if ($name !== null) {
             $template = template_registry::get($name);
-            $mform->addElement('hidden', 'template', $name);
-            $mform->setType('template', PARAM_PLUGIN);
-            $mform->setDefault('template', $name);
-            $mform->addElement('static', 'templatename', get_string('template', 'vrroom'), s($template->get_display_name()));
-            if ($this->_instance) {
-                $mform->addElement('static', 'templatelocked', '', get_string('templatelocked', 'vrroom'));
-            } else if (count(template_registry::get_all()) > 1) {
-                $mform->addElement('static', 'templatechosen', '', get_string('templatechosen', 'vrroom'));
+            $lockreason = $this->template_lock_reason();
+            if ($lockreason === null) {
+                // The template can still be chosen: changing it reloads the form with that template's
+                // fields (the no-submit button, pressed by mod_vrroom/template_select on change), as the
+                // course format select does (course/edit_form.php). Nothing is saved until Save.
+                $mform->addElement('select', 'template', get_string('template', 'vrroom'), template_registry::get_choices());
+                $mform->setType('template', PARAM_PLUGIN);
+                $mform->setDefault('template', $name);
+                $mform->addHelpButton('template', 'template', 'vrroom');
+                $mform->addElement('submit', 'vrroom_choosetemplate', get_string('choosetemplatebutton', 'vrroom'));
+                $PAGE->requires->js_call_amd('mod_vrroom/template_select', 'init', ['id_template', 'id_vrroom_choosetemplate']);
+            } else {
+                // Students have attempts, or the room was edited in the room editor: changing the
+                // template would rebuild the room and lose that work.
+                $mform->addElement('hidden', 'template', $name);
+                $mform->setType('template', PARAM_PLUGIN);
+                $mform->setDefault('template', $name);
+                $mform->addElement('static', 'templatename', get_string('template', 'vrroom'), s($template->get_display_name()));
+                $mform->addElement('static', 'templatelocked', '', get_string('templatelocked' . $lockreason, 'vrroom'));
+            }
+            $help = $template->get_chooser_help();
+            if ($help !== '') {
+                $mform->addElement('static', 'templatedescription', '', s($help));
             }
 
             if ($this->is_customised()) {
@@ -102,13 +121,13 @@ class mod_vrroom_mod_form extends moodleform_mod {
                 $template->define_form($this, $mform, $courseid);
             }
         } else {
-            // Reached without a template (e.g. a bare modedit.php?add=vrroom link): choose one first.
-            // The no-submit button reloads the form with the template's fields, as the course
-            // format select does (course/edit_form.php).
-            $mform->addElement('select', 'template', get_string('template', 'vrroom'), template_registry::get_choices());
-            $mform->setType('template', PARAM_PLUGIN);
-            $mform->addHelpButton('template', 'template', 'vrroom');
-            $mform->addElement('submit', 'vrroom_choosetemplate', get_string('choosetemplatebutton', 'vrroom'));
+            // No template plugin is installed at all.
+            $mform->addElement(
+                'static',
+                'templatemissing',
+                get_string('template', 'vrroom'),
+                get_string('notemplates', 'vrroom')
+            );
         }
 
         // Live mode.
@@ -199,7 +218,7 @@ class mod_vrroom_mod_form extends moodleform_mod {
             return $errors;
         }
         if ($name === null) {
-            $errors['template'] = get_string('choosetemplatefirst', 'vrroom');
+            $errors['name'] = get_string('notemplates', 'vrroom');
             return $errors;
         }
         if ($this->is_customised()) {
@@ -367,19 +386,36 @@ class mod_vrroom_mod_form extends moodleform_mod {
         }
         $all = template_registry::get_all();
         $name = null;
+        $requested = optional_param('template', '', PARAM_PLUGIN);
         if ($this->_instance) {
             $current = (string)($this->current->template ?? '');
             $name = isset($all[$current]) ? $current : null;
-        } else {
-            $requested = optional_param('template', '', PARAM_PLUGIN);
-            if ($requested !== '' && isset($all[$requested])) {
+            // While the template can still be changed, a reload with another template shows its fields.
+            if ($name !== null && $requested !== '' && isset($all[$requested]) && $this->template_lock_reason() === null) {
                 $name = $requested;
-            } else if (count($all) === 1) {
-                $name = (string)array_key_first($all);
             }
+        } else if ($requested !== '' && isset($all[$requested])) {
+            $name = $requested;
+        } else if ($all) {
+            $name = isset($all[self::DEFAULT_TEMPLATE]) ? self::DEFAULT_TEMPLATE : (string)array_key_first($all);
         }
         $this->resolvedtemplate = $name;
         return $name;
+    }
+
+    /**
+     * Why the template of the activity being edited can no longer be changed, or null while it can.
+     *
+     * @return string|null 'attempts', 'edited' or null (also null for a new activity).
+     */
+    protected function template_lock_reason(): ?string {
+        if (!$this->_instance) {
+            return null;
+        }
+        return instance_manager::template_lock_reason((object)[
+            'id' => $this->_instance,
+            'customised' => (int)($this->current->customised ?? 0),
+        ]);
     }
 
     /**

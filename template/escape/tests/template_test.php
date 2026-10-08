@@ -853,7 +853,8 @@ final class template_test extends \advanced_testcase {
         $this->assertStringContainsString('value="Safe"', $html);
         $this->assertStringContainsString('name="escape_addpuzzles"', $html);
         $this->assertStringNotContainsString('gallery_', $html);
-        $this->assertStringContainsString(get_string('templatelocked', 'vrroom'), $html);
+        // Unused activity: the template can still be changed, and escape is the one selected.
+        $this->assertMatchesRegularExpression('/<option[^>]*value="escape"[^>]*selected/', $html);
 
         // The stored lock types beat the repeat_elements() default (key): Safe keeps "no lock".
         $dom = new \DOMDocument();
