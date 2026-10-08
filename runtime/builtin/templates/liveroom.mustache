@@ -37,6 +37,7 @@
     * groups - [{id, name, selected}] the group rooms the user may join
     * maxpeers - most people in one room
     * count - people in the room shown in the heading (0 before joining)
+    * notice - plain-text notice to show instead of the default (optional)
 
     Example context (json):
     {
@@ -47,11 +48,12 @@
         "hasgroups": true,
         "groups": [{"id": 7, "name": "Group A", "selected": true}, {"id": 8, "name": "Group B", "selected": false}],
         "maxpeers": 6,
-        "count": 0
+        "count": 0,
+        "notice": ""
     }
 }}
 <h3 class="h5" id="mavr-liveroom-heading-{{cmid}}">{{#str}}liveroom, mavrruntime_builtin{{/str}}</h3>
-<p class="small" data-region="mavr-live-notice">{{#str}}livenotice, mavrruntime_builtin{{/str}}</p>
+<p class="small" data-region="mavr-live-notice">{{#notice}}{{notice}}{{/notice}}{{^notice}}{{#str}}livenotice, mavrruntime_builtin{{/str}}{{/notice}}</p>
 {{#nogroup}}
 <p class="alert alert-info">{{#str}}livenogroup, mavrruntime_builtin{{/str}}</p>
 {{/nogroup}}

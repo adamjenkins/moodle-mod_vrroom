@@ -50,6 +50,33 @@ const TRANSPORTS = {
     mesh: createMeshTransport,
 };
 
+/** AMD modules a launch config may name as its transport: another run mode's module. */
+const TRANSPORT_MODULE = /^mavrruntime_[a-z][a-z0-9_]*\/[a-z][a-z0-9_]*(\/[a-z][a-z0-9_]*)*$/;
+
+/**
+ * The transport factory for a live block: a built-in transport by name, or the createTransport
+ * export of the AMD module the run mode names in transportmodule (loaded on first use).
+ *
+ * @param {Object} liveconfig config.live
+ * @returns {Promise<Function|null>}
+ */
+const loadTransportFactory = (liveconfig) => {
+    const builtin = TRANSPORTS[liveconfig.transport || 'mesh'];
+    if (builtin) {
+        return Promise.resolve(builtin);
+    }
+    const name = typeof liveconfig.transportmodule === 'string' ? liveconfig.transportmodule : '';
+    if (!TRANSPORT_MODULE.test(name)) {
+        return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+        // RequireJS loads a module by a name known only at run time (core: lib/amd/src/chart_builder.js).
+        window.require([name], (module) => {
+            resolve(module && typeof module.createTransport === 'function' ? module.createTransport : null);
+        }, () => resolve(null));
+    });
+};
+
 /** Modes a state message may carry. */
 const MODES = ['3d', 'vr', 'mr', 'ar', 'list'];
 
@@ -251,11 +278,6 @@ class LiveController extends Emitter {
         }
         // Inside the user gesture: browsers start audio only then.
         this.voice.ensureAudio();
-        const factory = TRANSPORTS[this.liveconfig.transport || 'mesh'];
-        if (!factory) {
-            this.setStatus('livejoinfailed');
-            return Promise.resolve();
-        }
         const pending = new Pending('mavrruntime_builtin/live/controller:join');
         this.joining = true;
         if (this.panel) {
@@ -267,33 +289,44 @@ class LiveController extends Emitter {
             defaultgroupid: groupid || Number(this.liveconfig.defaultgroupid) || 0,
             groupid: groupid || Number(this.liveconfig.defaultgroupid) || 0,
         });
-        let transport;
-        try {
-            transport = factory(liveconfig, {});
-        } catch (error) {
+        const giveUp = () => {
             this.joining = false;
             if (this.panel) {
                 this.panel.setBusy(false);
             }
-            pending.resolve();
-            return Promise.reject(error);
-        }
-        this.bind(transport);
-        return Promise.resolve().then(() => transport.join()).then((result) => {
-            if (this.transport !== transport) {
+            this.setStatus('livejoinfailed');
+        };
+        return loadTransportFactory(this.liveconfig).then((factory) => {
+            if (this.destroyed || !this.joining) {
                 return undefined;
             }
-            if (result && result.self) {
-                this.names.set(result.self.peerid, String(result.self.name || ''));
+            if (!factory) {
+                giveUp();
+                return undefined;
             }
-            this.onJoined();
-            return undefined;
+            const transport = factory(liveconfig, {});
+            this.bind(transport);
+            return Promise.resolve().then(() => transport.join()).then((result) => {
+                if (this.transport !== transport) {
+                    return undefined;
+                }
+                if (result && result.self) {
+                    this.names.set(result.self.peerid, String(result.self.name || ''));
+                }
+                this.onJoined();
+                return undefined;
+            }).catch((error) => {
+                if (this.transport !== transport) {
+                    return undefined;
+                }
+                const code = error && error.errorcode ? String(error.errorcode) : '';
+                this.onFailed(ERRORCODES[code] || 'error');
+                return undefined;
+            });
         }).catch((error) => {
-            if (this.transport !== transport) {
-                return undefined;
-            }
-            const code = error && error.errorcode ? String(error.errorcode) : '';
-            this.onFailed(ERRORCODES[code] || 'error');
+            // The transport could not be created.
+            giveUp();
+            Notification.exception(error);
             return undefined;
         }).then(() => {
             pending.resolve();
@@ -533,6 +566,9 @@ class LiveController extends Emitter {
         if (this.panel) {
             this.panel.setBusy(false);
             this.panel.setJoined(true);
+            if (this.transport && this.transport.capabilities && this.transport.capabilities.voice === false) {
+                this.panel.setVoiceAvailable(false);
+            }
         }
         this.updatePresenceStatus(true);
         this.updateVoiceControls();

@@ -61,6 +61,7 @@ class Panel {
         this.str = options.str;
         this.rendered = false;
         this.joined = false;
+        this.novoice = false;
         this.busy = false;
         this.talking = false;
         this.listseq = 0;
@@ -89,6 +90,7 @@ class Panel {
             })),
             maxpeers: Number(live.maxpeers) || 0,
             count: 0,
+            notice: String(live.notice || ''),
         };
         return Templates.renderForPromise('mavrruntime_builtin/liveroom', context).then(({html, js}) => {
             Templates.replaceNodeContents(this.container, html, js);
@@ -209,7 +211,7 @@ class Panel {
         if (select) {
             select.disabled = this.joined || this.busy;
         }
-        part(this.container, 'mavr-live-voice').classList.toggle('d-none', !this.joined);
+        part(this.container, 'mavr-live-voice').classList.toggle('d-none', !this.joined || this.novoice);
         part(this.container, 'mavr-live-people').classList.toggle('d-none', !this.joined);
         if (!this.joined) {
             this.setTalking(false);
@@ -217,6 +219,19 @@ class Panel {
             part(this.container, 'mavr-live-participants').textContent = '';
         }
         this.setBusy(this.busy);
+    }
+
+    /**
+     * Show or hide the voice controls (a transport without voice hides them).
+     *
+     * @param {boolean} available Voice can be used in this room.
+     */
+    setVoiceAvailable(available) {
+        this.novoice = !available;
+        if (!this.rendered) {
+            return;
+        }
+        part(this.container, 'mavr-live-voice').classList.toggle('d-none', !available || !this.joined);
     }
 
     /**
