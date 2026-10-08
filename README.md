@@ -41,13 +41,17 @@ not have it yet, so teachers can upload 3D models. Uninstalling the plugin remov
 
 ## Using it
 
-1. In a course, add a **VR room** activity.
-2. Choose the **Gallery walk** template and an environment (*Gallery hall*, *Courtyard*, or your own
-   GLB model).
-3. Add stations: a title, a text, optionally a 3D model or an image, and optionally a question from
-   the course question banks. Mark stations as required and give them points.
-4. Choose a grading method (highest, average or last attempt), the number of attempts, and the
-   completion rule *Complete all required objectives* if wanted.
+1. In a course, add a **VR room** activity. The activity chooser lists one entry per template:
+   **Gallery walk**, **Escape chain** and **Empty room**.
+2. Fill in the template's form. For a gallery walk: an environment (*Gallery hall*, *Courtyard*, or
+   your own GLB model) and stations with a title, a text, optionally a 3D model or an image, and
+   optionally a question from the course question banks. An escape chain has puzzles with key or
+   question locks, hints and an optional time limit.
+3. Choose a grading method (highest, average or last attempt), the number of attempts, how
+   questions are answered (*One try per question*, or *Try again until correct* with a share of the
+   points lost per wrong try), and the completion rule *Complete all required objectives* if wanted.
+4. Optionally open the **Room editor** tab to move things, add objects, zones and tasks, or build a
+   room from scratch.
 
 Students open the activity, enter the 3D room (or the list view), visit the stations and answer the
 questions. A question opens once its station has been visited. When they finish the attempt the
@@ -60,23 +64,31 @@ objectives and recorded statements under *Reports* and can delete attempts there
   the floor to walk there, click a station's marker to open it, Enter to open what is in the middle
   of the screen.
 - Touch screen: the stick at the bottom left to move, drag to look around, tap to walk or open.
+- Walls, furniture and 3D models stop you; you slide along them instead of walking through.
+- The bar under the room has **Fullscreen** and three drag settings, saved as the user's Moodle
+  preferences so they apply in every VR room and on every device: *Reverse left/right drag*,
+  *Reverse up/down drag* and *Lock up/down drag* (the view stays level).
+- On a VR headset (and, as extras, AR on Android phones and mixed reality on passthrough headsets)
+  *Enter VR* / *Enter AR* / *Enter mixed reality* buttons appear. They need HTTPS.
 
-## Phase 1 scope (this release)
+## What is included
 
-Included:
+No release has been tagged yet (0.1.0, ALPHA). The code includes:
 
 - The activity with scenes, task graph (objectives and rules), attempts, grading and completion.
-- The built-in single-user viewer for desktop and phone browsers, and the accessible list view.
-- The Gallery walk template with two bundled procedural environments and uploaded GLB rooms.
-- Question-bank questions graded by Moodle's question engine.
+- The built-in viewer for desktop and phone browsers, with WebXR for VR headsets (and AR and mixed
+  reality as extras), and the accessible list view.
+- Three templates: Gallery walk, Escape chain and Empty room; a room and task editor.
+- Question-bank questions graded by Moodle's question engine, in either question mode.
+- Live mode for small groups (below), built in.
 - xAPI statements through Moodle's xAPI web service, validated and stored by the activity.
 - Teacher reports, privacy provider, backup and restore, course reset and clean uninstall.
 
-Not yet included (planned for later phases): scene editor, escape-chain template, WebXR
-(VR, AR and MR headsets), live multi-user rooms, the companion service and Hubs integration,
+Separate, optional: the **companion** run mode (`vrroomruntime_companion` plus the
+`vrroom-companion` container stack) for larger live rooms. Not yet built: Hubs integration,
 spatial analytics and Moodle app support.
 
-## Live mode (in development, not in a release yet)
+## Live mode
 
 A teacher can turn on **Live mode** in the activity settings (*Live mode* section). Then up to six
 people (the teacher chooses 2 to 6) who are working on the activity at the same time can join a
@@ -84,6 +96,10 @@ live room: they see each other as simple avatars in the 3D room or in VR, AR and
 to each other. Each person still makes their own attempt and gets their own grade; tasks and
 objects are not shared. In group mode each group has its own room, and students join only rooms
 of their own groups.
+
+Live mode is part of this plugin and **needs no companion service or other server**. The
+companion run mode is only for what live mode does not do well on its own: rooms of up to about 50
+people, server-based voice, and keeping participants' IP addresses from each other.
 
 How it works and what it discloses:
 
@@ -98,6 +114,13 @@ How it works and what it discloses:
   > VR room > Built-in viewer*, or turn live mode off for the whole site there.
 - Nothing is recorded: presence rows go when a person leaves or stops responding for 20 seconds,
   connection messages when delivered or after 60 seconds.
+- Voice needs HTTPS. On a plain-HTTP site avatars and the participant list work, but browsers
+  refuse the microphone.
+
+Tested so far: two students joining the same room and seeing each other (in two browsers on one
+machine), and the server rules in PHPUnit (rooms and groups kept apart, the size limit, rate and
+size limits, expiry). Not yet tested: real voice between people, participants on different
+networks (where TURN may be needed), and avatars on VR headsets.
 
 ## Trust model
 
