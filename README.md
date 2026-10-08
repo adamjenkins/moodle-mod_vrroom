@@ -60,7 +60,8 @@ objectives and recorded statements under *Reports* and can delete attempts there
 
 ### Controls in the 3D room
 
-- Computer: W, A, S, D or the arrow keys to move (Shift to go faster), drag to look around, click
+- Computer: W and S or the up and down arrows to walk (Shift to go faster), A and D or the left
+  and right arrows to turn, Q and E to step sideways, drag to look around, click
   the floor to walk there, click a station's marker to open it, Enter to open what is in the middle
   of the screen.
 - Touch screen: the stick at the bottom left to move, drag to look around, tap to walk or open.

@@ -57,8 +57,14 @@ const STICK = 60;
 const MOVES = {
     KeyW: [1, 0], ArrowUp: [1, 0],
     KeyS: [-1, 0], ArrowDown: [-1, 0],
-    KeyA: [0, -1], ArrowLeft: [0, -1],
-    KeyD: [0, 1], ArrowRight: [0, 1],
+    KeyQ: [0, -1],
+    KeyE: [0, 1],
+};
+
+/** Keys that turn: +1 turns left, -1 turns right (A/D and the left/right arrows; Q/E step sideways). */
+const TURNS = {
+    KeyA: 1, ArrowLeft: 1,
+    KeyD: -1, ArrowRight: -1,
 };
 
 /**
@@ -89,7 +95,6 @@ export const attach = (camera, canvas, options = {}) => {
     let locky = !!options.lockY;
     let target = null;
     const keys = new Set();
-    let turn = 0;
     let shift = false;
     const stickinput = {x: 0, y: 0};
     let drag = null;
@@ -258,15 +263,11 @@ export const attach = (camera, canvas, options = {}) => {
             return;
         }
         shift = e.shiftKey;
-        if (MOVES[e.code]) {
+        if (MOVES[e.code] || TURNS[e.code]) {
             keys.add(e.code);
-            target = null;
-            e.preventDefault();
-        } else if (e.code === 'KeyQ') {
-            turn = 1;
-            e.preventDefault();
-        } else if (e.code === 'KeyE') {
-            turn = -1;
+            if (MOVES[e.code]) {
+                target = null;
+            }
             e.preventDefault();
         } else if (e.key === 'Enter') {
             e.preventDefault();
@@ -278,13 +279,9 @@ export const attach = (camera, canvas, options = {}) => {
     listen(window, 'keyup', (e) => {
         shift = e.shiftKey;
         keys.delete(e.code);
-        if (e.code === 'KeyQ' || e.code === 'KeyE') {
-            turn = 0;
-        }
     });
     listen(canvas, 'blur', () => {
         keys.clear();
-        turn = 0;
         shift = false;
     });
 
@@ -414,13 +411,18 @@ export const attach = (camera, canvas, options = {}) => {
                 return;
             }
             const step = Math.min(0.1, Math.max(0, dt));
-            yaw += turn * TURN * step;
+            let turn = 0;
             let forward = 0;
             let right = 0;
             keys.forEach((code) => {
-                forward += MOVES[code][0];
-                right += MOVES[code][1];
+                if (TURNS[code]) {
+                    turn += TURNS[code];
+                } else if (MOVES[code]) {
+                    forward += MOVES[code][0];
+                    right += MOVES[code][1];
+                }
             });
+            yaw += Math.sign(turn) * TURN * step;
             forward -= stickinput.y;
             right += stickinput.x;
             const speed = WALK * (shift ? 2 : 1);
@@ -533,7 +535,6 @@ export const attach = (camera, canvas, options = {}) => {
         setEnabled(on) {
             enabled = !!on;
             keys.clear();
-            turn = 0;
             target = null;
             drag = null;
             stickinput.x = 0;

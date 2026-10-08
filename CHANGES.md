@@ -7,6 +7,8 @@
 - A bar under the 3D room: Fullscreen, and three drag settings remembered per user (reverse
   left/right, reverse up/down, lock up/down so the view stays level).
 - Walking stops at walls, furniture and 3D models instead of passing through them.
+- A and D and the left and right arrow keys now turn instead of stepping sideways; Q and E step
+  sideways.
 - New activity settings for questions: one try per question (an answered question now says so),
   or try again until correct, with a chosen share of the points lost per wrong try.
 - Supports Moodle 5.3 as well as 5.2; GitHub Actions CI on Moodle 5.3 (PHP 8.3 with MariaDB 11.4,

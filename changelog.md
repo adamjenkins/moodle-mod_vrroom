@@ -7,6 +7,7 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Changed
 
+- Keyboard: A/D and ←/→ turn; Q/E step sideways (previously the reverse).
 - Renamed the plugin from `mod_mavr` to `mod_vrroom` ("VR room"); sub-plugin types
   `vrroomruntime` and `vrroomtemplate`. Never released under the old name.
 - `$plugin->supported` widened to `[502, 503]`.
