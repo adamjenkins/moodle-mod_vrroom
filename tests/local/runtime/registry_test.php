@@ -80,8 +80,10 @@ final class registry_test extends \advanced_testcase {
      */
     public function test_value_classes(): void {
         $inline = new launch_descriptor(launch_descriptor::TYPE_INLINE, ['schema' => 'mavr-launch/1']);
-        $this->assertSame(['type' => 'inline', 'config' => ['schema' => 'mavr-launch/1'], 'url' => null],
-            $inline->to_array());
+        $this->assertSame(
+            ['type' => 'inline', 'config' => ['schema' => 'mavr-launch/1'], 'url' => null],
+            $inline->to_array()
+        );
 
         $url = new \moodle_url('/mod/mavr/view.php', ['id' => 3]);
         $external = new launch_descriptor(launch_descriptor::TYPE_EXTERNAL, [], $url);

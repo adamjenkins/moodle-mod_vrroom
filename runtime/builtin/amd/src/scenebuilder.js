@@ -224,6 +224,14 @@ export const readTransform = (object3d) => ({
 });
 
 /**
+ * A promise that resolves (to undefined) when all the given promises have resolved.
+ *
+ * @param {Promise[]} promises The promises.
+ * @returns {Promise<undefined>}
+ */
+const allSettledToUndefined = (promises) => Promise.all(promises).then(() => undefined);
+
+/**
  * Build one room.
  *
  * Options: loader (GLTFLoader), textureloader (THREE.TextureLoader), resolveUrl(fileref) →
@@ -816,7 +824,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
          * @param {Set|string[]} set Hidden ids.
          */
         setHidden(set) {
-            hidden = new Set(set instanceof Set ? set : (Array.isArray(set) ? set : []));
+            hidden = new Set(set instanceof Set || Array.isArray(set) ? set : []);
             items.forEach(refreshItem);
             props.forEach(refreshProp);
         },
@@ -1005,7 +1013,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
                 buildInteractable(item);
             }
         });
-        handle.ready = Promise.all(loads).then(() => undefined);
+        handle.ready = allSettledToUndefined(loads);
         return handle;
     });
 };

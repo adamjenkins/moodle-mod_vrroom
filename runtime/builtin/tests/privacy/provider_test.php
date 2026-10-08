@@ -33,7 +33,6 @@ use core_privacy\local\request\writer;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 final class provider_test extends \core_privacy\tests\provider_testcase {
-
     /** @var string This component. */
     private const COMPONENT = 'mavrruntime_builtin';
 
@@ -130,16 +129,25 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         }
         $this->assertEqualsCanonicalizing(
             ['mavrruntime_builtin_peers', 'mavrruntime_builtin_signals', 'livepeers', 'iceservers'],
-            array_keys($items));
-        $this->assertInstanceOf(\core_privacy\local\metadata\types\database_table::class,
-            $items['mavrruntime_builtin_peers']);
+            array_keys($items)
+        );
+        $this->assertInstanceOf(
+            \core_privacy\local\metadata\types\database_table::class,
+            $items['mavrruntime_builtin_peers']
+        );
         $this->assertInstanceOf(\core_privacy\local\metadata\types\external_location::class, $items['livepeers']);
-        $this->assertEqualsCanonicalizing(['userid', 'groupid', 'timejoined', 'timeseen'],
-            array_keys($items['mavrruntime_builtin_peers']->get_privacy_fields()));
-        $this->assertEqualsCanonicalizing(['frompeer', 'topeer', 'payload', 'timecreated'],
-            array_keys($items['mavrruntime_builtin_signals']->get_privacy_fields()));
-        $this->assertEqualsCanonicalizing(['fullname', 'ipaddress', 'pose', 'voice'],
-            array_keys($items['livepeers']->get_privacy_fields()));
+        $this->assertEqualsCanonicalizing(
+            ['userid', 'groupid', 'timejoined', 'timeseen'],
+            array_keys($items['mavrruntime_builtin_peers']->get_privacy_fields())
+        );
+        $this->assertEqualsCanonicalizing(
+            ['frompeer', 'topeer', 'payload', 'timecreated'],
+            array_keys($items['mavrruntime_builtin_signals']->get_privacy_fields())
+        );
+        $this->assertEqualsCanonicalizing(
+            ['fullname', 'ipaddress', 'pose', 'voice'],
+            array_keys($items['livepeers']->get_privacy_fields())
+        );
         $this->assertSame(['ipaddress'], array_keys($items['iceservers']->get_privacy_fields()));
 
         // Every string exists.
@@ -160,8 +168,10 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertSame([(int)$this->context->id], array_values(array_map('intval', $contextlist->get_contextids())));
 
         $contextlist = provider::get_contexts_for_userid((int)$this->users[3]->id);
-        $this->assertSame([(int)$this->othercontext->id],
-            array_values(array_map('intval', $contextlist->get_contextids())));
+        $this->assertSame(
+            [(int)$this->othercontext->id],
+            array_values(array_map('intval', $contextlist->get_contextids()))
+        );
 
         $nobody = $this->getDataGenerator()->create_user();
         $this->assertEmpty(provider::get_contexts_for_userid((int)$nobody->id)->get_contextids());
@@ -175,7 +185,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         provider::get_users_in_context($userlist);
         $this->assertEqualsCanonicalizing(
             [(int)$this->users[1]->id, (int)$this->users[2]->id],
-            array_map('intval', $userlist->get_userids()));
+            array_map('intval', $userlist->get_userids())
+        );
 
         $courselist = new userlist(\context_course::instance($this->mavr->course), self::COMPONENT);
         provider::get_users_in_context($courselist);

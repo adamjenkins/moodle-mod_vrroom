@@ -107,36 +107,77 @@ const wire = (host, session, slot) => {
         }
         const pending = new Pending('mavrruntime_builtin/question:submit');
         session.submitQuestion(slot, form)
-            .then((result) => place(host, {
-                slot: slot,
-                html: result.html,
-                answered: result.answered,
-                locked: false,
-                lockedmessage: '',
-                retry: !!result.retry,
-            }, result.javascript).then(() => {
-                host.dataset.mavrQuestionState = result.retry ? 'retry' : (result.answered ? 'answered' : 'open');
-                if (!result.answered) {
-                    wire(host, session, slot);
-                } else if (result.retry) {
-                    wireRetry(host, session, slot);
-                }
-                const heading = host.querySelector('[data-region="mavr-question-html"]');
-                if (heading) {
-                    heading.setAttribute('tabindex', '-1');
-                    heading.focus({preventScroll: false});
-                }
-                return undefined;
-            }))
+            .then((result) => showSubmitted(host, session, slot, result))
             .catch((error) => {
                 if (button) {
                     button.disabled = false;
                 }
                 Notification.exception(error);
             })
-            .then(() => pending.resolve());
+            .finally(() => pending.resolve());
     });
 };
+
+/**
+ * Show the graded question after a submit and wire what it needs next.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} session The session.
+ * @param {number} slot Slot.
+ * @param {Object} result The submit_question result.
+ * @returns {Promise}
+ */
+const showSubmitted = (host, session, slot, result) => place(host, {
+    slot: slot,
+    html: result.html,
+    answered: result.answered,
+    locked: false,
+    lockedmessage: '',
+    retry: !!result.retry,
+}, result.javascript).then(() => {
+    let state = 'open';
+    if (result.retry) {
+        state = 'retry';
+    } else if (result.answered) {
+        state = 'answered';
+    }
+    host.dataset.mavrQuestionState = state;
+    if (!result.answered) {
+        wire(host, session, slot);
+    } else if (result.retry) {
+        wireRetry(host, session, slot);
+    }
+    const heading = host.querySelector('[data-region="mavr-question-html"]');
+    if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({preventScroll: false});
+    }
+    return undefined;
+});
+
+/**
+ * Show a fetched question and wire its form while it is open.
+ *
+ * @param {HTMLElement} host The question region.
+ * @param {Object} session The session.
+ * @param {number} slot Slot.
+ * @param {Object} result The get_question result.
+ * @returns {Promise}
+ */
+const showFetched = (host, session, slot, result) => place(host, {
+    slot: slot,
+    html: result.html,
+    answered: !!result.answered,
+    locked: false,
+    lockedmessage: '',
+    retry: false,
+}, result.javascript).then(() => {
+    host.dataset.mavrQuestionState = result.answered ? 'answered' : 'open';
+    if (!result.answered) {
+        wire(host, session, slot);
+    }
+    return undefined;
+});
 
 /**
  * Render a slot's question into a host element.
@@ -163,20 +204,7 @@ export const renderQuestion = (host, session, slot) => {
     } else {
         host.dataset.mavrQuestionState = 'loading';
         promise = session.getQuestion(n)
-            .then((result) => place(host, {
-                slot: n,
-                html: result.html,
-                answered: !!result.answered,
-                locked: false,
-                lockedmessage: '',
-                retry: false,
-            }, result.javascript).then(() => {
-                host.dataset.mavrQuestionState = result.answered ? 'answered' : 'open';
-                if (!result.answered) {
-                    wire(host, session, n);
-                }
-                return undefined;
-            }))
+            .then((result) => showFetched(host, session, n, result))
             .catch((error) => {
                 if (error && error.errorcode === 'errorquestionlocked') {
                     host.dataset.mavrQuestionState = 'locked';

@@ -126,8 +126,10 @@ final class graph_validator_test extends \advanced_testcase {
         $graph['objectives'][5]['hints'] = [['id' => 'hn-1', 'text' => str_repeat('é', 1000)]];
         $this->assertSame([], graph_validator::validate($graph));
         $graph['objectives'][5]['hints'][0]['text'] = str_repeat('é', 1001);
-        $this->assertSame(['objectives[5].hints[0].text must be a non-empty string of at most 1000 characters'],
-            graph_validator::validate($graph));
+        $this->assertSame(
+            ['objectives[5].hints[0].text must be a non-empty string of at most 1000 characters'],
+            graph_validator::validate($graph)
+        );
     }
 
     /**

@@ -105,7 +105,7 @@ const vec3 = (value, fallback) => (Array.isArray(value) && value.length === 3 &&
  * @param {string} mode Gizmo mode that made the change.
  * @returns {boolean} Whether anything could be written.
  */
-const writeTransform = (draft, ref, t, mode) => {
+const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complexity
     const object = findRef(draft, ref);
     if (!object || ref.kind === 'environment') {
         return false;
@@ -339,6 +339,9 @@ export const init = (stage, model, context) => {
     /**
      * Point the camera at a room from its first start point.
      *
+     * The camera stands a little behind and above the start point, but never outside the room's
+     * walkable bounds: a start point near a wall would otherwise put it behind that wall.
+     *
      * @param {Object} scene Scene document.
      */
     const placeCamera = (scene) => {
@@ -346,7 +349,19 @@ export const init = (stage, model, context) => {
         const p = vec3(spawn.position, [0, 0, 0]);
         const yaw = (Number(spawn.yaw) || 0) * Math.PI / 180;
         const forward = [-Math.sin(yaw), 0, -Math.cos(yaw)];
-        camera.position.set(p[0] - 3 * forward[0], p[1] + 3, p[2] - 3 * forward[2]);
+        let x = p[0] - 3 * forward[0];
+        let y = p[1] + 3;
+        let z = p[2] - 3 * forward[2];
+        const bounds = handle && handle.environment ? handle.environment.bounds : null;
+        if (bounds && Array.isArray(bounds.min) && Array.isArray(bounds.max)) {
+            const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+            x = clamp(x, bounds.min[0], bounds.max[0]);
+            z = clamp(z, bounds.min[2], bounds.max[2]);
+            if (bounds.max[1] > bounds.min[1] + 0.5) {
+                y = clamp(y, bounds.min[1] + 0.5, bounds.max[1] - 0.2);
+            }
+        }
+        camera.position.set(x, y, z);
         orbit.target.set(p[0] + 4 * forward[0], p[1] + 1, p[2] + 4 * forward[2]);
         orbit.update();
     };

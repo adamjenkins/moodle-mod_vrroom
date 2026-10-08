@@ -187,8 +187,13 @@ final class config {
             return false;
         }
         $quoted = implode('|', array_map(fn($s) => preg_quote((string)$s, '~'), $schemes));
-        if (!preg_match('~^(' . $quoted . '):(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+)(?::([0-9]{1,5}))?(\?transport=(?:udp|tcp))?$~',
-                $url, $m)) {
+        if (
+            !preg_match(
+                '~^(' . $quoted . '):(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+)(?::([0-9]{1,5}))?(\?transport=(?:udp|tcp))?$~',
+                $url,
+                $m
+            )
+        ) {
             return false;
         }
         $scheme = $m[1];

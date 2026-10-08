@@ -33,7 +33,6 @@ require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/backup_mavr_stepslib.php'
  * the temporary-questions cleanup step follow the structure step.
  */
 class backup_mavr_activity_task extends backup_activity_task {
-
     /**
      * No specific settings for this activity.
      *

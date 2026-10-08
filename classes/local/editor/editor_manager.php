@@ -168,8 +168,14 @@ final class editor_manager {
         global $DB;
 
         $rows = [];
-        foreach ($DB->get_records('mavr_scenes', ['mavrid' => $mavr->id], 'sortorder ASC, id ASC',
-                'id, idnumber, sortorder, scenejson') as $row) {
+        foreach (
+            $DB->get_records(
+                'mavr_scenes',
+                ['mavrid' => $mavr->id],
+                'sortorder ASC, id ASC',
+                'id, idnumber, sortorder, scenejson'
+            ) as $row
+        ) {
             $rows[] = [(string)$row->idnumber, (int)$row->sortorder, (string)$row->scenejson];
         }
         $bindings = [];
@@ -230,21 +236,33 @@ final class editor_manager {
         }
         $fs = get_file_storage();
         foreach (self::file_refs($scenes) as $ref) {
-            $file = $fs->get_file($context->id, 'mod_mavr', (string)$ref['area'], (int)$ref['itemid'],
-                (string)$ref['filepath'], (string)$ref['filename']);
+            $file = $fs->get_file(
+                $context->id,
+                'mod_mavr',
+                (string)$ref['area'],
+                (int)$ref['itemid'],
+                (string)$ref['filepath'],
+                (string)$ref['filename']
+            );
             if (!$file || $file->is_directory()) {
                 throw new \moodle_exception('erroreditorasset', 'mod_mavr', '', s((string)$ref['filename']));
             }
         }
         foreach ($scenes as $i => $scene) {
             foreach ($scene['interactables'] ?? [] as $j => $item) {
-                if (!isset($item['content']) || !is_array($item['content'])
-                        || !array_key_exists('textformat', $item['content'])) {
+                if (
+                    !isset($item['content']) || !is_array($item['content'])
+                        || !array_key_exists('textformat', $item['content'])
+                ) {
                     continue;
                 }
                 if (!in_array($item['content']['textformat'], self::TEXT_FORMATS, true)) {
-                    throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '',
-                        "scenes[{$i}].interactables[{$j}].content.textformat is not a known text format");
+                    throw new \moodle_exception(
+                        'erroreditorinvalid',
+                        'mod_mavr',
+                        '',
+                        "scenes[{$i}].interactables[{$j}].content.textformat is not a known text format"
+                    );
                 }
             }
         }
@@ -539,8 +557,14 @@ final class editor_manager {
             'itemid' => (int)$file->get_itemid(),
             'filepath' => $file->get_filepath(),
             'filename' => $file->get_filename(),
-            'url' => \moodle_url::make_pluginfile_url($file->get_contextid(), 'mod_mavr', $file->get_filearea(),
-                $file->get_itemid(), $file->get_filepath(), $file->get_filename())->out(false),
+            'url' => \moodle_url::make_pluginfile_url(
+                $file->get_contextid(),
+                'mod_mavr',
+                $file->get_filearea(),
+                $file->get_itemid(),
+                $file->get_filepath(),
+                $file->get_filename()
+            )->out(false),
             'mimetype' => (string)$file->get_mimetype(),
             'kind' => self::asset_kind($file->get_filename()),
             'filesize' => (int)$file->get_filesize(),
@@ -693,8 +717,12 @@ final class editor_manager {
             $bindings = [];
         }
         if (!is_array($bindings) || !array_is_list($bindings) || count($bindings) > self::MAX_BINDINGS) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '',
-                'bindings must be a list of at most ' . self::MAX_BINDINGS . ' questions');
+            throw new \moodle_exception(
+                'erroreditorinvalid',
+                'mod_mavr',
+                '',
+                'bindings must be a list of at most ' . self::MAX_BINDINGS . ' questions'
+            );
         }
         $objectivebyslot = [];
         foreach ($graph['objectives'] ?? [] as $objective) {
@@ -709,17 +737,31 @@ final class editor_manager {
             $qbeid = is_array($binding) ? ($binding['questionbankentryid'] ?? null) : null;
             $maxmark = is_array($binding) ? ($binding['maxmark'] ?? null) : null;
             if (!is_int($slot) || $slot < 1 || isset($seen[$slot])) {
-                throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '',
-                    "bindings[{$k}].slot must be a unique integer of at least 1");
+                throw new \moodle_exception(
+                    'erroreditorinvalid',
+                    'mod_mavr',
+                    '',
+                    "bindings[{$k}].slot must be a unique integer of at least 1"
+                );
             }
             if (!is_int($qbeid) || $qbeid <= 0) {
-                throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '',
-                    "bindings[{$k}].questionbankentryid must be a question");
+                throw new \moodle_exception(
+                    'erroreditorinvalid',
+                    'mod_mavr',
+                    '',
+                    "bindings[{$k}].questionbankentryid must be a question"
+                );
             }
-            if ((!is_int($maxmark) && !is_float($maxmark)) || !is_finite((float)$maxmark)
-                    || $maxmark <= 0 || $maxmark > self::MAX_MARK) {
-                throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '',
-                    "bindings[{$k}].maxmark must be a number greater than 0 and at most 1000");
+            if (
+                (!is_int($maxmark) && !is_float($maxmark)) || !is_finite((float)$maxmark)
+                    || $maxmark <= 0 || $maxmark > self::MAX_MARK
+            ) {
+                throw new \moodle_exception(
+                    'erroreditorinvalid',
+                    'mod_mavr',
+                    '',
+                    "bindings[{$k}].maxmark must be a number greater than 0 and at most 1000"
+                );
             }
             $seen[$slot] = true;
             // The client's objective id is ignored: the graph says which objective answers the slot.
@@ -742,8 +784,14 @@ final class editor_manager {
     private static function scene_signature(int $mavrid): array {
         global $DB;
         $signature = [];
-        foreach ($DB->get_records('mavr_scenes', ['mavrid' => $mavrid], 'sortorder ASC, id ASC',
-                'id, idnumber, scenejson') as $row) {
+        foreach (
+            $DB->get_records(
+                'mavr_scenes',
+                ['mavrid' => $mavrid],
+                'sortorder ASC, id ASC',
+                'id, idnumber, scenejson'
+            ) as $row
+        ) {
             $signature[] = [(string)$row->idnumber, (string)$row->scenejson];
         }
         return $signature;

@@ -26,14 +26,17 @@ Feature: A teacher builds an escape chain
 
   Scenario: Create an escape chain with a key puzzle and a question lock
     Given I log in as "teacher1"
-    When I add a MAVR activity using the "escape" template to course "Course 1" section "1" and I fill the form with:
-      | Name                | Lab escape                                   |
-      | escape_title[0]     | Desk                                         |
-      | escape_locktype[0]  | Find and take a key                          |
-      | escape_hint1[0]     | Look on the desk.                            |
-      | escape_title[1]     | Safe                                         |
-      | escape_locktype[1]  | Unlock with a question (for example a code) |
-      | escape_question[1]  | Q1                                           |
+    When I add a MAVR activity using the "escape" template to course "Course 1" section "1"
+    And I set the following fields to these values:
+      | Name               | Lab escape                                   |
+      | escape_title[0]    | Desk                                         |
+      | escape_locktype[0] | Find and take a key                          |
+      | escape_hint1[0]    | Look on the desk.                            |
+      | escape_title[1]    | Safe                                         |
+      | escape_locktype[1] | Unlock with a question (for example a code) |
+    # The question picker is an autocomplete: its named select is hidden, so set it by label.
+    And I set the field "Question" in the "#fitem_id_escape_question_1" "css_element" to "Q1"
+    And I press "Save and return to course"
     Then I should see "Lab escape"
     And I am on the "Lab escape" "mavr activity" page
     And I press "Preview the list view"

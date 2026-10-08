@@ -258,12 +258,19 @@ final class usage {
      * @param int[] $qubaids Question usage ids (zeros are ignored).
      */
     public static function delete(array $qubaids): void {
+        global $DB;
         self::require_engine();
         $qubaids = array_values(array_unique(array_filter(array_map('intval', $qubaids))));
         if (!$qubaids) {
             return;
         }
         \question_engine::delete_questions_usage_by_activities(new \qubaid_list($qubaids));
+        // On MySQL/MariaDB core deletes a usage through a join on its question attempts, so a
+        // usage that holds no question (a template without question stations) stays behind.
+        foreach (array_chunk($qubaids, 1000) as $chunk) {
+            [$insql, $params] = $DB->get_in_or_equal($chunk);
+            $DB->delete_records_select('question_usages', "id $insql", $params);
+        }
     }
 
     /**

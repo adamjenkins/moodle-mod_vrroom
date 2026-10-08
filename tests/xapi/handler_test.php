@@ -35,7 +35,6 @@ use mod_mavr\local\xapi\iri;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(handler::class)]
 final class handler_test extends \advanced_testcase {
-
     /**
      * Create a course, a two-station gallery and an enrolled student.
      *
@@ -94,8 +93,13 @@ final class handler_test extends \advanced_testcase {
      * @param string|null $statementid statement id extension (null = fresh uuid)
      * @return statement
      */
-    private function statement(\stdClass $user, string $verb, string $objectiri, $attemptid,
-            ?string $statementid = null): statement {
+    private function statement(
+        \stdClass $user,
+        string $verb,
+        string $objectiri,
+        $attemptid,
+        ?string $statementid = null
+    ): statement {
         global $CFG;
         $extensions = [
             iri::EXT_STATEMENT => $statementid ?? \core\uuid::generate(),
@@ -298,8 +302,13 @@ final class handler_test extends \advanced_testcase {
         ]);
         $this->assertSame([0 => true, 1 => true], $result);
         $result = $handler->process_statements([
-            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id,
-                strtoupper($sid)),
+            $this->statement(
+                $fx->student,
+                'entered',
+                $this->zone_iri($fx, 'Vase'),
+                (int)$attempt->id,
+                strtoupper($sid)
+            ),
         ]);
         $this->assertSame([0 => true], $result);
         $this->assertSame(1, $this->client_rows((int)$attempt->id));
@@ -391,14 +400,30 @@ final class handler_test extends \advanced_testcase {
         $cmid = (int)$fx->cm->id;
 
         $result = handler::create('mod_mavr')->process_statements([
-            $this->statement($fx->student, 'entered', iri::for_object($cmid, 'zone', $fx->sceneid, 'nosuchzone'),
-                (int)$attempt->id),
-            $this->statement($fx->student, 'entered', iri::for_object($cmid, 'scene', 'nosuchscene', null),
-                (int)$attempt->id),
-            $this->statement($fx->student, 'interacted', iri::for_object($cmid, 'object', $fx->sceneid, 'nosuchobject'),
-                (int)$attempt->id),
-            $this->statement($fx->student, 'interacted', iri::for_object($cmid, 'object', $fx->sceneid,
-                $fx->objects['Vase']), (int)$attempt->id),
+            $this->statement(
+                $fx->student,
+                'entered',
+                iri::for_object($cmid, 'zone', $fx->sceneid, 'nosuchzone'),
+                (int)$attempt->id
+            ),
+            $this->statement(
+                $fx->student,
+                'entered',
+                iri::for_object($cmid, 'scene', 'nosuchscene', null),
+                (int)$attempt->id
+            ),
+            $this->statement(
+                $fx->student,
+                'interacted',
+                iri::for_object($cmid, 'object', $fx->sceneid, 'nosuchobject'),
+                (int)$attempt->id
+            ),
+            $this->statement($fx->student, 'interacted', iri::for_object(
+                $cmid,
+                'object',
+                $fx->sceneid,
+                $fx->objects['Vase']
+            ), (int)$attempt->id),
         ]);
         $this->assertSame([0 => false, 1 => false, 2 => false, 3 => true], $result);
     }
@@ -470,8 +495,13 @@ final class handler_test extends \advanced_testcase {
 
         $rejected = [
             new state($agent, item_activity::create_from_id((string)$fx->context->id), 'other', $data, null),
-            new state($agent, item_activity::create_from_id((string)\context_course::instance($fx->course->id)->id),
-                'mavr-resume', $data, null),
+            new state(
+                $agent,
+                item_activity::create_from_id((string)\context_course::instance($fx->course->id)->id),
+                'mavr-resume',
+                $data,
+                null
+            ),
             new state($agent, item_activity::create_from_id('999999999'), 'mavr-resume', $data, null),
         ];
         foreach ($rejected as $state) {
@@ -486,8 +516,13 @@ final class handler_test extends \advanced_testcase {
         // A teacher cannot attempt, so has no resume state.
         $teacher = $this->getDataGenerator()->create_and_enrol($fx->course, 'editingteacher');
         $this->setUser($teacher);
-        $state = new state(item_agent::create_from_user($teacher), item_activity::create_from_id((string)$fx->context->id),
-            'mavr-resume', $data, null);
+        $state = new state(
+            item_agent::create_from_user($teacher),
+            item_activity::create_from_id((string)$fx->context->id),
+            'mavr-resume',
+            $data,
+            null
+        );
         $this->expectException(xapi_exception::class);
         $handler->save_state($state);
     }
@@ -539,7 +574,9 @@ final class handler_test extends \advanced_testcase {
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
         ]);
         $this->assertSame([0 => true], $result);
-        $this->assertSame(attempt_manager::STATE_INPROGRESS,
-            $DB->get_field('mavr_attempts', 'state', ['id' => $attempt->id]));
+        $this->assertSame(
+            attempt_manager::STATE_INPROGRESS,
+            $DB->get_field('mavr_attempts', 'state', ['id' => $attempt->id])
+        );
     }
 }

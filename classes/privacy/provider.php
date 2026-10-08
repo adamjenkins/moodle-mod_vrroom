@@ -39,10 +39,9 @@ use mod_mavr\local\questions\usage;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provider implements
-        \core_privacy\local\metadata\provider,
-        \core_privacy\local\request\plugin\provider,
-        \core_privacy\local\request\core_userlist_provider {
-
+    \core_privacy\local\metadata\provider,
+    \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\plugin\provider {
     /** @var string This component. */
     private const COMPONENT = 'mod_mavr';
 
@@ -151,8 +150,10 @@ class provider implements
 
             $states = \core_xapi\privacy\provider::get_xapi_states_for_user($userid, self::COMPONENT, (int)$context->id);
             if ($states) {
-                writer::with_context($context)->export_data([get_string('privacy:xapistate', 'core_xapi')],
-                    (object)$states);
+                writer::with_context($context)->export_data(
+                    [get_string('privacy:xapistate', 'core_xapi')],
+                    (object)$states
+                );
             }
 
             $attempts = $DB->get_records('mavr_attempts', ['mavrid' => $mavrid, 'userid' => $userid], 'attempt ASC');
@@ -198,15 +199,24 @@ class provider implements
             ];
         }
         if ($statements) {
-            writer::with_context($context)->export_related_data($subcontext, 'statements',
-                (object)['statements' => $statements]);
+            writer::with_context($context)->export_related_data(
+                $subcontext,
+                'statements',
+                (object)['statements' => $statements]
+            );
         }
 
         if (!empty($attempt->uniqueid)) {
             $options = usage::display_options(true);
             $options->context = $context;
-            \core_question\privacy\provider::export_question_usage($userid, $context, $subcontext,
-                (int)$attempt->uniqueid, $options, true);
+            \core_question\privacy\provider::export_question_usage(
+                $userid,
+                $context,
+                $subcontext,
+                (int)$attempt->uniqueid,
+                $options,
+                true
+            );
         }
     }
 

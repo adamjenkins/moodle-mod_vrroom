@@ -29,7 +29,6 @@ use mod_mavr\local\editor\editor_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class asset_upload extends \core_form\dynamic_form {
-
     /** @var string[] Kinds of file this form takes. */
     public const KINDS = ['model', 'image', 'audio', 'video'];
 
@@ -44,8 +43,13 @@ class asset_upload extends \core_form\dynamic_form {
         $mform->addElement('hidden', 'kind');
         $mform->setType('kind', PARAM_ALPHA);
 
-        $mform->addElement('filemanager', 'assetfile', get_string('editorassetfile', 'mod_mavr'), null,
-            self::file_options($this->get_kind()));
+        $mform->addElement(
+            'filemanager',
+            'assetfile',
+            get_string('editorassetfile', 'mod_mavr'),
+            null,
+            self::file_options($this->get_kind())
+        );
         $mform->addRule('assetfile', null, 'required');
     }
 
@@ -104,8 +108,14 @@ class asset_upload extends \core_form\dynamic_form {
         $context = $this->get_context_for_dynamic_submission();
 
         $itemid = editor_manager::next_asset_itemid($context);
-        file_save_draft_area_files((int)$data->assetfile, $context->id, 'mod_mavr', editor_manager::ASSET_AREA, $itemid,
-            self::file_options($kind));
+        file_save_draft_area_files(
+            (int)$data->assetfile,
+            $context->id,
+            'mod_mavr',
+            editor_manager::ASSET_AREA,
+            $itemid,
+            self::file_options($kind)
+        );
 
         $fs = get_file_storage();
         $files = $fs->get_area_files($context->id, 'mod_mavr', editor_manager::ASSET_AREA, $itemid, 'id', false);

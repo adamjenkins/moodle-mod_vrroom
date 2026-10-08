@@ -31,7 +31,6 @@ use mod_mavr\local\instance_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(get_attempt_state::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(helper::class)]
 final class get_attempt_state_test extends \advanced_testcase {
-
     /**
      * The owner gets the server evaluation; others are refused.
      *
@@ -59,8 +58,10 @@ final class get_attempt_state_test extends \advanced_testcase {
         $start = start_attempt::execute((int)$module->cmid);
         $attemptid = (int)$start['attemptid'];
 
-        $state = external_api::clean_returnvalue(get_attempt_state::execute_returns(),
-            get_attempt_state::execute($attemptid));
+        $state = external_api::clean_returnvalue(
+            get_attempt_state::execute_returns(),
+            get_attempt_state::execute($attemptid)
+        );
         $this->assertSame($attemptid, $state['attemptid']);
         $this->assertSame('inprogress', $state['state']);
         $this->assertEqualsWithDelta(0.0, $state['score'], 1e-6);
@@ -74,18 +75,27 @@ final class get_attempt_state_test extends \advanced_testcase {
 
         $scene = instance_manager::get_scenes((int)$module->id)[0];
         $zone = $scene['zones'][0];
-        event_store::insert($attemptid, \core\uuid::generate(),
+        event_store::insert(
+            $attemptid,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $zone['id'], 'scene' => $scene['id'], 'fraction' => null],
-            true, null, time());
-        $state = external_api::clean_returnvalue(get_attempt_state::execute_returns(),
-            get_attempt_state::execute($attemptid));
+            true,
+            null,
+            time()
+        );
+        $state = external_api::clean_returnvalue(
+            get_attempt_state::execute_returns(),
+            get_attempt_state::execute($attemptid)
+        );
         $this->assertEqualsWithDelta(1.0, $state['earnedpoints'], 1e-6);
         $this->assertEqualsWithDelta(0.5, $state['score'], 1e-6);
 
         // Still readable once finished.
         finish_attempt::execute($attemptid);
-        $state = external_api::clean_returnvalue(get_attempt_state::execute_returns(),
-            get_attempt_state::execute($attemptid));
+        $state = external_api::clean_returnvalue(
+            get_attempt_state::execute_returns(),
+            get_attempt_state::execute($attemptid)
+        );
         $this->assertSame('finished', $state['state']);
 
         $this->setUser($other);

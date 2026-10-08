@@ -36,7 +36,6 @@ use mod_mavr\local\grading\grader;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report_overview implements renderable, templatable {
-
     /**
      * Constructor.
      *
@@ -69,8 +68,10 @@ class report_overview implements renderable, templatable {
         $candelete = has_capability('mod/mavr:deleteattempts', $this->context);
         $groupmode = groups_get_activity_groupmode($this->cm);
         $records = [];
-        if ($this->groupid > 0 || $groupmode != SEPARATEGROUPS
-                || has_capability('moodle/site:accessallgroups', $this->context)) {
+        if (
+            $this->groupid > 0 || $groupmode != SEPARATEGROUPS
+                || has_capability('moodle/site:accessallgroups', $this->context)
+        ) {
             // In separate groups "all groups" is only for those who may access all groups; anyone
             // else without a group of their own sees no attempts.
             $userfields = \core_user\fields::for_name()->get_sql('u', true, '', '', true);
@@ -98,8 +99,10 @@ class report_overview implements renderable, templatable {
             $row = [
                 'attemptid' => (int)$record->id,
                 'user' => fullname($record),
-                'userurl' => (new \moodle_url('/user/view.php',
-                    ['id' => $record->userid, 'course' => $this->cm->course]))->out(false),
+                'userurl' => (new \moodle_url(
+                    '/user/view.php',
+                    ['id' => $record->userid, 'course' => $this->cm->course]
+                ))->out(false),
                 'attempt' => (int)$record->attempt,
                 'state' => self::state_label((string)$record->state),
                 'score' => self::format_score($score),

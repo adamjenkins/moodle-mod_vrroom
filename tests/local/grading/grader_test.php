@@ -26,7 +26,6 @@ namespace mod_mavr\local\grading;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(grader::class)]
 final class grader_test extends \advanced_testcase {
-
     /** @var int Next fake question usage id (mavr_attempts.uniqueid is unique). */
     private int $nextusage = 900000;
 
@@ -187,8 +186,10 @@ final class grader_test extends \advanced_testcase {
      */
     public function test_options_and_format(): void {
         [, $mavr] = $this->setup_activity();
-        $this->assertSame([grader::GRADE_HIGHEST, grader::GRADE_AVERAGE, grader::GRADE_LAST],
-            array_keys(grader::grade_options()));
+        $this->assertSame(
+            [grader::GRADE_HIGHEST, grader::GRADE_AVERAGE, grader::GRADE_LAST],
+            array_keys(grader::grade_options())
+        );
         $this->assertSame('75.00', grader::format_grade($mavr, 0.75));
         $this->assertSame('-', grader::format_grade($mavr, null));
     }

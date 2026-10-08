@@ -38,7 +38,6 @@ use mod_mavr\local\xapi\iri;
 #[\PHPUnit\Framework\Attributes\CoversClass(scene_updated::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(graph_updated::class)]
 final class events_test extends \advanced_testcase {
-
     /**
      * Course, activity, student.
      *
@@ -181,8 +180,12 @@ final class events_test extends \advanced_testcase {
     public function test_editor_events(): void {
         global $DB;
         $fx = $this->setup_activity();
-        $graphrow = $DB->get_record('mavr_graphs', ['mavrid' => $fx->mavr->id, 'version' => $fx->mavr->graphversion],
-            '*', MUST_EXIST);
+        $graphrow = $DB->get_record(
+            'mavr_graphs',
+            ['mavrid' => $fx->mavr->id, 'version' => $fx->mavr->graphversion],
+            '*',
+            MUST_EXIST
+        );
 
         $sink = $this->redirectEvents();
         scene_updated::create([

@@ -95,9 +95,11 @@ final class runtime_test extends \advanced_testcase {
         $this->assertSame(launch_descriptor::TYPE_INLINE, $descriptor->type);
         $this->assertNull($descriptor->url);
         $config = $descriptor->config;
-        foreach (['schema', 'preview', 'cmid', 'contextid', 'courseid', 'userid', 'attemptid', 'attemptnumber',
+        foreach (
+            ['schema', 'preview', 'cmid', 'contextid', 'courseid', 'userid', 'attemptid', 'attemptnumber',
                 'activityiri', 'actor', 'extbase', 'verbs', 'maxbatch', 'startscene', 'scenes', 'graph', 'state',
-                'events', 'questions', 'resume', 'finishurl'] as $key) {
+                'events', 'questions', 'resume', 'finishurl'] as $key
+        ) {
             $this->assertArrayHasKey($key, $config, "Launch config key {$key}");
         }
         $this->assertSame('mavr-launch/1', $config['schema']);

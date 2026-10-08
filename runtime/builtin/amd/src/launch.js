@@ -155,9 +155,7 @@ class Controller {
             } else {
                 clearMessage(this.root);
             }
-            // The live room panel is optional: a failure is reported and the launch goes on.
-            const rendering = this.live ? this.live.render().catch(Notification.exception) : Promise.resolve();
-            return rendering.then(() => (mode === '3d' ? this.start3d() : this.startList()));
+            return this.showLiveAndView(mode);
         }).catch((error) => {
             this.setLaunchDisabled(false);
             Notification.exception(error);
@@ -322,10 +320,33 @@ class Controller {
             if (!this.live) {
                 this.live = createLiveController(this.root, this.config, this.session);
             }
-            const rendering = this.live ? this.live.render().catch(Notification.exception) : Promise.resolve();
-            return rendering.then(() => (mode === '3d' ? this.start3d() : this.startList())).then(() => {
-                throw error;
-            });
+            return this.restoreAfterFailure(mode, error);
+        });
+    }
+
+    /**
+     * Render the live room panel (if any), then start the view in the given mode.
+     *
+     * The live room panel is optional: a failure to render it is reported and the view still starts.
+     *
+     * @param {string} mode '3d' or 'list'
+     * @returns {Promise}
+     */
+    showLiveAndView(mode) {
+        const rendering = this.live ? this.live.render().catch(Notification.exception) : Promise.resolve();
+        return rendering.then(() => (mode === '3d' ? this.start3d() : this.startList()));
+    }
+
+    /**
+     * Bring the live room and the view back after a failed finish, then reject with the error.
+     *
+     * @param {string} mode '3d' or 'list'
+     * @param {*} error The finish error.
+     * @returns {Promise} always rejected with error
+     */
+    restoreAfterFailure(mode, error) {
+        return this.showLiveAndView(mode).then(() => {
+            throw error;
         });
     }
 }
@@ -345,6 +366,7 @@ export const init = (boot) => {
     const pending = new Pending('mavrruntime_builtin/launch:init');
     const canstart = !!(boot.canattempt && boot.canstart);
     const canpreview = !!boot.canpreview;
+    let strings = null;
     return getStrings([
         {key: 'previewnotice', component: 'mavrruntime_builtin'},
         {key: 'webglunavailable', component: 'mavrruntime_builtin'},
@@ -352,16 +374,16 @@ export const init = (boot) => {
         {key: 'allrequireddone', component: 'mavrruntime_builtin'},
         {key: 'statementsfailed', component: 'mavrruntime_builtin'},
     ]).then(([previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed]) => {
-        const strings = {previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed};
+        strings = {previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed};
         return Templates.renderForPromise('mavrruntime_builtin/shell', {
             cmid: boot.cmid,
             canstart: canstart,
             canpreview: canpreview,
             nolaunch: !canstart && !canpreview,
-        }).then(({html, js}) => {
-            Templates.replaceNodeContents(root, html, js);
-            return new Controller(root, boot, strings);
         });
+    }).then(({html, js}) => {
+        Templates.replaceNodeContents(root, html, js);
+        return new Controller(root, boot, strings);
     }).catch(Notification.exception).then(() => {
         pending.resolve();
         return undefined;

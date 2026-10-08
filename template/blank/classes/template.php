@@ -54,8 +54,12 @@ class template extends \mod_mavr\local\template\base {
         $mform->addElement('header', 'blank_heading', get_string('blankheading', self::COMPONENT));
         $mform->setExpanded('blank_heading');
 
-        $mform->addElement('select', 'blank_environment', get_string('environment', self::COMPONENT),
-            presets::get_choices());
+        $mform->addElement(
+            'select',
+            'blank_environment',
+            get_string('environment', self::COMPONENT),
+            presets::get_choices()
+        );
         $mform->setDefault('blank_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('blank_environment', 'environment', self::COMPONENT);
 

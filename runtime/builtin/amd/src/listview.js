@@ -71,6 +71,29 @@ const orderedScenes = (config) => {
 };
 
 /**
+ * The file URL of an item of the given kind.
+ *
+ * @param {Object} item Interactable.
+ * @param {string} kind The kind that carries a file ('image', 'media').
+ * @returns {string} URL or ''
+ */
+const fileUrl = (item, kind) => (item.kind === kind && item.file && item.file.url ? item.file.url : '');
+
+/**
+ * The question slot a hotspot opens.
+ *
+ * @param {Object} item Interactable.
+ * @param {Object} content Its content.
+ * @returns {number|null}
+ */
+const questionSlot = (item, content) => {
+    if (item.kind !== 'hotspot' || content.question === null || content.question === undefined) {
+        return null;
+    }
+    return Number(content.question);
+};
+
+/**
  * Template context of one item (labels that need strings are filled in later).
  *
  * @param {Object} item Interactable.
@@ -81,9 +104,8 @@ const orderedScenes = (config) => {
  */
 const itemContext = (item, scene, hidden, usable) => {
     const content = item.content || {};
-    const slot = item.kind === 'hotspot' && content.question !== null && content.question !== undefined
-        ? Number(content.question) : null;
-    const mediaurl = item.kind === 'media' && item.file && item.file.url ? item.file.url : '';
+    const slot = questionSlot(item, content);
+    const mediaurl = fileUrl(item, 'media');
     const usebutton = item.kind === 'grabbable' || usable.has(String(item.id));
     return {
         id: item.id,
@@ -93,7 +115,7 @@ const itemContext = (item, scene, hidden, usable) => {
         title: plainText(item.kind === 'hotspot' ? (content.title || item.name) : item.name),
         html: item.kind === 'hotspot' ? (content.html || '') : '',
         text: item.kind === 'text' ? plainText(item.text || '') : '',
-        imageurl: item.kind === 'image' && item.file && item.file.url ? item.file.url : '',
+        imageurl: fileUrl(item, 'image'),
         ismodel: item.kind === 'model',
         isaudio: !!mediaurl && item.media === 'audio',
         isvideo: !!mediaurl && item.media === 'video',
@@ -141,6 +163,28 @@ const fillLabels = (items, scenenames) => {
 };
 
 /**
+ * Announce an objective status change to screen readers.
+ *
+ * @param {HTMLElement} root The MAVR root element.
+ * @param {string} title Objective title.
+ * @param {string} status Status label.
+ */
+const announceStatus = (root, title, status) => {
+    getString('objectivestatuschanged', 'mavrruntime_builtin', {title, status})
+        .then((text) => announce(root, text))
+        .catch(() => null);
+};
+
+/**
+ * Play a media element, ignoring a refused autoplay.
+ *
+ * @param {HTMLMediaElement} media The element.
+ */
+const playMedia = (media) => {
+    Promise.resolve(media.play()).catch(() => null);
+};
+
+/**
  * Start the list view.
  *
  * @param {HTMLElement} root The MAVR root element (holding the shell).
@@ -159,6 +203,8 @@ export const start = (root, session, config) => {
     let progress = null;
     let unsubscribe = () => null;
     let lockedtimer = null;
+    let listcontext = null;
+    let wire = null;
 
     const stringrequests = [
         {key: 'objectivestatus_locked', component: 'mavrruntime_builtin'},
@@ -231,206 +277,206 @@ export const start = (root, session, config) => {
             others: others,
         };
 
-        return fillLabels(allitems, scenenames)
-            .then(() => Templates.renderForPromise('mavrruntime_builtin/listview', context))
-            .then(({html, js}) => {
-                Templates.replaceNodeContents(host, html, js);
-                host.classList.remove('d-none');
+        listcontext = context;
+        // Wired up after the template has rendered (kept out of nested promise chains).
+        wire = ({html, js}) => {
+            Templates.replaceNodeContents(host, html, js);
+            host.classList.remove('d-none');
 
-                const showLocked = (station) => {
-                    const note = station ? station.querySelector('[data-region="mavr-station-locked"]') : null;
-                    if (note) {
-                        note.hidden = false;
-                    }
-                    showMessage(root, stationlocked, 'warning');
-                    announce(root, stationlocked);
-                    if (lockedtimer) {
-                        window.clearTimeout(lockedtimer);
-                    }
-                    lockedtimer = window.setTimeout(() => clearMessage(root, stationlocked), 4000);
-                };
+            const showLocked = (station) => {
+                const note = station ? station.querySelector('[data-region="mavr-station-locked"]') : null;
+                if (note) {
+                    note.hidden = false;
+                }
+                showMessage(root, stationlocked, 'warning');
+                announce(root, stationlocked);
+                if (lockedtimer) {
+                    window.clearTimeout(lockedtimer);
+                }
+                lockedtimer = window.setTimeout(() => clearMessage(root, stationlocked), 4000);
+            };
 
-                const renderQuestions = (container) => {
-                    container.querySelectorAll('[data-region="mavr-question"]').forEach((qhost) => {
-                        const qstate = qhost.dataset.mavrQuestionState;
-                        if (!qstate || (qstate === 'locked' && session.isSlotAvailable(qhost.dataset.slot))) {
-                            renderQuestion(qhost, session, qhost.dataset.slot);
-                        }
-                    });
-                };
-
-                const openStation = (button, quiet) => {
-                    const station = button.closest('[data-region="mavr-station"]');
-                    const zoneid = button.dataset.zone;
-                    const sceneid = station.dataset.scene;
-                    const body = station.querySelector('[data-region="mavr-station-body"]');
-                    if (button.getAttribute('aria-expanded') === 'true') {
-                        if (!quiet) {
-                            body.hidden = true;
-                            button.setAttribute('aria-expanded', 'false');
-                        }
-                        return;
+            const renderQuestions = (container) => {
+                container.querySelectorAll('[data-region="mavr-question"]').forEach((qhost) => {
+                    const qstate = qhost.dataset.mavrQuestionState;
+                    if (!qstate || (qstate === 'locked' && session.isSlotAvailable(qhost.dataset.slot))) {
+                        renderQuestion(qhost, session, qhost.dataset.slot);
                     }
-                    if (session.isZoneLocked(zoneid)) {
-                        showLocked(station);
-                        return;
-                    }
-                    station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
-                    // Expand first: recording may run graph effects that look at the expanded state.
-                    body.hidden = false;
-                    button.setAttribute('aria-expanded', 'true');
-                    session.setScene(sceneid);
-                    session.record('interacted', 'zone', zoneid, sceneid);
-                    // Reading a station counts as interacting with its hotspots, as clicking them does in 3D.
-                    const scene = scenes.find((s) => s.id === sceneid);
-                    const interactables = scene && Array.isArray(scene.interactables) ? scene.interactables : [];
-                    interactables.filter((i) => i.zone === zoneid && i.kind === 'hotspot').forEach((i) => {
-                        session.record('interacted', 'object', i.id, sceneid);
-                    });
-                    renderQuestions(body);
-                };
+                });
+            };
 
-                const openItem = (button) => {
-                    const card = button.closest('[data-interactable]');
-                    const body = card.querySelector('[data-region="mavr-item-body"]');
-                    if (button.getAttribute('aria-expanded') === 'true') {
+            const openStation = (button, quiet) => {
+                const station = button.closest('[data-region="mavr-station"]');
+                const zoneid = button.dataset.zone;
+                const sceneid = station.dataset.scene;
+                const body = station.querySelector('[data-region="mavr-station-body"]');
+                if (button.getAttribute('aria-expanded') === 'true') {
+                    if (!quiet) {
                         body.hidden = true;
                         button.setAttribute('aria-expanded', 'false');
-                        return;
                     }
-                    if (session.isObjectLocked(button.dataset.item)) {
-                        showLocked(null);
-                        return;
-                    }
-                    body.hidden = false;
-                    button.setAttribute('aria-expanded', 'true');
-                    session.setScene(card.dataset.scene);
-                    session.record('interacted', 'object', button.dataset.item, card.dataset.scene);
-                    renderQuestions(body);
-                };
-
-                const useItem = (button) => {
-                    const itemid = button.dataset.item;
-                    if (session.isObjectLocked(itemid)) {
-                        showLocked(button.closest('[data-region="mavr-station"]'));
-                        return;
-                    }
-                    session.setScene(button.dataset.scene);
-                    session.record('interacted', 'object', itemid, button.dataset.scene);
-                };
-
-                const listview = region(root, 'mavr-listview');
-                listview.addEventListener('click', (e) => {
-                    const stationbutton = e.target.closest('[data-action="mavr-open-station"]');
-                    if (stationbutton) {
-                        e.preventDefault();
-                        openStation(stationbutton, false);
-                        return;
-                    }
-                    const itembutton = e.target.closest('[data-action="mavr-open-item"]');
-                    if (itembutton) {
-                        e.preventDefault();
-                        openItem(itembutton);
-                        return;
-                    }
-                    const usebutton = e.target.closest('[data-action="mavr-use-item"]');
-                    if (usebutton) {
-                        e.preventDefault();
-                        useItem(usebutton);
-                        return;
-                    }
-                    const switchbutton = e.target.closest('[data-action="mavr-switch-3d"]');
-                    if (switchbutton && config.onSwitch3d) {
-                        e.preventDefault();
-                        config.onSwitch3d();
-                    }
+                    return;
+                }
+                if (session.isZoneLocked(zoneid)) {
+                    showLocked(station);
+                    return;
+                }
+                station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
+                // Expand first: recording may run graph effects that look at the expanded state.
+                body.hidden = false;
+                button.setAttribute('aria-expanded', 'true');
+                session.setScene(sceneid);
+                session.record('interacted', 'zone', zoneid, sceneid);
+                // Reading a station counts as interacting with its hotspots, as clicking them does in 3D.
+                const scene = scenes.find((s) => s.id === sceneid);
+                const interactables = scene && Array.isArray(scene.interactables) ? scene.interactables : [];
+                interactables.filter((i) => i.zone === zoneid && i.kind === 'hotspot').forEach((i) => {
+                    session.record('interacted', 'object', i.id, sceneid);
                 });
+                renderQuestions(body);
+            };
 
-                // The first play of an audio or video counts as interacting with it.
-                const played = new Set();
-                listview.querySelectorAll('[data-region="mavr-media"]').forEach((media) => {
-                    media.addEventListener('play', () => {
-                        const itemid = media.dataset.item;
-                        if (stopped || played.has(itemid)) {
-                            return;
-                        }
-                        played.add(itemid);
-                        session.setScene(media.dataset.scene);
-                        session.record('interacted', 'object', itemid, media.dataset.scene);
-                    });
-                });
+            const openItem = (button) => {
+                const card = button.closest('[data-interactable]');
+                const body = card.querySelector('[data-region="mavr-item-body"]');
+                if (button.getAttribute('aria-expanded') === 'true') {
+                    body.hidden = true;
+                    button.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                if (session.isObjectLocked(button.dataset.item)) {
+                    showLocked(null);
+                    return;
+                }
+                body.hidden = false;
+                button.setAttribute('aria-expanded', 'true');
+                session.setScene(card.dataset.scene);
+                session.record('interacted', 'object', button.dataset.item, card.dataset.scene);
+                renderQuestions(body);
+            };
 
-                // Keep badges, hidden items and questions in step with the state.
-                const update = (message) => {
-                    const current = message.state;
-                    listview.querySelectorAll('[data-region="mavr-station"]').forEach((station) => {
-                        const zoneid = station.dataset.zone;
-                        const status = zoneStatus(zoneid);
-                        const badge = station.querySelector('[data-region="mavr-station-status"]');
-                        if (badge.dataset.status !== status) {
-                            badge.dataset.status = status;
-                            badge.className = `badge ${BADGES[status]}`;
-                            badge.textContent = labels[status];
-                        }
-                        if (status !== 'locked') {
-                            station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
-                        }
-                        const item = station.closest('[data-region="mavr-station-item"]');
-                        if (item) {
-                            item.hidden = current.hidden.has(zoneid);
-                        }
-                    });
-                    listview.querySelectorAll('[data-interactable]').forEach((el) => {
-                        el.hidden = current.hidden.has(el.dataset.interactable);
-                    });
-                    listview.querySelectorAll('[data-region="mavr-station-body"]:not([hidden]),' +
-                        '[data-region="mavr-item-body"]:not([hidden])').forEach((body) => renderQuestions(body));
-                    message.completed.concat(message.unlocked).forEach((objective) => {
-                        getString('objectivestatuschanged', 'mavrruntime_builtin', {
-                            title: objective.title,
-                            status: labels[objective.status],
-                        }).then((text) => announce(root, text)).catch(() => null);
-                    });
-                    message.effects.forEach((effect) => {
-                        if (effect.do === 'play_media') {
-                            const media = listview.querySelector(
-                                `[data-region="mavr-media"][data-item="${CSS.escape(String(effect.target))}"]`);
-                            if (media) {
-                                Promise.resolve(media.play()).catch(() => null);
-                            }
-                            return;
-                        }
-                        if (effect.do !== 'open_question') {
-                            return;
-                        }
-                        const qhost = listview.querySelector(
-                            `[data-region="mavr-question"][data-slot="${Number(effect.target)}"]`);
-                        if (!qhost) {
-                            return;
-                        }
-                        const station = qhost.closest('[data-region="mavr-station"]');
-                        const button = station ? station.querySelector('[data-action="mavr-open-station"]') : null;
-                        if (button && button.getAttribute('aria-expanded') !== 'true') {
-                            openStation(button, true);
-                        } else {
-                            renderQuestions(qhost.parentElement);
-                        }
-                    });
-                };
-                unsubscribe = session.on((message) => {
-                    if (message.type === 'change' && !stopped) {
-                        update(message);
+            const useItem = (button) => {
+                const itemid = button.dataset.item;
+                if (session.isObjectLocked(itemid)) {
+                    showLocked(button.closest('[data-region="mavr-station"]'));
+                    return;
+                }
+                session.setScene(button.dataset.scene);
+                session.record('interacted', 'object', itemid, button.dataset.scene);
+            };
+
+            const listview = region(root, 'mavr-listview');
+            listview.addEventListener('click', (e) => {
+                const stationbutton = e.target.closest('[data-action="mavr-open-station"]');
+                if (stationbutton) {
+                    e.preventDefault();
+                    openStation(stationbutton, false);
+                    return;
+                }
+                const itembutton = e.target.closest('[data-action="mavr-open-item"]');
+                if (itembutton) {
+                    e.preventDefault();
+                    openItem(itembutton);
+                    return;
+                }
+                const usebutton = e.target.closest('[data-action="mavr-use-item"]');
+                if (usebutton) {
+                    e.preventDefault();
+                    useItem(usebutton);
+                    return;
+                }
+                const switchbutton = e.target.closest('[data-action="mavr-switch-3d"]');
+                if (switchbutton && config.onSwitch3d) {
+                    e.preventDefault();
+                    config.onSwitch3d();
+                }
+            });
+
+            // The first play of an audio or video counts as interacting with it.
+            const played = new Set();
+            listview.querySelectorAll('[data-region="mavr-media"]').forEach((media) => {
+                media.addEventListener('play', () => {
+                    const itemid = media.dataset.item;
+                    if (stopped || played.has(itemid)) {
+                        return;
                     }
-                });
-
-                session.start('builtin-list', startscene ? startscene.id : null);
-
-                return createProgress(region(root, 'mavr-list-progress'), session, {
-                    root: root,
-                    onFinish: config.onFinish,
+                    played.add(itemid);
+                    session.setScene(media.dataset.scene);
+                    session.record('interacted', 'object', itemid, media.dataset.scene);
                 });
             });
-    }).then((created) => {
+
+            // Keep badges, hidden items and questions in step with the state.
+            const update = (message) => {
+                const current = message.state;
+                listview.querySelectorAll('[data-region="mavr-station"]').forEach((station) => {
+                    const zoneid = station.dataset.zone;
+                    const status = zoneStatus(zoneid);
+                    const badge = station.querySelector('[data-region="mavr-station-status"]');
+                    if (badge.dataset.status !== status) {
+                        badge.dataset.status = status;
+                        badge.className = `badge ${BADGES[status]}`;
+                        badge.textContent = labels[status];
+                    }
+                    if (status !== 'locked') {
+                        station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
+                    }
+                    const item = station.closest('[data-region="mavr-station-item"]');
+                    if (item) {
+                        item.hidden = current.hidden.has(zoneid);
+                    }
+                });
+                listview.querySelectorAll('[data-interactable]').forEach((el) => {
+                    el.hidden = current.hidden.has(el.dataset.interactable);
+                });
+                listview.querySelectorAll('[data-region="mavr-station-body"]:not([hidden]),' +
+                    '[data-region="mavr-item-body"]:not([hidden])').forEach((body) => renderQuestions(body));
+                message.completed.concat(message.unlocked).forEach((objective) => {
+                    announceStatus(root, objective.title, labels[objective.status]);
+                });
+                message.effects.forEach((effect) => {
+                    if (effect.do === 'play_media') {
+                        const media = listview.querySelector(
+                            `[data-region="mavr-media"][data-item="${CSS.escape(String(effect.target))}"]`);
+                        if (media) {
+                            playMedia(media);
+                        }
+                        return;
+                    }
+                    if (effect.do !== 'open_question') {
+                        return;
+                    }
+                    const qhost = listview.querySelector(
+                        `[data-region="mavr-question"][data-slot="${Number(effect.target)}"]`);
+                    if (!qhost) {
+                        return;
+                    }
+                    const station = qhost.closest('[data-region="mavr-station"]');
+                    const button = station ? station.querySelector('[data-action="mavr-open-station"]') : null;
+                    if (button && button.getAttribute('aria-expanded') !== 'true') {
+                        openStation(button, true);
+                    } else {
+                        renderQuestions(qhost.parentElement);
+                    }
+                });
+            };
+            unsubscribe = session.on((message) => {
+                if (message.type === 'change' && !stopped) {
+                    update(message);
+                }
+            });
+
+            session.start('builtin-list', startscene ? startscene.id : null);
+
+            return createProgress(region(root, 'mavr-list-progress'), session, {
+                root: root,
+                onFinish: config.onFinish,
+            });
+        };
+        return fillLabels(allitems, scenenames);
+    }).then(() => Templates.renderForPromise('mavrruntime_builtin/listview', listcontext))
+    .then((rendered) => wire(rendered))
+    .then((created) => {
         progress = created;
         root.dataset.mavrReady = 'list';
         const heading = host.querySelector('h2');

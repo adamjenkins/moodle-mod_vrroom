@@ -30,7 +30,6 @@ use mod_mavr\local\editor\editor_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class editor_load extends external_api {
-
     /**
      * Parameters.
      *

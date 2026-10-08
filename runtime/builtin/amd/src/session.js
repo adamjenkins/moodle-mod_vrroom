@@ -63,6 +63,22 @@ const hintMap = (hints) => {
 };
 
 /**
+ * Hint counts of an objective, merging the local and server state.
+ *
+ * @param {Object} def Objective definition (from the graph).
+ * @param {Object} loc Local objective state.
+ * @param {Object|undefined} srv Server objective state.
+ * @returns {Object} {used, total, nextpenalty}
+ */
+const hintCounts = (def, loc, srv) => {
+    const hintdefs = Array.isArray(def.hints) ? def.hints.filter((h) => h && h.id !== undefined) : [];
+    const serverused = srv ? Number(srv.hintsused) || 0 : 0;
+    const used = Math.max(Number(loc.hintsused) || 0, serverused);
+    const nextpenalty = used < hintdefs.length ? Number(hintdefs[used].penalty) || 0 : 0;
+    return {used: used, total: hintdefs.length, nextpenalty: nextpenalty};
+};
+
+/**
  * Normalise an event to the evaluator's shape (contract §4.4.1).
  *
  * @param {Object} event Raw event.
@@ -245,8 +261,7 @@ class Session {
             }
             const points = Number(def.points) || 0;
             const required = !!def.required;
-            const hintdefs = Array.isArray(def.hints) ? def.hints.filter((h) => h && h.id !== undefined) : [];
-            const hintsused = Math.max(Number(loc.hintsused) || 0, srv ? Number(srv.hintsused) || 0 : 0);
+            const hints = hintCounts(def, loc, srv);
             const objective = {
                 id: def.id,
                 type: def.type,
@@ -258,9 +273,9 @@ class Session {
                 zone: def.zone || null,
                 slot: def.slot === undefined ? null : Number(def.slot),
                 target: def.target || null,
-                hintsused: hintsused,
-                hintstotal: hintdefs.length,
-                nexthintpenalty: hintsused < hintdefs.length ? Number(hintdefs[hintsused].penalty) || 0 : 0,
+                hintsused: hints.used,
+                hintstotal: hints.total,
+                nexthintpenalty: hints.nextpenalty,
             };
             objectives.push(objective);
             byid[def.id] = objective;
@@ -469,12 +484,12 @@ class Session {
         if (!this.queue) {
             return Promise.resolve(true);
         }
+        let flushed = true;
         return this.queue.flush().then((ok) => {
-            if (this.reconciling) {
-                return this.reconciling.then(() => ok);
-            }
-            return ok;
-        });
+            flushed = ok;
+            // Wait for the reconcile that follows, if one is running.
+            return this.reconciling;
+        }).then(() => flushed);
     }
 
     /**

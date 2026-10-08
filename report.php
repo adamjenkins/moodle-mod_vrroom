@@ -75,8 +75,12 @@ if ($deleteid) {
     if ($confirm) {
         require_sesskey();
         attempt_manager::delete_attempt($attempt);
-        redirect($baseurl, get_string('reportattemptdeleted', 'mod_mavr'), null,
-            \core\output\notification::NOTIFY_SUCCESS);
+        redirect(
+            $baseurl,
+            get_string('reportattemptdeleted', 'mod_mavr'),
+            null,
+            \core\output\notification::NOTIFY_SUCCESS
+        );
     }
 
     $user = core_user::get_user((int)$attempt->userid);
@@ -111,14 +115,18 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading(format_string($mavr->name) . ': ' . get_string('reports', 'mod_mavr'));
 
 if ($attempt) {
-    echo $OUTPUT->render_from_template('mod_mavr/report_attempt',
-        (new report_attempt($mavr, $cm, $context, $attempt))->export_for_template($OUTPUT));
+    echo $OUTPUT->render_from_template(
+        'mod_mavr/report_attempt',
+        (new report_attempt($mavr, $cm, $context, $attempt))->export_for_template($OUTPUT)
+    );
 } else {
     if ($groupmode != NOGROUPS) {
         echo groups_print_activity_menu($cm, $baseurl, true);
     }
-    echo $OUTPUT->render_from_template('mod_mavr/report_overview',
-        (new report_overview($mavr, $cm, $context, $groupid))->export_for_template($OUTPUT));
+    echo $OUTPUT->render_from_template(
+        'mod_mavr/report_overview',
+        (new report_overview($mavr, $cm, $context, $groupid))->export_for_template($OUTPUT)
+    );
 }
 
 echo $OUTPUT->footer();

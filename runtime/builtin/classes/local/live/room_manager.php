@@ -109,8 +109,16 @@ final class room_manager {
      * @return array{peer: \stdClass, peers: array, interval: int}
      * @throws \moodle_exception errorlivebusy, errorliveroomfull
      */
-    public static function join(\cm_info $cm, \context_module $context, \stdClass $mavr, int $userid,
-            string $kind, int $attemptid, int $groupid, ?int $now = null): array {
+    public static function join(
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        int $userid,
+        string $kind,
+        int $attemptid,
+        int $groupid,
+        ?int $now = null
+    ): array {
         global $DB;
         $now = $now ?? time();
         $mavrid = (int)$mavr->id;
@@ -130,9 +138,11 @@ final class room_manager {
             }
 
             $max = access::max_peers($mavr);
-            $count = $DB->count_records_select(self::TABLE_PEERS,
+            $count = $DB->count_records_select(
+                self::TABLE_PEERS,
                 'mavrid = :mavrid AND groupid = :groupid AND timeseen >= :fresh',
-                ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]);
+                ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
+            );
             if ($count >= $max) {
                 throw new \moodle_exception('errorliveroomfull', 'mavrruntime_builtin', '', $max);
             }
@@ -200,8 +210,14 @@ final class room_manager {
      * @param int|null $now Current time.
      * @return array{status: string, interval: int, peers: array, signals: array, iceservers: array, iceexpires: int}
      */
-    public static function poll(\stdClass $peer, \cm_info $cm, \context_module $context, \stdClass $mavr,
-            bool $refreshice, ?int $now = null): array {
+    public static function poll(
+        \stdClass $peer,
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        bool $refreshice,
+        ?int $now = null
+    ): array {
         global $DB;
         $now = $now ?? time();
         $result = [
@@ -237,8 +253,15 @@ final class room_manager {
         }
 
         $fresh = $now - self::SIGNAL_TTL;
-        $rows = $DB->get_records_select(self::TABLE_SIGNALS, 'topeer = :topeer AND timecreated >= :fresh',
-            ['topeer' => $peer->peerid, 'fresh' => $fresh], 'id ASC', 'id, frompeer, type, payload', 0, self::MAX_DELIVER);
+        $rows = $DB->get_records_select(
+            self::TABLE_SIGNALS,
+            'topeer = :topeer AND timecreated >= :fresh',
+            ['topeer' => $peer->peerid, 'fresh' => $fresh],
+            'id ASC',
+            'id, frompeer, type, payload',
+            0,
+            self::MAX_DELIVER
+        );
         $delivered = (bool)$rows;
         if ($delivered) {
             [$insql, $inparams] = $DB->get_in_or_equal(array_keys($rows), SQL_PARAMS_NAMED, 'sig');
@@ -254,8 +277,11 @@ final class room_manager {
         }
         $DB->update_record(self::TABLE_PEERS, $update);
 
-        $morepending = $DB->record_exists_select(self::TABLE_SIGNALS, 'topeer = :topeer AND timecreated >= :fresh',
-            ['topeer' => $peer->peerid, 'fresh' => $fresh]);
+        $morepending = $DB->record_exists_select(
+            self::TABLE_SIGNALS,
+            'topeer = :topeer AND timecreated >= :fresh',
+            ['topeer' => $peer->peerid, 'fresh' => $fresh]
+        );
 
         $result['peers'] = self::roster($peer, $context, $now);
         $result['interval'] = self::interval_for($peer, $now, $delivered, $morepending);
@@ -281,8 +307,14 @@ final class room_manager {
      * @param int|null $now Current time.
      * @return array{status: string, results: array}
      */
-    public static function send(\stdClass $peer, \cm_info $cm, \context_module $context, \stdClass $mavr,
-            array $signals, ?int $now = null): array {
+    public static function send(
+        \stdClass $peer,
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        array $signals,
+        ?int $now = null
+    ): array {
         global $DB;
         $now = $now ?? time();
 
@@ -321,10 +353,13 @@ final class room_manager {
                 continue;
             }
             if (!array_key_exists($to, $targets)) {
-                $targets[$to] = $DB->record_exists_select(self::TABLE_PEERS,
+                $targets[$to] = $DB->record_exists_select(
+                    self::TABLE_PEERS,
                     'peerid = :peerid AND mavrid = :mavrid AND groupid = :groupid AND timeseen >= :fresh AND id <> :self',
                     ['peerid' => $to, 'mavrid' => (int)$peer->mavrid, 'groupid' => (int)$peer->groupid,
-                        'fresh' => $fresh, 'self' => (int)$peer->id]);
+                    'fresh' => $fresh,
+                    'self' => (int)$peer->id]
+                );
             }
             if (!$targets[$to]) {
                 $entry['error'] = 'unknownpeer';
@@ -340,8 +375,11 @@ final class room_manager {
                 continue;
             }
 
-            $pending = $DB->count_records_select(self::TABLE_SIGNALS, 'topeer = :topeer AND timecreated >= :fresh',
-                ['topeer' => $to, 'fresh' => $now - self::SIGNAL_TTL]);
+            $pending = $DB->count_records_select(
+                self::TABLE_SIGNALS,
+                'topeer = :topeer AND timecreated >= :fresh',
+                ['topeer' => $to, 'fresh' => $now - self::SIGNAL_TTL]
+            );
             if ($pending >= self::MAX_PENDING) {
                 $entry['error'] = 'mailboxfull';
                 $results[] = $entry;
@@ -437,8 +475,11 @@ final class room_manager {
      */
     public static function remove_peer(\stdClass $peer): void {
         global $DB;
-        $DB->delete_records_select(self::TABLE_SIGNALS, 'frompeer = :frompeer OR topeer = :topeer',
-            ['frompeer' => (string)$peer->peerid, 'topeer' => (string)$peer->peerid]);
+        $DB->delete_records_select(
+            self::TABLE_SIGNALS,
+            'frompeer = :frompeer OR topeer = :topeer',
+            ['frompeer' => (string)$peer->peerid, 'topeer' => (string)$peer->peerid]
+        );
         $DB->delete_records(self::TABLE_PEERS, ['id' => (int)$peer->id]);
     }
 
@@ -452,14 +493,20 @@ final class room_manager {
      */
     public static function purge_room(int $mavrid, int $groupid, int $now): void {
         global $DB;
-        $stale = $DB->get_fieldset_select(self::TABLE_PEERS, 'peerid',
+        $stale = $DB->get_fieldset_select(
+            self::TABLE_PEERS,
+            'peerid',
             'mavrid = :mavrid AND groupid = :groupid AND timeseen < :fresh',
-            ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]);
+            ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
+        );
         if ($stale) {
             self::delete_peers_by_peerid($stale);
         }
-        $DB->delete_records_select(self::TABLE_SIGNALS, 'mavrid = :mavrid AND timecreated < :expired',
-            ['mavrid' => $mavrid, 'expired' => $now - self::SIGNAL_TTL]);
+        $DB->delete_records_select(
+            self::TABLE_SIGNALS,
+            'mavrid = :mavrid AND timecreated < :expired',
+            ['mavrid' => $mavrid, 'expired' => $now - self::SIGNAL_TTL]
+        );
     }
 
     /**
@@ -471,8 +518,12 @@ final class room_manager {
     public static function purge_expired(?int $now = null): array {
         global $DB;
         $now = $now ?? time();
-        $stale = $DB->get_fieldset_select(self::TABLE_PEERS, 'peerid', 'timeseen < :fresh',
-            ['fresh' => $now - self::STALE_AFTER]);
+        $stale = $DB->get_fieldset_select(
+            self::TABLE_PEERS,
+            'peerid',
+            'timeseen < :fresh',
+            ['fresh' => $now - self::STALE_AFTER]
+        );
         $signals = 0;
         if ($stale) {
             $signals += self::delete_peers_by_peerid($stale);
@@ -538,15 +589,20 @@ final class room_manager {
      */
     public static function interval_for(\stdClass $peer, int $now, bool $delivered, bool $morepending): int {
         global $DB;
-        if ($delivered || $morepending
+        if (
+            $delivered || $morepending
                 || $now - (int)$peer->timejoined < self::ACTIVE_WINDOW
-                || $now - (int)$peer->lastsignal < self::ACTIVE_WINDOW) {
+                || $now - (int)$peer->lastsignal < self::ACTIVE_WINDOW
+        ) {
             return self::INTERVAL_ACTIVE;
         }
-        $newcomer = $DB->record_exists_select(self::TABLE_PEERS,
+        $newcomer = $DB->record_exists_select(
+            self::TABLE_PEERS,
             'mavrid = :mavrid AND groupid = :groupid AND id <> :self AND timejoined > :recent AND timeseen >= :fresh',
             ['mavrid' => (int)$peer->mavrid, 'groupid' => (int)$peer->groupid, 'self' => (int)($peer->id ?? 0),
-                'recent' => $now - self::ACTIVE_WINDOW, 'fresh' => $now - self::STALE_AFTER]);
+            'recent' => $now - self::ACTIVE_WINDOW,
+            'fresh' => $now - self::STALE_AFTER]
+        );
         return $newcomer ? self::INTERVAL_ACTIVE : self::INTERVAL_IDLE;
     }
 

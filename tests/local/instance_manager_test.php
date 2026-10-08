@@ -177,7 +177,7 @@ final class instance_manager_test extends \advanced_testcase {
         $this->assertSame(['scene-a'], array_column(instance_manager::get_scenes($mavr->id), 'id'));
         $this->assertSame('A', instance_manager::get_graph($mavr->id)['objectives'][0]['title']);
 
-        // "Rebuild from the template" recompiles and clears the flag.
+        // The "Rebuild from the template" action recompiles and clears the flag.
         $data = self::form_data_for_update($after, $cm);
         $data->gallery_title[0] = 'Amphora';
         $data->mavr_rebuild = 1;

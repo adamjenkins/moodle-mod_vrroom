@@ -602,8 +602,10 @@ final class evaluator {
         switch ($kind) {
             case 'event':
                 foreach (['verb', 'type', 'id'] as $field) {
-                    if (array_key_exists($field, $on) && $on[$field] !== null
-                            && self::str($on[$field]) !== $trigger['event'][$field]) {
+                    if (
+                        array_key_exists($field, $on) && $on[$field] !== null
+                            && self::str($on[$field]) !== $trigger['event'][$field]
+                    ) {
                         return false;
                     }
                 }

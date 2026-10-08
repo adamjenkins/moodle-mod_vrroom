@@ -28,7 +28,6 @@ namespace mod_mavr\local;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class token {
-
     /** @var string Token format version prefix. */
     private const VERSION = 'v1';
 

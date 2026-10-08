@@ -57,8 +57,10 @@ class live_poll extends external_api {
      */
     public static function execute(string $peerid, bool $refreshice = false): array {
         global $USER;
-        $params = self::validate_parameters(self::execute_parameters(),
-            ['peerid' => $peerid, 'refreshice' => $refreshice]);
+        $params = self::validate_parameters(
+            self::execute_parameters(),
+            ['peerid' => $peerid, 'refreshice' => $refreshice]
+        );
 
         $peer = room_manager::get_own_peer((string)$params['peerid'], (int)$USER->id);
         if (!$peer) {
@@ -95,8 +97,10 @@ class live_poll extends external_api {
             'interval' => new external_value(PARAM_INT, 'Milliseconds until the next poll'),
             'peers' => new external_multiple_structure(live_join::peer_structure(), 'The others in the room'),
             'signals' => new external_multiple_structure(live_join::signal_structure(), 'Messages for the caller'),
-            'iceservers' => new external_multiple_structure(live_join::iceserver_structure(),
-                'New STUN and TURN servers, only when asked for'),
+            'iceservers' => new external_multiple_structure(
+                live_join::iceserver_structure(),
+                'New STUN and TURN servers, only when asked for'
+            ),
             'iceexpires' => new external_value(PARAM_INT, 'When the new TURN credentials expire, 0 without TURN'),
         ]);
     }

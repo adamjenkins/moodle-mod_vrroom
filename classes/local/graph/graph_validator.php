@@ -145,8 +145,10 @@ final class graph_validator {
             if (!is_string($objective['title'] ?? null)) {
                 $errors[] = "{$where}.title must be a string";
             }
-            if (array_key_exists('points', $objective)
-                    && (!self::is_number($objective['points']) || $objective['points'] < 0)) {
+            if (
+                array_key_exists('points', $objective)
+                    && (!self::is_number($objective['points']) || $objective['points'] < 0)
+            ) {
                 $errors[] = "{$where}.points must be a number >= 0";
             }
             if (array_key_exists('required', $objective) && !is_bool($objective['required'])) {
@@ -160,8 +162,10 @@ final class graph_validator {
                     if (array_key_exists('after', $unlock) && !self::is_id_list($unlock['after'], true)) {
                         $errors[] = "{$where}.unlock.after must be an array of ids";
                     }
-                    if (array_key_exists('score_at_least', $unlock) && $unlock['score_at_least'] !== null
-                            && !self::is_number($unlock['score_at_least'])) {
+                    if (
+                        array_key_exists('score_at_least', $unlock) && $unlock['score_at_least'] !== null
+                            && !self::is_number($unlock['score_at_least'])
+                    ) {
                         $errors[] = "{$where}.unlock.score_at_least must be a number or null";
                     }
                 }
@@ -182,8 +186,10 @@ final class graph_validator {
                     if (!self::is_id($objective['zone'] ?? null)) {
                         $errors[] = "{$where}.zone is not a valid id";
                     }
-                    if (array_key_exists('scene', $objective) && $objective['scene'] !== null
-                            && !self::is_id($objective['scene'])) {
+                    if (
+                        array_key_exists('scene', $objective) && $objective['scene'] !== null
+                            && !self::is_id($objective['scene'])
+                    ) {
                         $errors[] = "{$where}.scene is not a valid id";
                     }
                     break;
@@ -304,8 +310,13 @@ final class graph_validator {
      * @param array $hintids hint id => true over all objectives seen so far, appended to
      * @param string[] $errors errors, appended to
      */
-    private static function validate_hints(mixed $hints, mixed $type, string $where, array &$hintids,
-            array &$errors): void {
+    private static function validate_hints(
+        mixed $hints,
+        mixed $type,
+        string $where,
+        array &$hintids,
+        array &$errors
+    ): void {
         if (!self::is_list($hints) || count($hints) > self::MAX_HINTS) {
             $errors[] = "{$where}.hints must be an array of at most " . self::MAX_HINTS . ' hints';
             return;
@@ -332,8 +343,10 @@ final class graph_validator {
                 $errors[] = "{$where}.hints[{$j}].text must be a non-empty string of at most "
                     . self::MAX_HINT_TEXT . ' characters';
             }
-            if (array_key_exists('penalty', $hint)
-                    && (!self::is_number($hint['penalty']) || $hint['penalty'] < 0)) {
+            if (
+                array_key_exists('penalty', $hint)
+                    && (!self::is_number($hint['penalty']) || $hint['penalty'] < 0)
+            ) {
                 $errors[] = "{$where}.hints[{$j}].penalty must be a number >= 0";
             }
         }
@@ -359,12 +372,16 @@ final class graph_validator {
         }
         switch ($kind) {
             case 'event':
-                if (array_key_exists('verb', $on) && $on['verb'] !== null
-                        && (!is_string($on['verb']) || !in_array($on['verb'], self::VERBS, true))) {
+                if (
+                    array_key_exists('verb', $on) && $on['verb'] !== null
+                        && (!is_string($on['verb']) || !in_array($on['verb'], self::VERBS, true))
+                ) {
                     $errors[] = "{$where}.verb is unknown";
                 }
-                if (array_key_exists('type', $on) && $on['type'] !== null
-                        && (!is_string($on['type']) || !in_array($on['type'], self::OBJECT_TYPES, true))) {
+                if (
+                    array_key_exists('type', $on) && $on['type'] !== null
+                        && (!is_string($on['type']) || !in_array($on['type'], self::OBJECT_TYPES, true))
+                ) {
                     $errors[] = "{$where}.type is unknown";
                 }
                 if (array_key_exists('id', $on) && $on['id'] !== null && !self::is_id($on['id'])) {
@@ -392,8 +409,13 @@ final class graph_validator {
      * @param array $slots question slot => true
      * @param string[] $errors errors, appended to
      */
-    private static function validate_action(mixed $action, string $where, array $types, array $slots,
-            array &$errors): void {
+    private static function validate_action(
+        mixed $action,
+        string $where,
+        array $types,
+        array $slots,
+        array &$errors
+    ): void {
         if (!self::is_object($action)) {
             $errors[] = "{$where} must be an object";
             return;

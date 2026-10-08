@@ -31,7 +31,6 @@ use mod_mavr\output\report_overview;
 #[\PHPUnit\Framework\Attributes\CoversClass(report_overview::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(report_attempt::class)]
 final class report_test extends \advanced_testcase {
-
     /** @var string A hostile name part. */
     private const HOSTILE = '<b>Evil</b> & Co';
 
@@ -45,7 +44,11 @@ final class report_test extends \advanced_testcase {
         global $DB;
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $student = $generator->create_and_enrol($course, 'student', ['firstname' => self::HOSTILE, 'lastname' => 'Pupil']);
+        $student = $generator->create_and_enrol($course, 'student', ['lastname' => 'Pupil']);
+        // Stored directly: the user generator would clean the tags out of the name, but a
+        // name can still reach the table unclean (an import, an auth plugin, an old site).
+        $DB->set_field('user', 'firstname', self::HOSTILE, ['id' => $student->id]);
+        $student->firstname = self::HOSTILE;
         $module = $generator->create_module('mavr', [
             'course' => $course->id,
             'stations' => [
@@ -126,15 +129,17 @@ final class report_test extends \advanced_testcase {
         $sources = array_column($data['statements'], 'clientasserted');
         $this->assertContains(true, $sources);
         $this->assertContains(false, $sources);
-        $interacted = array_values(array_filter($data['statements'],
-            fn($s) => $s['verb'] === get_string('verb_interacted', 'mod_mavr')));
+        $interacted = array_values(array_filter(
+            $data['statements'],
+            fn($s) => $s['verb'] === get_string('verb_interacted', 'mod_mavr')
+        ));
         $this->assertCount(1, $interacted);
         $this->assertTrue($interacted[0]['clientasserted']);
         $this->assertSame(get_string('reportclientasserted', 'mod_mavr'), $interacted[0]['source']);
         $this->assertSame(get_string('objecttype_zone', 'mod_mavr'), $interacted[0]['objecttype']);
         $this->assertStringNotContainsString('<script>', $interacted[0]['objectname']);
         $this->assertStringContainsString('Vase', $interacted[0]['objectname']);
-        // format_string() made the name HTML-safe: the ampersand is escaped exactly once.
+        // The format_string() call made the name HTML-safe: the ampersand is escaped exactly once.
         $this->assertStringContainsString('&amp; jug', $interacted[0]['objectname']);
         $this->assertStringNotContainsString('&amp;amp;', $interacted[0]['objectname']);
 
@@ -203,10 +208,14 @@ final class report_test extends \advanced_testcase {
             $this->create_group_setup(SEPARATEGROUPS);
         $this->setUser($teacher);
 
-        $this->assertSame([(int)$attempta->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id)));
-        $this->assertSame([(int)$attemptb->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupb->id)));
+        $this->assertSame(
+            [(int)$attempta->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id))
+        );
+        $this->assertSame(
+            [(int)$attemptb->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupb->id))
+        );
         $this->assertSame([], $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
 
         // The detail page and the deletion both go through this check.
@@ -233,8 +242,10 @@ final class report_test extends \advanced_testcase {
         $expected = [(int)$attempta->id, (int)$attemptb->id];
         sort($expected);
         $this->assertSame($expected, $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
-        $this->assertSame([(int)$attempta->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id)));
+        $this->assertSame(
+            [(int)$attempta->id],
+            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id))
+        );
         report_overview::require_attempt_in_groups($course, $cm, $attemptb);
     }
 
@@ -250,8 +261,11 @@ final class report_test extends \advanced_testcase {
 
             $expected = [(int)$attempta->id, (int)$attemptb->id];
             sort($expected);
-            $this->assertSame($expected, $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)),
-                'group mode ' . $groupmode);
+            $this->assertSame(
+                $expected,
+                $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)),
+                'group mode ' . $groupmode
+            );
             report_overview::require_attempt_in_groups($course, $cm, $attemptb);
         }
     }

@@ -226,9 +226,10 @@ export const buildEnvironment = (THREE, environment, loader, resolveUrl = null) 
     addLights(THREE, env.lights, group);
     const background = colour(THREE, env.sky, '#20242a');
     const shell = [];
-    const url = env.type === 'model' && env.file
-        ? (resolveUrl ? resolveUrl(env.file) : (env.file.url || null))
-        : null;
+    let url = null;
+    if (env.type === 'model' && env.file) {
+        url = resolveUrl ? resolveUrl(env.file) : (env.file.url || null);
+    }
 
     if (url) {
         return loader.loadAsync(url).then((gltf) => {

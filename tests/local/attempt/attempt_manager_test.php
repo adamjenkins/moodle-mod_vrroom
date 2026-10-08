@@ -29,7 +29,6 @@ use mod_mavr\local\instance_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(attempt_manager::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(event_store::class)]
 final class attempt_manager_test extends \advanced_testcase {
-
     /**
      * Create a course, a gallery with one question station and one text station, and a student.
      *
@@ -89,9 +88,14 @@ final class attempt_manager_test extends \advanced_testcase {
      * @return void
      */
     private function enter(\stdClass $attempt, \stdClass $fx, string $zone): void {
-        event_store::insert((int)$attempt->id, \core\uuid::generate(),
+        event_store::insert(
+            (int)$attempt->id,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $fx->zones[$zone], 'scene' => $fx->sceneid, 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
     }
 
     /**
@@ -257,8 +261,10 @@ final class attempt_manager_test extends \advanced_testcase {
     public function test_require_own_open_attempt(): void {
         $fx = $this->setup_activity();
         [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
-        [$loaded, $mavr, $cm, $context] = attempt_manager::require_own_open_attempt((int)$attempt->id,
-            (int)$fx->student->id);
+        [$loaded, $mavr, $cm, $context] = attempt_manager::require_own_open_attempt(
+            (int)$attempt->id,
+            (int)$fx->student->id
+        );
         $this->assertEquals($attempt->id, $loaded->id);
         $this->assertEquals($fx->mavr->id, $mavr->id);
         $this->assertEquals($fx->cm->id, $cm->id);
@@ -342,9 +348,14 @@ final class attempt_manager_test extends \advanced_testcase {
         $fx = $this->setup_activity();
         [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
         $sid = strtoupper(\core\uuid::generate());
-        event_store::insert((int)$attempt->id, $sid,
+        event_store::insert(
+            (int)$attempt->id,
+            $sid,
             ['verb' => 'entered', 'type' => 'scene', 'id' => $fx->sceneid, 'scene' => null, 'fraction' => null],
-            true, null, 123);
+            true,
+            null,
+            123
+        );
         $this->assertTrue(event_store::exists($sid));
         $this->assertTrue(event_store::exists(strtolower($sid)));
         $rows = event_store::get_rows((int)$attempt->id);

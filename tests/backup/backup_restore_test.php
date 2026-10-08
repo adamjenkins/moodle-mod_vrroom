@@ -26,6 +26,8 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
+require_once($CFG->dirroot . '/backup/moodle2/backup_plan_builder.class.php');
+require_once($CFG->dirroot . '/backup/moodle2/restore_plan_builder.class.php');
 require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/backup_mavr_activity_task.class.php');
 require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_activity_task.class.php');
 
@@ -41,7 +43,6 @@ require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_activity_tas
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_structure_step::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_task::class)]
 final class backup_restore_test extends \advanced_testcase {
-
     /**
      * A course with a question bank, a two-station gallery walk (one question) and a student
      * attempt with a visit, an answer and a finish.
@@ -73,8 +74,15 @@ final class backup_restore_test extends \advanced_testcase {
         $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
         $scene = instance_manager::get_scenes((int)$mavr->id)[0];
         $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
-        $mavrgen->record_event($attempt, 'answered', 'question', null, '1', false,
-            ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]);
+        $mavrgen->record_event(
+            $attempt,
+            'answered',
+            'question',
+            null,
+            '1',
+            false,
+            ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]
+        );
 
         return [$course, $mavr, $cm, $question, $student, $attempt];
     }
@@ -89,8 +97,14 @@ final class backup_restore_test extends \advanced_testcase {
      */
     private function backup_and_restore(\stdClass $course, \stdClass $cm, bool $users): int {
         global $USER;
-        $bc = new backup_controller(backup::TYPE_1COURSE, $course->id, backup::FORMAT_MOODLE,
-            backup::INTERACTIVE_NO, backup::MODE_IMPORT, $USER->id);
+        $bc = new backup_controller(
+            backup::TYPE_1COURSE,
+            $course->id,
+            backup::FORMAT_MOODLE,
+            backup::INTERACTIVE_NO,
+            backup::MODE_IMPORT,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_status(\backup_setting::NOT_LOCKED);
         $bc->get_plan()->get_setting('users')->set_value($users);
         // In import mode the activity's userinfo setting does not follow the root setting.
@@ -102,8 +116,14 @@ final class backup_restore_test extends \advanced_testcase {
         $bc->destroy();
 
         $newcourseid = \restore_dbops::create_new_course('Restored course', 'restored_' . $course->id, $course->category);
-        $rc = new restore_controller($backupid, $newcourseid, backup::INTERACTIVE_NO, backup::MODE_GENERAL,
-            $USER->id, backup::TARGET_NEW_COURSE);
+        $rc = new restore_controller(
+            $backupid,
+            $newcourseid,
+            backup::INTERACTIVE_NO,
+            backup::MODE_GENERAL,
+            $USER->id,
+            backup::TARGET_NEW_COURSE
+        );
         $rc->get_plan()->get_setting('users')->set_status(\backup_setting::NOT_LOCKED);
         $rc->get_plan()->get_setting('users')->set_value($users);
         $this->assertTrue($rc->execute_precheck());
@@ -148,25 +168,34 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertSame($mavr->graphjson, $new->graphjson);
         $this->assertEquals(
             $DB->get_records_menu('mavr_graphs', ['mavrid' => $mavr->id], 'version', 'version, graphjson'),
-            $DB->get_records_menu('mavr_graphs', ['mavrid' => $new->id], 'version', 'version, graphjson'));
+            $DB->get_records_menu('mavr_graphs', ['mavrid' => $new->id], 'version', 'version, graphjson')
+        );
         $this->assertEquals(
             $DB->get_records_menu('mavr_scenes', ['mavrid' => $mavr->id], 'sortorder', 'idnumber, scenejson'),
-            $DB->get_records_menu('mavr_scenes', ['mavrid' => $new->id], 'sortorder', 'idnumber, scenejson'));
+            $DB->get_records_menu('mavr_scenes', ['mavrid' => $new->id], 'sortorder', 'idnumber, scenejson')
+        );
 
         // The slot and its reference point at the new activity and a remapped bank entry.
         $slots = $DB->get_records('mavr_slots', ['mavrid' => $new->id]);
         $this->assertCount(1, $slots);
         $slot = reset($slots);
         $this->assertEquals(1, $slot->slot);
-        $reference = $DB->get_record('question_references',
-            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id], '*', MUST_EXIST);
+        $reference = $DB->get_record(
+            'question_references',
+            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id],
+            '*',
+            MUST_EXIST
+        );
         $this->assertEquals($newcontext->id, $reference->usingcontextid);
         $this->assertNotEquals($question->questionbankentryid, $reference->questionbankentryid);
         $bankcontextid = $DB->get_field_sql(
             "SELECT qc.contextid
                FROM {question_bank_entries} qbe
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE qbe.id = :id", ['id' => $reference->questionbankentryid], MUST_EXIST);
+              WHERE qbe.id = :id",
+            ['id' => $reference->questionbankentryid],
+            MUST_EXIST
+        );
         $bankcontext = \context::instance_by_id($bankcontextid);
         $this->assertSame((int)$newcourseid, (int)$bankcontext->get_course_context()->instanceid);
 
@@ -194,8 +223,10 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertSame(array_column($oldevents, 'objectid'), array_column($newevents, 'objectid'));
         $this->assertSame(array_column($oldevents, 'clientasserted'), array_column($newevents, 'clientasserted'));
         // Same site: every statement id collided with the original and was renewed.
-        $this->assertEmpty(array_intersect(array_column($oldevents, 'statementid'),
-            array_column($newevents, 'statementid')));
+        $this->assertEmpty(array_intersect(
+            array_column($oldevents, 'statementid'),
+            array_column($newevents, 'statementid')
+        ));
 
         // A replay of the restored attempt gives the same score.
         $this->assertEqualsWithDelta((float)$attempt->score, (float)$newattempt->score, 1e-6);
@@ -218,8 +249,10 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertSame($mavr->graphjson, $new->graphjson);
         $this->assertEquals(1, $DB->count_records('mavr_slots', ['mavrid' => $new->id]));
         $this->assertEquals(0, $DB->count_records('mavr_attempts', ['mavrid' => $new->id]));
-        $this->assertEquals(0, $DB->count_records('question_usages',
-            ['component' => 'mod_mavr', 'contextid' => \context_module::instance($newcm->id)->id]));
+        $this->assertEquals(0, $DB->count_records(
+            'question_usages',
+            ['component' => 'mod_mavr', 'contextid' => \context_module::instance($newcm->id)->id]
+        ));
     }
 
     /**
@@ -318,8 +351,12 @@ final class backup_restore_test extends \advanced_testcase {
         [$new] = $this->get_restored($newcourseid);
 
         $slot = $DB->get_record('mavr_slots', ['mavrid' => $new->id], '*', MUST_EXIST);
-        $reference = $DB->get_record('question_references',
-            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id], '*', MUST_EXIST);
+        $reference = $DB->get_record(
+            'question_references',
+            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id],
+            '*',
+            MUST_EXIST
+        );
         $this->assertNotEquals($question->questionbankentryid, $reference->questionbankentryid);
 
         $newconfig = json_decode($new->templateconfig);

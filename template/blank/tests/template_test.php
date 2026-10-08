@@ -77,8 +77,10 @@ final class template_test extends \advanced_testcase {
         $this->assertSame([], $scene['props']);
         $this->assertSame([], $scene['interactables']);
 
-        $this->assertSame(['schema' => 'mavr-graph/1', 'hidden' => [], 'objectives' => [], 'rules' => []],
-            $compiled->graph);
+        $this->assertSame(
+            ['schema' => 'mavr-graph/1', 'hidden' => [], 'objectives' => [], 'rules' => []],
+            $compiled->graph
+        );
         $this->assertSame([], graph_validator::validate($compiled->graph));
         $this->assertSame([], $compiled->slots);
     }
@@ -96,8 +98,10 @@ final class template_test extends \advanced_testcase {
         $this->assertSame('escape-room', $config->environment);
         $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $config->sceneid);
 
-        $this->assertSame(template::DEFAULT_ENVIRONMENT,
-            $template->extract_config((object)['blank_environment' => 'nowhere'])->environment);
+        $this->assertSame(
+            template::DEFAULT_ENVIRONMENT,
+            $template->extract_config((object)['blank_environment' => 'nowhere'])->environment
+        );
 
         $course = $this->getDataGenerator()->create_course();
         $mavrid = $DB->insert_record('mavr', (object)[
@@ -121,8 +125,10 @@ final class template_test extends \advanced_testcase {
     public function test_validation_and_preprocessing(): void {
         $template = new template();
         $this->assertSame([], $template->validation(['blank_environment' => 'courtyard'], [], 0));
-        $this->assertSame(['blank_environment' => get_string('required')],
-            $template->validation(['blank_environment' => 'moon-base'], [], 0));
+        $this->assertSame(
+            ['blank_environment' => get_string('required')],
+            $template->validation(['blank_environment' => 'moon-base'], [], 0)
+        );
 
         $values = [];
         $template->data_preprocessing($values, null, null);

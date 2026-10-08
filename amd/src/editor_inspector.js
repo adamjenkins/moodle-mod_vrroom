@@ -228,7 +228,7 @@ const start = (container, model, context, str) => {
      * @param {Object} ref Selection.
      * @returns {Object|null} {heading, fields, candelete, canduplicate}
      */
-    const describe = (doc, ref) => {
+    const describe = (doc, ref) => { // eslint-disable-line complexity
         const scene = findScene(doc, ref.scene);
         const object = findRef(doc, ref);
         if (!scene || !object) {
@@ -382,7 +382,7 @@ const start = (container, model, context, str) => {
      * @param {*} raw Field value (string or boolean).
      * @returns {boolean} False when the value is not usable (nothing changes).
      */
-    const apply = (draft, ref, path, type, raw) => {
+    const apply = (draft, ref, path, type, raw) => { // eslint-disable-line complexity
         const scene = findScene(draft, ref.scene);
         if (!scene) {
             return false;
@@ -401,7 +401,7 @@ const start = (container, model, context, str) => {
                 if (sizes && value <= 0) {
                     return false;
                 }
-                const fallback = path.startsWith('scale') ? [1, 1, 1] : (path.startsWith('size') ? [1, 1, 1] : [0, 0, 0]);
+                const fallback = path.startsWith('scale') || path.startsWith('size') ? [1, 1, 1] : [0, 0, 0];
                 setPath(target, path, Math.round(value * 1000) / 1000, getPath(target, path.split('.')[0]) || fallback);
                 return true;
             }
@@ -559,24 +559,28 @@ const start = (container, model, context, str) => {
         }
         const path = button.dataset.path;
         const kind = button.dataset.kind;
+        let key = null;
         context.actions.upload(kind, button).then((asset) => {
             if (!asset || destroyed) {
                 return null;
             }
-            const key = refKey(toRef(asset));
-            return getString('editorchange_edit', 'mod_mavr', asset.filename).then((label) => {
-                model.transact(label, (draft) => {
-                    if (path === 'environment') {
-                        const scene = findScene(draft, ref.scene);
-                        return scene ? applyEnvironment(scene, `file:${key}`) : false;
-                    }
-                    const type = path === 'file' && findRef(draft, ref) && findRef(draft, ref).kind === 'grabbable'
-                        ? 'grabsource' : 'fileref';
-                    return apply(draft, ref, path, type, key);
-                });
-                refresh();
+            key = refKey(toRef(asset));
+            return getString('editorchange_edit', 'mod_mavr', asset.filename);
+        }).then((label) => {
+            if (label === null || destroyed) {
                 return null;
+            }
+            model.transact(label, (draft) => {
+                if (path === 'environment') {
+                    const scene = findScene(draft, ref.scene);
+                    return scene ? applyEnvironment(scene, `file:${key}`) : false;
+                }
+                const type = path === 'file' && findRef(draft, ref) && findRef(draft, ref).kind === 'grabbable'
+                    ? 'grabsource' : 'fileref';
+                return apply(draft, ref, path, type, key);
             });
+            refresh();
+            return null;
         }).catch(Notification.exception);
     };
 
@@ -603,7 +607,7 @@ const start = (container, model, context, str) => {
                 }
             }
             return null;
-        }).catch(Notification.exception).then(() => pending.resolve(), () => pending.resolve());
+        }).catch(Notification.exception).finally(() => pending.resolve());
     };
 
     const onChange = (e) => {

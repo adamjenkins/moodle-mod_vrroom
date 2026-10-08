@@ -33,7 +33,6 @@ use mod_mavr\local\attempt\attempt_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class finish_attempt extends external_api {
-
     /**
      * Parameters.
      *

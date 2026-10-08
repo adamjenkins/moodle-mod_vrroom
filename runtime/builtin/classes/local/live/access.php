@@ -101,8 +101,13 @@ final class access {
      * @return array{kind: string, attemptid: int}
      * @throws \moodle_exception errorlivenotallowed, or mod_mavr's attempt errors
      */
-    public static function resolve_kind(\cm_info $cm, \context_module $context, \stdClass $mavr, int $attemptid,
-            int $userid): array {
+    public static function resolve_kind(
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        int $attemptid,
+        int $userid
+    ): array {
         if ($attemptid > 0) {
             [$attempt] = attempt_manager::require_own_open_attempt($attemptid, $userid);
             if ((int)$attempt->mavrid !== (int)$mavr->id) {
@@ -182,8 +187,10 @@ final class access {
         $userid = (int)$peer->userid;
         if ($peer->kind === self::KIND_ATTEMPT) {
             $attempt = $DB->get_record('mavr_attempts', ['id' => (int)$peer->attemptid]);
-            if (!$attempt || (int)$attempt->userid !== $userid || (int)$attempt->mavrid !== (int)$mavr->id
-                    || $attempt->state !== attempt_manager::STATE_INPROGRESS || attempt_manager::is_overdue($attempt)) {
+            if (
+                !$attempt || (int)$attempt->userid !== $userid || (int)$attempt->mavrid !== (int)$mavr->id
+                    || $attempt->state !== attempt_manager::STATE_INPROGRESS || attempt_manager::is_overdue($attempt)
+            ) {
                 return false;
             }
             if (!has_capability('mod/mavr:attempt', $context, $userid)) {
@@ -215,8 +222,13 @@ final class access {
      * @param \stdClass $user The user launching.
      * @return array
      */
-    public static function launch_block(\cm_info $cm, \context_module $context, \stdClass $mavr, ?\stdClass $attempt,
-            \stdClass $user): array {
+    public static function launch_block(
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        ?\stdClass $attempt,
+        \stdClass $user
+    ): array {
         $block = [
             'available' => false,
             'canjoin' => false,
@@ -288,7 +300,7 @@ final class access {
      * The default room among the allowed groups: the active group when allowed, else the first.
      *
      * @param \cm_info $cm Course module.
-     * @param array<int, string> $groups Allowed groups, not empty.
+     * @param array $groups Allowed groups (groupid => name), not empty.
      * @return int
      */
     private static function default_group(\cm_info $cm, array $groups): int {
@@ -309,6 +321,8 @@ final class access {
     private static function plain(string $text, \context_module $context): string {
         return html_entity_decode(
             strip_tags(format_string($text, true, ['context' => $context, 'escape' => false])),
-            ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
     }
 }

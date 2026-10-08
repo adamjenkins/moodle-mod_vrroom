@@ -41,10 +41,9 @@ use core_privacy\local\request\writer;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class provider implements
-        \core_privacy\local\metadata\provider,
-        \core_privacy\local\request\plugin\provider,
-        \core_privacy\local\request\core_userlist_provider {
-
+    \core_privacy\local\metadata\provider,
+    \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\plugin\provider {
     /** @var string This component. */
     private const COMPONENT = 'mavrruntime_builtin';
 
@@ -167,8 +166,13 @@ class provider implements
 
             $signals = [];
             [$insql, $inparams] = $DB->get_in_or_equal($peerids, SQL_PARAMS_NAMED, 'peer');
-            $rows = $DB->get_records_select(self::TABLE_SIGNALS, "mavrid = :mavrid AND frompeer {$insql}",
-                ['mavrid' => $mavrid] + $inparams, 'id ASC', 'id, type, payload, timecreated');
+            $rows = $DB->get_records_select(
+                self::TABLE_SIGNALS,
+                "mavrid = :mavrid AND frompeer {$insql}",
+                ['mavrid' => $mavrid] + $inparams,
+                'id ASC',
+                'id, type, payload, timecreated'
+            );
             foreach ($rows as $row) {
                 $signals[] = (object)[
                     'type' => (string)$row->type,
@@ -177,8 +181,10 @@ class provider implements
                 ];
             }
 
-            writer::with_context($context)->export_data([get_string('privacy:livepath', self::COMPONENT)],
-                (object)['presence' => $presence, 'signals' => $signals]);
+            writer::with_context($context)->export_data(
+                [get_string('privacy:livepath', self::COMPONENT)],
+                (object)['presence' => $presence, 'signals' => $signals]
+            );
         }
     }
 
@@ -276,8 +282,11 @@ class provider implements
         foreach (array_chunk($peerids, self::CHUNK) as $chunk) {
             [$fromsql, $fromparams] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED, 'from');
             [$tosql, $toparams] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED, 'to');
-            $DB->delete_records_select(self::TABLE_SIGNALS, "frompeer {$fromsql} OR topeer {$tosql}",
-                $fromparams + $toparams);
+            $DB->delete_records_select(
+                self::TABLE_SIGNALS,
+                "frompeer {$fromsql} OR topeer {$tosql}",
+                $fromparams + $toparams
+            );
         }
         $DB->delete_records_select(self::TABLE_PEERS, $select, $params);
     }

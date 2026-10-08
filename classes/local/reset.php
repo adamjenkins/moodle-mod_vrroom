@@ -32,7 +32,6 @@ use mod_mavr\local\runtime\registry as runtime_registry;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class reset {
-
     /** @var string Name of the reset form checkbox. */
     public const FIELD_ATTEMPTS = 'reset_mavr_attempts';
 

@@ -95,8 +95,12 @@ final class room_manager_test extends \advanced_testcase {
         }
 
         // A goes stale: C may join, and A's row is purged.
-        $DB->set_field('mavrruntime_builtin_peers', 'timeseen', $this->now - room_manager::STALE_AFTER - 1,
-            ['peerid' => $peera->peerid]);
+        $DB->set_field(
+            'mavrruntime_builtin_peers',
+            'timeseen',
+            $this->now - room_manager::STALE_AFTER - 1,
+            ['peerid' => $peera->peerid]
+        );
         $joinedc = $this->join($activity, $c, $attemptc);
         $this->assertCount(1, $joinedc['peers']);
         $this->assertSame($joinedb['peer']->peerid, $joinedc['peers'][0]['peerid']);
@@ -147,8 +151,12 @@ final class room_manager_test extends \advanced_testcase {
         [$b, $attemptb] = $this->learner($activity);
         $peera = $this->join($activity, $a, $attempta)['peer'];
         $peerb = $this->join($activity, $b, $attemptb)['peer'];
-        $DB->set_field('mavrruntime_builtin_peers', 'timeseen', $this->now - room_manager::STALE_AFTER - 1,
-            ['peerid' => $peerb->peerid]);
+        $DB->set_field(
+            'mavrruntime_builtin_peers',
+            'timeseen',
+            $this->now - room_manager::STALE_AFTER - 1,
+            ['peerid' => $peerb->peerid]
+        );
 
         $result = $this->send($activity, $peera, [
             ['to' => $peera->peerid, 'type' => 'candidates', 'payload' => self::CANDIDATES],
@@ -235,8 +243,10 @@ final class room_manager_test extends \advanced_testcase {
             ['to' => $to, 'type' => 'candidates', 'payload' => json_encode($tomany)],
             ['to' => $to, 'type' => 'description', 'payload' => json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => "v=0\r\né"])],
         ]);
-        $this->assertSame(['', 'toolarge', 'invalid', 'invalid', 'invalid', 'invalid', 'invalid'],
-            array_column($result['results'], 'error'));
+        $this->assertSame(
+            ['', 'toolarge', 'invalid', 'invalid', 'invalid', 'invalid', 'invalid'],
+            array_column($result['results'], 'error')
+        );
 
         $stored = $DB->get_field('mavrruntime_builtin_signals', 'payload', ['topeer' => $to], MUST_EXIST);
         $this->assertSame('{"gen":2,"type":"offer","sdp":"v=0\r\n"}', $stored);
@@ -365,12 +375,16 @@ final class room_manager_test extends \advanced_testcase {
         $peera = $this->join($activity, $a, $attempta)['peer'];
 
         $this->assertSame(room_manager::INTERVAL_ACTIVE, $this->poll($activity, $peera, $this->now + 5)['interval']);
-        $this->assertSame(room_manager::INTERVAL_IDLE,
-            $this->poll($activity, $peera, $this->now + room_manager::ACTIVE_WINDOW + 1)['interval']);
+        $this->assertSame(
+            room_manager::INTERVAL_IDLE,
+            $this->poll($activity, $peera, $this->now + room_manager::ACTIVE_WINDOW + 1)['interval']
+        );
 
         $this->join($activity, $b, $attemptb, 0, $this->now + room_manager::ACTIVE_WINDOW + 2);
-        $this->assertSame(room_manager::INTERVAL_ACTIVE,
-            $this->poll($activity, $peera, $this->now + room_manager::ACTIVE_WINDOW + 3)['interval']);
+        $this->assertSame(
+            room_manager::INTERVAL_ACTIVE,
+            $this->poll($activity, $peera, $this->now + room_manager::ACTIVE_WINDOW + 3)['interval']
+        );
     }
 
     /**
@@ -446,8 +460,16 @@ final class room_manager_test extends \advanced_testcase {
      * @return array
      */
     private function join(array $activity, \stdClass $user, \stdClass $attempt, int $groupid = 0, ?int $now = null): array {
-        return room_manager::join($activity['cm'], $activity['context'], $activity['mavr'], (int)$user->id, 'attempt',
-            (int)$attempt->id, $groupid, $now ?? $this->now);
+        return room_manager::join(
+            $activity['cm'],
+            $activity['context'],
+            $activity['mavr'],
+            (int)$user->id,
+            'attempt',
+            (int)$attempt->id,
+            $groupid,
+            $now ?? $this->now
+        );
     }
 
     /**
@@ -461,8 +483,14 @@ final class room_manager_test extends \advanced_testcase {
     private function poll(array $activity, \stdClass $peer, ?int $now = null): array {
         global $DB;
         $fresh = $DB->get_record('mavrruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
-        return room_manager::poll($fresh, $activity['cm'], $activity['context'], $activity['mavr'], false,
-            $now ?? $this->now);
+        return room_manager::poll(
+            $fresh,
+            $activity['cm'],
+            $activity['context'],
+            $activity['mavr'],
+            false,
+            $now ?? $this->now
+        );
     }
 
     /**
@@ -477,8 +505,14 @@ final class room_manager_test extends \advanced_testcase {
     private function send(array $activity, \stdClass $peer, array $signals, ?int $now = null): array {
         global $DB;
         $fresh = $DB->get_record('mavrruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
-        return room_manager::send($fresh, $activity['cm'], $activity['context'], $activity['mavr'], $signals,
-            $now ?? $this->now);
+        return room_manager::send(
+            $fresh,
+            $activity['cm'],
+            $activity['context'],
+            $activity['mavr'],
+            $signals,
+            $now ?? $this->now
+        );
     }
 
     /**

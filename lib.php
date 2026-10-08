@@ -93,8 +93,11 @@ function mavr_delete_instance(int $id): bool {
 function mavr_get_coursemodule_info(stdClass $coursemodule) {
     global $DB;
 
-    $mavr = $DB->get_record('mavr', ['id' => $coursemodule->instance],
-        'id, name, intro, introformat, completionobjectives');
+    $mavr = $DB->get_record(
+        'mavr',
+        ['id' => $coursemodule->instance],
+        'id, name, intro, introformat, completionobjectives'
+    );
     if (!$mavr) {
         return false;
     }
@@ -315,10 +318,28 @@ function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownloa
  * @param bool $forcedownload Whether to force download.
  * @param array $options Extra options for send_stored_file().
  */
-function mavr_question_pluginfile($course, $context, $component, $filearea, $qubaid, $slot, $args,
-        $forcedownload, array $options = []) {
-    \mod_mavr\local\questions\files::serve_question_file($course, $context, $component, $filearea, $qubaid, $slot,
-        $args, $forcedownload, $options);
+function mavr_question_pluginfile(
+    $course,
+    $context,
+    $component,
+    $filearea,
+    $qubaid,
+    $slot,
+    $args,
+    $forcedownload,
+    array $options = []
+) {
+    \mod_mavr\local\questions\files::serve_question_file(
+        $course,
+        $context,
+        $component,
+        $filearea,
+        $qubaid,
+        $slot,
+        $args,
+        $forcedownload,
+        $options
+    );
 }
 
 /**
@@ -334,13 +355,25 @@ function mavr_extend_settings_navigation(settings_navigation $settings, navigati
     }
     if (has_capability('mod/mavr:manage', $cm->context)) {
         $url = new moodle_url('/mod/mavr/edit.php', ['id' => $cm->id]);
-        $node->add_node(navigation_node::create(get_string('editor', 'mavr'), $url,
-            navigation_node::TYPE_SETTING, null, 'mod_mavr_editor', new pix_icon('t/edit', '')));
+        $node->add_node(navigation_node::create(
+            get_string('editor', 'mavr'),
+            $url,
+            navigation_node::TYPE_SETTING,
+            null,
+            'mod_mavr_editor',
+            new pix_icon('t/edit', '')
+        ));
     }
     if (has_capability('mod/mavr:viewreports', $cm->context)) {
         $url = new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
-        $node->add_node(navigation_node::create(get_string('reports', 'mavr'), $url,
-            navigation_node::TYPE_SETTING, null, 'mod_mavr_reports', new pix_icon('i/report', '')));
+        $node->add_node(navigation_node::create(
+            get_string('reports', 'mavr'),
+            $url,
+            navigation_node::TYPE_SETTING,
+            null,
+            'mod_mavr_reports',
+            new pix_icon('i/report', '')
+        ));
     }
 }
 
@@ -369,8 +402,11 @@ function mavr_get_file_areas($course, $cm, $context): array {
  * @param \stdClass $course The course.
  * @return \core_course\local\entity\content_item[]
  */
-function mod_mavr_get_course_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem,
-        \stdClass $user, \stdClass $course): array {
+function mod_mavr_get_course_content_items(
+    \core_course\local\entity\content_item $defaultmodulecontentitem,
+    \stdClass $user,
+    \stdClass $course
+): array {
     return \mod_mavr\local\template\chooser::content_items($defaultmodulecontentitem);
 }
 

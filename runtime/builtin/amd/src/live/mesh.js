@@ -89,6 +89,15 @@ const REASONS = Object.freeze({
 });
 
 /**
+ * Remove our presence from the server, ignoring a failure (best effort).
+ *
+ * @param {Object} signalling The signalling client.
+ */
+const quietLeave = (signalling) => {
+    signalling.leave().catch(() => undefined);
+};
+
+/**
  * Map an error to a state reason.
  *
  * @param {*} error Error with errorcode (from signalling).
@@ -359,11 +368,20 @@ class Link {
             if (payload.type !== 'offer' || this.closed) {
                 return undefined;
             }
-            return this.prepareTransceivers().then(() => this.pc.setLocalDescription()).then(() => {
-                this.sendDescription();
-                this.ready = true;
-                return;
-            });
+            return this.answerOffer();
+        });
+    }
+
+    /**
+     * Answer an applied remote offer.
+     *
+     * @returns {Promise}
+     */
+    answerOffer() {
+        return this.prepareTransceivers().then(() => this.pc.setLocalDescription()).then(() => {
+            this.sendDescription();
+            this.ready = true;
+            return undefined;
         });
     }
 
@@ -737,7 +755,7 @@ class MeshTransport extends Transport {
             this.joining = null;
             if (this.disposed || this.state !== 'joining') {
                 // Left while joining: remove the presence the server just made.
-                this.signalling.leave().catch(() => undefined);
+                quietLeave(this.signalling);
                 throw joinError('closed');
             }
             this.applyJoin(result);
@@ -969,7 +987,7 @@ class MeshTransport extends Transport {
         this.signalling.join(this.groupid).then((result) => {
             this.rejoining = false;
             if (this.disposed || this.state !== 'reconnecting') {
-                this.signalling.leave().catch(() => undefined);
+                quietLeave(this.signalling);
                 return;
             }
             this.applyJoin(result);

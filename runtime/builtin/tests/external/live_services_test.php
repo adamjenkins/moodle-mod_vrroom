@@ -193,8 +193,11 @@ final class live_services_test extends \advanced_testcase {
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
 
-        $signals = array_fill(0, room_manager::MAX_SIGNALS_PER_CALL + 1,
-            ['to' => room_manager::new_peerid(), 'type' => 'candidates', 'payload' => self::CANDIDATES]);
+        $signals = array_fill(
+            0,
+            room_manager::MAX_SIGNALS_PER_CALL + 1,
+            ['to' => room_manager::new_peerid(), 'type' => 'candidates', 'payload' => self::CANDIDATES]
+        );
         $this->expectException(\invalid_parameter_exception::class);
         live_send::execute($joina['peerid'], $signals);
     }
@@ -216,8 +219,10 @@ final class live_services_test extends \advanced_testcase {
         $this->assertSame(2, $jointeacher['maxpeers']);
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
-        $this->assertSame([['peerid' => $jointeacher['peerid'], 'name' => fullname($teacher), 'kind' => 'preview']],
-            $joina['peers']);
+        $this->assertSame(
+            [['peerid' => $jointeacher['peerid'], 'name' => fullname($teacher), 'kind' => 'preview']],
+            $joina['peers']
+        );
 
         $this->setUser($b);
         $this->expectException(\moodle_exception::class);

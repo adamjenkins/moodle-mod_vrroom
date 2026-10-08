@@ -51,7 +51,6 @@ use mod_mavr\local\attempt\event_store;
  * exactly as the activity form would submit them.
  */
 class mod_mavr_generator extends testing_module_generator {
-
     /**
      * Create a MAVR activity.
      *
@@ -109,8 +108,14 @@ class mod_mavr_generator extends testing_module_generator {
         }
 
         $stations = $this->build_stations($record);
-        unset($record->stations, $record->stationtitles, $record->stationquestions, $record->stationpoints,
-            $record->stationrequired, $record->stationtexts);
+        unset(
+            $record->stations,
+            $record->stationtitles,
+            $record->stationquestions,
+            $record->stationpoints,
+            $record->stationrequired,
+            $record->stationtexts
+        );
 
         $record->gallery_stationid = [];
         $record->gallery_title = [];
@@ -144,8 +149,17 @@ class mod_mavr_generator extends testing_module_generator {
         $record->escape_story = (string)($record->escape_story ?? ($record->story ?? ''));
         $record->escape_timelimit = (int)($record->escape_timelimit ?? ($record->timelimit ?? 0));
         $record->escape_hintpenalty = (float)($record->escape_hintpenalty ?? ($record->hintpenalty ?? 0));
-        unset($record->puzzles, $record->puzzletitles, $record->puzzlelocks, $record->puzzlequestions,
-            $record->puzzlehints, $record->puzzlepoints, $record->timelimit, $record->hintpenalty, $record->story);
+        unset(
+            $record->puzzles,
+            $record->puzzletitles,
+            $record->puzzlelocks,
+            $record->puzzlequestions,
+            $record->puzzlehints,
+            $record->puzzlepoints,
+            $record->timelimit,
+            $record->hintpenalty,
+            $record->story
+        );
 
         $fields = ['puzzleid', 'title', 'clue', 'cluemedia', 'clueimage', 'cluemodel', 'locktype', 'keyname',
             'question', 'hint1', 'hint2', 'points'];
@@ -273,11 +287,23 @@ class mod_mavr_generator extends testing_module_generator {
      * @param array|null $result server result (e.g. ['fraction' => 1.0] for 'answered')
      * @return int the new mavr_events id
      */
-    public function record_event(stdClass $attempt, string $verb, string $type, ?string $sceneid, ?string $id,
-            bool $clientasserted = true, ?array $result = null): int {
-        $eventid = event_store::insert((int)$attempt->id, strtolower(\core\uuid::generate()),
+    public function record_event(
+        stdClass $attempt,
+        string $verb,
+        string $type,
+        ?string $sceneid,
+        ?string $id,
+        bool $clientasserted = true,
+        ?array $result = null
+    ): int {
+        $eventid = event_store::insert(
+            (int)$attempt->id,
+            strtolower(\core\uuid::generate()),
             ['verb' => $verb, 'type' => $type, 'id' => $id, 'scene' => $sceneid, 'fraction' => null],
-            $clientasserted, $result, time());
+            $clientasserted,
+            $result,
+            time()
+        );
         attempt_manager::recompute($attempt);
         return $eventid;
     }

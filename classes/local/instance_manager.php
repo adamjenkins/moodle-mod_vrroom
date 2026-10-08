@@ -356,8 +356,12 @@ final class instance_manager {
         }
         $json = $DB->get_field('mavr_graphs', 'graphjson', ['mavrid' => $mavrid, 'version' => $version]);
         if ($json === false) {
-            throw new \moodle_exception('invalidgraph', 'mod_mavr', '',
-                "graph version {$version} of activity {$mavrid} does not exist");
+            throw new \moodle_exception(
+                'invalidgraph',
+                'mod_mavr',
+                '',
+                "graph version {$version} of activity {$mavrid} does not exist"
+            );
         }
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
@@ -399,8 +403,12 @@ final class instance_manager {
         foreach ($compiled->slots as $binding) {
             $slot = (int)($binding['slot'] ?? 0);
             if ($slot < 1 || isset($seen[$slot])) {
-                throw new \moodle_exception('invalidgraph', 'mod_mavr', '',
-                    'question slot numbers must be unique and at least 1');
+                throw new \moodle_exception(
+                    'invalidgraph',
+                    'mod_mavr',
+                    '',
+                    'question slot numbers must be unique and at least 1'
+                );
             }
             $seen[$slot] = true;
         }

@@ -26,7 +26,6 @@ namespace mod_mavr\form;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(asset_upload::class)]
 final class asset_upload_test extends \advanced_testcase {
-
     /**
      * A course with a gallery, an editing teacher and a student.
      *
@@ -108,8 +107,14 @@ final class asset_upload_test extends \advanced_testcase {
             $this->assertGreaterThan($itemid, $asset['itemid']);
             $itemid = $asset['itemid'];
             $this->assertStringContainsString("/mod_mavr/assets/{$itemid}/{$filename}", $asset['url']);
-            $this->assertTrue(get_file_storage()->file_exists($fx->context->id, 'mod_mavr', 'assets', $itemid, '/',
-                $filename));
+            $this->assertTrue(get_file_storage()->file_exists(
+                $fx->context->id,
+                'mod_mavr',
+                'assets',
+                $itemid,
+                '/',
+                $filename
+            ));
         }
         $this->assertSame(4, $itemid);
     }
@@ -120,9 +125,11 @@ final class asset_upload_test extends \advanced_testcase {
     public function test_wrong_extension(): void {
         $fx = $this->setup_activity();
         $this->setUser($fx->teacher);
+        // The file manager's accepted types refuse it at validation; the extension check in
+        // process_dynamic_submission() is the second line and throws if validation is bypassed.
         try {
-            self::submit((int)$fx->module->cmid, 'model', self::draft_with('notes.txt'));
-            $this->fail('A text file was stored as a model.');
+            $result = self::submit((int)$fx->module->cmid, 'model', self::draft_with('notes.txt'));
+            $this->assertFalse($result['submitted'], 'A text file was stored as a model.');
         } catch (\moodle_exception $e) {
             $this->assertSame('erroreditorinvalid', $e->errorcode);
         }

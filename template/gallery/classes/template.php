@@ -107,8 +107,13 @@ class template extends \mod_mavr\local\template\base {
         $mform->setDefault('gallery_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('gallery_environment', 'environment', self::COMPONENT);
 
-        $mform->addElement('filemanager', 'gallery_environmentfile', get_string('environmentfile', self::COMPONENT),
-            null, self::model_file_options());
+        $mform->addElement(
+            'filemanager',
+            'gallery_environmentfile',
+            get_string('environmentfile', self::COMPONENT),
+            null,
+            self::model_file_options()
+        );
         $mform->addHelpButton('gallery_environmentfile', 'environmentfile', self::COMPONENT);
         $mform->hideIf('gallery_environmentfile', 'gallery_environment', 'neq', self::ENVIRONMENT_UPLOAD);
 
@@ -129,21 +134,45 @@ class template extends \mod_mavr\local\template\base {
         $repeated = [
             $mform->createElement('header', 'gallery_stationheader', get_string('station', self::COMPONENT)),
             $mform->createElement('hidden', 'gallery_stationid', ''),
-            $mform->createElement('text', 'gallery_title', get_string('stationtitle', self::COMPONENT),
-                ['size' => 50, 'maxlength' => self::MAX_TITLE_LENGTH]),
-            $mform->createElement('editor', 'gallery_text', get_string('stationtext', self::COMPONENT),
-                ['rows' => 6], ['maxfiles' => 0, 'noclean' => false]),
+            $mform->createElement(
+                'text',
+                'gallery_title',
+                get_string('stationtitle', self::COMPONENT),
+                ['size' => 50, 'maxlength' => self::MAX_TITLE_LENGTH]
+            ),
+            $mform->createElement(
+                'editor',
+                'gallery_text',
+                get_string('stationtext', self::COMPONENT),
+                ['rows' => 6],
+                ['maxfiles' => 0, 'noclean' => false]
+            ),
             $mform->createElement('select', 'gallery_mediatype', get_string('mediatype', self::COMPONENT), [
                 self::MEDIA_NONE => get_string('mediatype_none', self::COMPONENT),
                 self::MEDIA_MODEL => get_string('mediatype_model', self::COMPONENT),
                 self::MEDIA_IMAGE => get_string('mediatype_image', self::COMPONENT),
             ]),
-            $mform->createElement('filemanager', 'gallery_model', get_string('stationmodel', self::COMPONENT),
-                null, self::model_file_options()),
-            $mform->createElement('filemanager', 'gallery_image', get_string('stationimage', self::COMPONENT),
-                null, self::image_file_options()),
-            $mform->createElement('autocomplete', 'gallery_question', get_string('stationquestion', self::COMPONENT),
-                $questions, ['multiple' => false]),
+            $mform->createElement(
+                'filemanager',
+                'gallery_model',
+                get_string('stationmodel', self::COMPONENT),
+                null,
+                self::model_file_options()
+            ),
+            $mform->createElement(
+                'filemanager',
+                'gallery_image',
+                get_string('stationimage', self::COMPONENT),
+                null,
+                self::image_file_options()
+            ),
+            $mform->createElement(
+                'autocomplete',
+                'gallery_question',
+                get_string('stationquestion', self::COMPONENT),
+                $questions,
+                ['multiple' => false]
+            ),
             $mform->createElement('advcheckbox', 'gallery_required', get_string('stationrequired', self::COMPONENT)),
             $mform->createElement('float', 'gallery_points', get_string('stationpoints', self::COMPONENT)),
         ];
@@ -199,8 +228,14 @@ class template extends \mod_mavr\local\template\base {
 
         if ($context !== null) {
             $draftitemid = file_get_submitted_draft_itemid('gallery_environmentfile');
-            file_prepare_draft_area($draftitemid, $context->id, 'mod_mavr', 'environment', 0,
-                self::model_file_options());
+            file_prepare_draft_area(
+                $draftitemid,
+                $context->id,
+                'mod_mavr',
+                'environment',
+                0,
+                self::model_file_options()
+            );
             $defaultvalues['gallery_environmentfile'] = $draftitemid;
         }
 
@@ -217,15 +252,34 @@ class template extends \mod_mavr\local\template\base {
             $defaultvalues['gallery_required'][$i] = !empty($station->required) ? 1 : 0;
             $defaultvalues['gallery_points'][$i] = (float)($station->points ?? 0);
 
+            // The repeat_elements() 'default' options are stored under flat keys such as
+            // 'gallery_question[0]', and QuickForm looks a flat key up before the nested array,
+            // so the stored values must be given under the same flat keys to win (as mod_quiz does).
+            foreach (['gallery_mediatype', 'gallery_question', 'gallery_required', 'gallery_points'] as $field) {
+                $defaultvalues["{$field}[{$i}]"] = $defaultvalues[$field][$i];
+            }
+
             if ($context !== null) {
                 $itemid = (int)($station->fileitemid ?? ($i + 1));
                 $modeldraft = 0;
-                file_prepare_draft_area($modeldraft, $context->id, 'mod_mavr', 'models', $itemid,
-                    self::model_file_options());
+                file_prepare_draft_area(
+                    $modeldraft,
+                    $context->id,
+                    'mod_mavr',
+                    'models',
+                    $itemid,
+                    self::model_file_options()
+                );
                 $defaultvalues['gallery_model'][$i] = $modeldraft;
                 $imagedraft = 0;
-                file_prepare_draft_area($imagedraft, $context->id, 'mod_mavr', 'media', $itemid,
-                    self::image_file_options());
+                file_prepare_draft_area(
+                    $imagedraft,
+                    $context->id,
+                    'mod_mavr',
+                    'media',
+                    $itemid,
+                    self::image_file_options()
+                );
                 $defaultvalues['gallery_image'][$i] = $imagedraft;
             }
         }
@@ -419,8 +473,14 @@ class template extends \mod_mavr\local\template\base {
         $environment = (string)($data['gallery_environment'] ?? self::DEFAULT_ENVIRONMENT);
         if ($environment === self::ENVIRONMENT_UPLOAD) {
             if (!empty($data['gallery_environmentfile'])) {
-                file_save_draft_area_files((int)$data['gallery_environmentfile'], $context->id, 'mod_mavr',
-                    'environment', 0, self::model_file_options());
+                file_save_draft_area_files(
+                    (int)$data['gallery_environmentfile'],
+                    $context->id,
+                    'mod_mavr',
+                    'environment',
+                    0,
+                    self::model_file_options()
+                );
             }
         } else {
             $fs->delete_area_files($context->id, 'mod_mavr', 'environment');
@@ -433,8 +493,14 @@ class template extends \mod_mavr\local\template\base {
 
             if ($mediatype === self::MEDIA_MODEL) {
                 if (!empty($data['gallery_model'][$i])) {
-                    file_save_draft_area_files((int)$data['gallery_model'][$i], $context->id, 'mod_mavr', 'models',
-                        $itemid, self::model_file_options());
+                    file_save_draft_area_files(
+                        (int)$data['gallery_model'][$i],
+                        $context->id,
+                        'mod_mavr',
+                        'models',
+                        $itemid,
+                        self::model_file_options()
+                    );
                 }
             } else {
                 $fs->delete_area_files($context->id, 'mod_mavr', 'models', $itemid);
@@ -442,8 +508,14 @@ class template extends \mod_mavr\local\template\base {
 
             if ($mediatype === self::MEDIA_IMAGE) {
                 if (!empty($data['gallery_image'][$i])) {
-                    file_save_draft_area_files((int)$data['gallery_image'][$i], $context->id, 'mod_mavr', 'media',
-                        $itemid, self::image_file_options());
+                    file_save_draft_area_files(
+                        (int)$data['gallery_image'][$i],
+                        $context->id,
+                        'mod_mavr',
+                        'media',
+                        $itemid,
+                        self::image_file_options()
+                    );
                 }
             } else {
                 $fs->delete_area_files($context->id, 'mod_mavr', 'media', $itemid);
@@ -480,8 +552,12 @@ class template extends \mod_mavr\local\template\base {
 
         if ($environmentid === self::ENVIRONMENT_UPLOAD) {
             if ($count > layout::MAX_UPLOAD_STATIONS) {
-                throw new \moodle_exception('invalidscene', 'mod_mavr', '',
-                    "An uploaded environment takes at most " . layout::MAX_UPLOAD_STATIONS . " stations.");
+                throw new \moodle_exception(
+                    'invalidscene',
+                    'mod_mavr',
+                    '',
+                    "An uploaded environment takes at most " . layout::MAX_UPLOAD_STATIONS . " stations."
+                );
             }
             $envfile = self::file_ref($fs, $context, 'environment', 0);
             if ($envfile === null) {
@@ -506,8 +582,12 @@ class template extends \mod_mavr\local\template\base {
             }
             $available = count($preset['anchors'] ?? []);
             if ($count > $available) {
-                throw new \moodle_exception('invalidscene', 'mod_mavr', '',
-                    "The environment has room for {$available} stations.");
+                throw new \moodle_exception(
+                    'invalidscene',
+                    'mod_mavr',
+                    '',
+                    "The environment has room for {$available} stations."
+                );
             }
             $environment = [
                 'type' => 'preset',

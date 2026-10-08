@@ -170,8 +170,8 @@ final class template_test extends \advanced_testcase {
         }
         $this->assertSame([], scene_validator::validate_set($compiled->scenes));
         $this->assertSame([], graph_validator::validate($compiled->graph));
-        $this->assertSame($compiled->graph, json_decode(json_encode($compiled->graph), true));
-        $this->assertSame($compiled->scenes, json_decode(json_encode($compiled->scenes), true));
+        $this->assertSame($compiled->graph, json_decode(json_encode($compiled->graph, JSON_PRESERVE_ZERO_FRACTION), true));
+        $this->assertSame($compiled->scenes, json_decode(json_encode($compiled->scenes, JSON_PRESERVE_ZERO_FRACTION), true));
     }
 
     /**
@@ -293,8 +293,10 @@ final class template_test extends \advanced_testcase {
         $this->assertEquals(2, $objectives['x-desk']['points']);
         $this->assertSame(['after' => ['v-desk']], $objectives['x-desk']['unlock']);
         $this->assertSame(get_string('objectivekey', 'mavrtemplate_escape', 'Brass key'), $objectives['x-desk']['title']);
-        $this->assertSame([['id' => 'hn-desk-1', 'text' => 'Look on the desk.', 'penalty' => 0.5]],
-            $objectives['x-desk']['hints']);
+        $this->assertSame(
+            [['id' => 'hn-desk-1', 'text' => 'Look on the desk.', 'penalty' => 0.5]],
+            $objectives['x-desk']['hints']
+        );
 
         // Code lock: opens after the previous puzzle is solved, retried until right.
         $this->assertSame(['after' => ['x-desk']], $objectives['v-safe']['unlock']);
@@ -309,8 +311,10 @@ final class template_test extends \advanced_testcase {
         // No lock: the visit is the solve and carries the points and hints.
         $this->assertSame(['after' => ['x-safe']], $objectives['v-hall']['unlock']);
         $this->assertEquals(1, $objectives['v-hall']['points']);
-        $this->assertSame([['id' => 'hn-hall-1', 'text' => 'Go to the back.', 'penalty' => 0.5]],
-            $objectives['v-hall']['hints']);
+        $this->assertSame(
+            [['id' => 'hn-hall-1', 'text' => 'Go to the back.', 'penalty' => 0.5]],
+            $objectives['v-hall']['hints']
+        );
 
         $this->assertSame('interact', $objectives['o-exit']['type']);
         $this->assertSame('d-exit', $objectives['o-exit']['target']);
@@ -364,14 +368,19 @@ final class template_test extends \advanced_testcase {
         ], $compiled->slots);
 
         $objectives = $this->by_id($graph['objectives']);
-        $this->assertSame(['v-pz1', 'x-pz1', 'v-pz2', 'x-pz2', 'v-pz3', 'x-pz3', 'v-pz4', 'o-exit'],
-            array_keys($objectives));
+        $this->assertSame(
+            ['v-pz1', 'x-pz1', 'v-pz2', 'x-pz2', 'v-pz3', 'x-pz3', 'v-pz4', 'o-exit'],
+            array_keys($objectives)
+        );
         $this->assertSame(['after' => ['x-pz3']], $objectives['v-pz4']['unlock']);
         $this->assertEquals(1, $objectives['v-pz4']['points']);
         $this->assertSame(['after' => ['x-pz1', 'x-pz2', 'x-pz3', 'v-pz4']], $objectives['o-exit']['unlock']);
         // An empty key name falls back to the default name.
-        $this->assertSame(get_string('objectivekey', 'mavrtemplate_escape',
-            get_string('keyname_default', 'mavrtemplate_escape')), $objectives['x-pz2']['title']);
+        $this->assertSame(get_string(
+            'objectivekey',
+            'mavrtemplate_escape',
+            get_string('keyname_default', 'mavrtemplate_escape')
+        ), $objectives['x-pz2']['title']);
 
         $items = $this->by_id($compiled->scenes[0]['interactables']);
         $this->assertArrayNotHasKey('t-story', $items);
@@ -711,6 +720,7 @@ final class template_test extends \advanced_testcase {
 
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
+        $PAGE->set_url('/course/modedit.php');
         $mavr = $this->getDataGenerator()->create_module('mavr', [
             'course' => $course->id,
             'template' => 'escape',
@@ -731,6 +741,17 @@ final class template_test extends \advanced_testcase {
         $this->assertStringContainsString('name="escape_addpuzzles"', $html);
         $this->assertStringNotContainsString('gallery_', $html);
         $this->assertStringContainsString(get_string('templatelocked', 'mavr'), $html);
+
+        // The stored lock types beat the repeat_elements() default (key): Safe keeps "no lock".
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8"?>' . $html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new \DOMXPath($dom);
+        $selected = $xpath->query('//select[@name="escape_locktype[1]"]/option[@selected]')->item(0);
+        $this->assertNotNull($selected);
+        $this->assertSame(template::LOCK_NONE, $selected->getAttribute('value'));
     }
 
     /**
@@ -745,7 +766,8 @@ final class template_test extends \advanced_testcase {
         /** @var \core_question_generator $questiongenerator */
         $questiongenerator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $questiongenerator->create_question_category(
-            ['contextid' => \context_module::instance($qbank->cmid)->id]);
+            ['contextid' => \context_module::instance($qbank->cmid)->id]
+        );
         $question = $questiongenerator->create_question('shortanswer', null, ['category' => $category->id]);
         return (int)$DB->get_field('question_versions', 'questionbankentryid', ['questionid' => $question->id]);
     }

@@ -85,8 +85,12 @@ final class bank_test extends \advanced_testcase {
             'status' => question_version_status::QUESTION_STATUS_DRAFT,
         ]);
         $hidden = $this->make_question('truefalse', ['name' => 'Hidden one']);
-        $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_HIDDEN,
-            ['questionid' => $hidden->id]);
+        $DB->set_field(
+            'question_versions',
+            'status',
+            question_version_status::QUESTION_STATUS_HIDDEN,
+            ['questionid' => $hidden->id]
+        );
 
         $choices = bank::get_choices((int)$this->course->id);
 
@@ -156,8 +160,10 @@ final class bank_test extends \advanced_testcase {
         $this->assertArrayNotHasKey((int)$others->questionbankentryid, $choices);
 
         $this->assertNull(bank::validate_entry((int)$theirs->questionbankentryid, (int)$this->course->id));
-        $this->assertSame('errorquestionnotallowed',
-            bank::validate_entry((int)$others->questionbankentryid, (int)$this->course->id));
+        $this->assertSame(
+            'errorquestionnotallowed',
+            bank::validate_entry((int)$others->questionbankentryid, (int)$this->course->id)
+        );
     }
 
     /**
@@ -184,8 +190,12 @@ final class bank_test extends \advanced_testcase {
         $tf = $this->make_question('truefalse');
         $essay = $this->make_question('essay');
         $hidden = $this->make_question('truefalse');
-        $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_HIDDEN,
-            ['questionid' => $hidden->id]);
+        $DB->set_field(
+            'question_versions',
+            'status',
+            question_version_status::QUESTION_STATUS_HIDDEN,
+            ['questionid' => $hidden->id]
+        );
         $draft = $this->make_question('truefalse', ['status' => question_version_status::QUESTION_STATUS_DRAFT]);
 
         $this->assertNull(bank::validate_entry((int)$tf->questionbankentryid, $courseid));
@@ -195,8 +205,11 @@ final class bank_test extends \advanced_testcase {
         $this->assertSame('errorquestiontype', bank::validate_entry((int)$essay->questionbankentryid, $courseid));
         $this->assertSame('errorquestionnotfound', bank::validate_entry((int)$hidden->questionbankentryid, $courseid));
         // A hidden question already bound to the activity may stay.
-        $this->assertNull(bank::validate_entry((int)$hidden->questionbankentryid, $courseid,
-            [(int)$hidden->questionbankentryid]));
+        $this->assertNull(bank::validate_entry(
+            (int)$hidden->questionbankentryid,
+            $courseid,
+            [(int)$hidden->questionbankentryid]
+        ));
 
         // A student may not use the question, unless it is already on the activity.
         $student = $this->getDataGenerator()->create_and_enrol($this->course, 'student');
@@ -204,8 +217,11 @@ final class bank_test extends \advanced_testcase {
         $this->assertSame('errorquestionnotallowed', bank::validate_entry((int)$tf->questionbankentryid, $courseid));
         $this->assertNull(bank::validate_entry((int)$tf->questionbankentryid, $courseid, [(int)$tf->questionbankentryid]));
         // Keeping never excuses a type that is not allowed.
-        $this->assertSame('errorquestiontype', bank::validate_entry((int)$essay->questionbankentryid, $courseid,
-            [(int)$essay->questionbankentryid]));
+        $this->assertSame('errorquestiontype', bank::validate_entry(
+            (int)$essay->questionbankentryid,
+            $courseid,
+            [(int)$essay->questionbankentryid]
+        ));
     }
 
     /**

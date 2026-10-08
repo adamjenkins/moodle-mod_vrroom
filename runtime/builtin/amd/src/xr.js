@@ -81,6 +81,15 @@ export const detect = () => {
 };
 
 /**
+ * End an XR session, ignoring a failure (it may already be ending).
+ *
+ * @param {XRSession} xrsession The session.
+ */
+const endQuietly = (xrsession) => {
+    Promise.resolve().then(() => xrsession.end()).catch(() => null);
+};
+
+/**
  * Create the controller of immersive sessions for a renderer.
  *
  * Options: stage (HTMLElement used as the AR DOM overlay root), onStart(mode), onEnd(mode).
@@ -165,12 +174,13 @@ export const createXr = (renderer, options = {}) => {
                 return starting;
             }
             const vr = requested === 'vr';
+            const sessiontype = vr ? 'immersive-vr' : 'immersive-ar';
             let xrsession = null;
             let info = null;
             starting = detect().then((result) => {
                 info = result;
                 if (!(vr ? info.vr : info.ar)) {
-                    throw new Error(`WebXR ${vr ? 'immersive-vr' : 'immersive-ar'} is not supported`);
+                    throw new Error(`WebXR ${sessiontype} is not supported`);
                 }
                 const init = vr ? {
                     requiredFeatures: ['local-floor'],
@@ -184,7 +194,7 @@ export const createXr = (renderer, options = {}) => {
                     init.optionalFeatures = ['local-floor', 'hand-tracking'];
                     delete init.domOverlay;
                 }
-                return navigator.xr.requestSession(vr ? 'immersive-vr' : 'immersive-ar', init);
+                return navigator.xr.requestSession(sessiontype, init);
             }).then((created) => {
                 xrsession = created;
                 renderer.xr.setReferenceSpaceType(vr ? 'local-floor' : 'local');
@@ -212,7 +222,7 @@ export const createXr = (renderer, options = {}) => {
                 return mode;
             }).catch((error) => {
                 if (xrsession && session !== xrsession) {
-                    Promise.resolve().then(() => xrsession.end()).catch(() => null);
+                    endQuietly(xrsession);
                 }
                 throw error;
             }).then((result) => {

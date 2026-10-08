@@ -36,7 +36,6 @@ use mod_mavr\local\template\compiled_activity;
 #[\PHPUnit\Framework\Attributes\CoversClass(submit_question::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(usage::class)]
 final class question_retry_test extends \advanced_testcase {
-
     /**
      * A gallery with a true/false question (True is right) whose graph is replaced: v-1 visits the
      * station, q-1 (2 points) answers the question after it, with or without pass_fraction 1.
@@ -94,9 +93,14 @@ final class question_retry_test extends \advanced_testcase {
         $this->setUser($student);
         $start = start_attempt::execute((int)$module->cmid);
         $attemptid = (int)$start['attemptid'];
-        event_store::insert($attemptid, \core\uuid::generate(),
+        event_store::insert(
+            $attemptid,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $zone, 'scene' => (string)$scene['id'], 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
         return (object) [
             'student' => $student,
             'attemptid' => $attemptid,
@@ -125,7 +129,7 @@ final class question_retry_test extends \advanced_testcase {
      * @param string $id objective id
      * @return string
      */
-    private function status(array $state, string $id): string {
+    private function objective_status(array $state, string $id): string {
         foreach ($state['objectives'] as $objective) {
             if ($objective['id'] === $id) {
                 return $objective['status'];
@@ -142,12 +146,14 @@ final class question_retry_test extends \advanced_testcase {
         global $DB;
         $fx = $this->setup_attempt(true);
 
-        $result = external_api::clean_returnvalue(submit_question::execute_returns(),
-            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '0')));
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '0'))
+        );
         $this->assertTrue($result['retry']);
         $this->assertSame('gradedwrong', $result['status']);
         $this->assertEqualsWithDelta(0.0, $result['fraction'], 1e-6);
-        $this->assertSame('available', $this->status($result['state'], 'q-1'));
+        $this->assertSame('available', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
         // The feedback of the graded try comes back before the restart.
         $this->assertStringContainsString('q' . $fx->attempt->uniqueid . ':', $result['html']);
@@ -163,11 +169,13 @@ final class question_retry_test extends \advanced_testcase {
         $view = get_question::execute($fx->attemptid, $fx->slot);
         $this->assertFalse($view['answered']);
 
-        $result = external_api::clean_returnvalue(submit_question::execute_returns(),
-            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '1')));
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
         $this->assertFalse($result['retry']);
         $this->assertSame('gradedright', $result['status']);
-        $this->assertSame('completed', $this->status($result['state'], 'q-1'));
+        $this->assertSame('completed', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(2.0, $result['state']['earnedpoints'], 1e-6);
         $this->assertCount(2, $DB->get_records('mavr_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
 
@@ -186,10 +194,12 @@ final class question_retry_test extends \advanced_testcase {
     public function test_without_pass_fraction(): void {
         $fx = $this->setup_attempt(false);
 
-        $result = external_api::clean_returnvalue(submit_question::execute_returns(),
-            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '0')));
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '0'))
+        );
         $this->assertFalse($result['retry']);
-        $this->assertSame('completed', $this->status($result['state'], 'q-1'));
+        $this->assertSame('completed', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
         $qa = usage::get_question_attempt(attempt_manager::get_attempt($fx->attemptid), $fx->slot);
         $this->assertTrue($qa->get_state()->is_finished());

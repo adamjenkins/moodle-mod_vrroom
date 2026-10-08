@@ -139,7 +139,7 @@ const start = (container, model, context, headings) => {
                 }
             }
             return null;
-        }).catch(Notification.exception).then(() => pending.resolve(), () => pending.resolve());
+        }).catch(Notification.exception).finally(() => pending.resolve());
     };
 
     const onClick = (e) => {

@@ -125,8 +125,10 @@ final class access_test extends \advanced_testcase {
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
 
-        $this->assertSame(['kind' => 'preview', 'attemptid' => 0],
-            access::resolve_kind($cm, $context, $mavr, 0, (int)$teacher->id));
+        $this->assertSame(
+            ['kind' => 'preview', 'attemptid' => 0],
+            access::resolve_kind($cm, $context, $mavr, 0, (int)$teacher->id)
+        );
 
         $this->expectException(\moodle_exception::class);
         $this->expectExceptionMessage(get_string('errorlivenotallowed', 'mavrruntime_builtin'));
@@ -172,8 +174,10 @@ final class access_test extends \advanced_testcase {
             }
 
             $this->setUser($teacher);
-            $this->assertSame([(int)$groupa->id => 'Group A', (int)$groupb->id => 'Group B'],
-                access::allowed_groups($cm, $context, (int)$teacher->id));
+            $this->assertSame(
+                [(int)$groupa->id => 'Group A', (int)$groupb->id => 'Group B'],
+                access::allowed_groups($cm, $context, (int)$teacher->id)
+            );
             $this->assertSame((int)$groupb->id, access::resolve_group($cm, $context, (int)$teacher->id, (int)$groupb->id));
         }
     }

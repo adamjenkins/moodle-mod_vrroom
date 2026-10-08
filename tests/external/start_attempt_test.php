@@ -30,7 +30,6 @@ use mod_mavr\local\token;
 #[\PHPUnit\Framework\Attributes\CoversClass(start_attempt::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(get_preview::class)]
 final class start_attempt_test extends \advanced_testcase {
-
     /**
      * Course with an activity, a student and an editing teacher.
      *
@@ -61,8 +60,10 @@ final class start_attempt_test extends \advanced_testcase {
         $fx = $this->setup_activity();
         $this->setUser($fx->student);
 
-        $result = external_api::clean_returnvalue(start_attempt::execute_returns(),
-            start_attempt::execute((int)$fx->module->cmid));
+        $result = external_api::clean_returnvalue(
+            start_attempt::execute_returns(),
+            start_attempt::execute((int)$fx->module->cmid)
+        );
         $this->assertFalse($result['resumed']);
         $this->assertSame(1, $result['attempt']);
 
@@ -94,8 +95,10 @@ final class start_attempt_test extends \advanced_testcase {
         $this->assertSame((int)$fx->module->cmid, $claims['cmid']);
         $this->assertSame($result['attemptid'], $claims['attemptid']);
 
-        $again = external_api::clean_returnvalue(start_attempt::execute_returns(),
-            start_attempt::execute((int)$fx->module->cmid));
+        $again = external_api::clean_returnvalue(
+            start_attempt::execute_returns(),
+            start_attempt::execute((int)$fx->module->cmid)
+        );
         $this->assertTrue($again['resumed']);
         $this->assertSame($result['attemptid'], $again['attemptid']);
     }
@@ -149,8 +152,10 @@ final class start_attempt_test extends \advanced_testcase {
         $fx = $this->setup_activity();
 
         $this->setUser($fx->teacher);
-        $result = external_api::clean_returnvalue(get_preview::execute_returns(),
-            get_preview::execute((int)$fx->module->cmid));
+        $result = external_api::clean_returnvalue(
+            get_preview::execute_returns(),
+            get_preview::execute((int)$fx->module->cmid)
+        );
         $config = json_decode($result['launchjson'], true)['config'];
         $this->assertTrue($config['preview']);
         $this->assertSame(0, $config['attemptid']);

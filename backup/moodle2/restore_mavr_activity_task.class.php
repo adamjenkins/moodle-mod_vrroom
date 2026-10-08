@@ -30,7 +30,6 @@ require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_stepslib.php
  * Provides the steps to restore one MAVR activity.
  */
 class restore_mavr_activity_task extends restore_activity_task {
-
     /**
      * No specific settings for this activity.
      *

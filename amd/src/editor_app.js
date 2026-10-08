@@ -97,6 +97,8 @@ const usedAssetItemids = (doc) => {
  * Start the editor.
  *
  * @param {Object} options {cmid, rootid}
+ * @param {number} options.cmid Course module id.
+ * @param {string} options.rootid Id of the editor root element.
  */
 export const init = ({cmid, rootid}) => {
     const root = document.getElementById(rootid);
@@ -119,7 +121,7 @@ export const init = ({cmid, rootid}) => {
     }).catch((error) => {
         region(root, 'mavr-editor-status').textContent = '';
         Notification.exception(error);
-    }).then(() => pending.resolve(), () => pending.resolve());
+    }).finally(() => pending.resolve());
 };
 
 /**
@@ -274,36 +276,47 @@ const start = (root, cmid, response, strings) => {
         } else if (kind === 'media') {
             assetpromise = chooseAsset(media === 'video' ? 'video' : 'audio', ['media', 'assets'], trigger);
         }
+        const collection = INTERACTABLES.includes(kind) ? 'interactable' : kind;
+        // What the steps below learn, passed along the flat promise chain.
+        const state = {asset: null, doc: null, current: null, name: null};
         assetpromise.then((asset) => {
             if (['model', 'image', 'media'].includes(kind) && !asset) {
                 return null;
             }
-            const doc = model.getDocument();
-            const current = findScene(doc, scene.id);
-            const collection = INTERACTABLES.includes(kind) ? 'interactable' : kind;
-            const count = getCollection(clone(current), collection)
+            state.asset = asset;
+            state.doc = model.getDocument();
+            state.current = findScene(state.doc, scene.id);
+            const count = getCollection(clone(state.current), collection)
                 .filter((o) => collection !== 'interactable' || o.kind === kind).length;
-            return getString('editornewname', 'mod_mavr', {kind: strings[KINDLABELS[kind]], number: count + 1})
-                .then((name) => getString('editorchange_add', 'mod_mavr', name).then((label) => {
-                    const id = model.newId(PREFIXES[kind]);
-                    const p = view ? view.getPlacement() : roomCentre();
-                    const object = newObject(kind, id, name, p, {asset: asset, media: media === 'video' ? 'video' : 'audio',
-                        scene: current, doc: doc});
-                    if (!object) {
-                        return null;
-                    }
-                    model.transact(label, (draft) => {
-                        const target = findScene(draft, scene.id);
-                        if (!target) {
-                            return false;
-                        }
-                        getCollection(target, collection).push(object);
-                        return true;
-                    });
-                    model.select({scene: scene.id, kind: collection, id: id});
-                    announce(label);
-                    return null;
-                }));
+            return getString('editornewname', 'mod_mavr', {kind: strings[KINDLABELS[kind]], number: count + 1});
+        }).then((name) => {
+            if (name === null) {
+                return null;
+            }
+            state.name = name;
+            return getString('editorchange_add', 'mod_mavr', name);
+        }).then((label) => {
+            if (label === null) {
+                return null;
+            }
+            const id = model.newId(PREFIXES[kind]);
+            const p = view ? view.getPlacement() : roomCentre();
+            const object = newObject(kind, id, state.name, p, {asset: state.asset, media: media === 'video' ? 'video' : 'audio',
+                scene: state.current, doc: state.doc});
+            if (!object) {
+                return null;
+            }
+            model.transact(label, (draft) => {
+                const target = findScene(draft, scene.id);
+                if (!target) {
+                    return false;
+                }
+                getCollection(target, collection).push(object);
+                return true;
+            });
+            model.select({scene: scene.id, kind: collection, id: id});
+            announce(label);
+            return null;
         }).catch(Notification.exception);
     };
 
@@ -387,10 +400,15 @@ const start = (root, cmid, response, strings) => {
             return;
         }
         const number = (doc.scenes || []).length + 1;
+        let name = '';
+        let spawnname = '';
         Promise.all([
             getString('editornewscene', 'mod_mavr', number),
             getString('editornewname', 'mod_mavr', {kind: strings.editoraddspawn, number: 1}),
-        ]).then(([name, spawnname]) => getString('editorchange_add', 'mod_mavr', name).then((label) => {
+        ]).then((values) => {
+            [name, spawnname] = values;
+            return getString('editorchange_add', 'mod_mavr', name);
+        }).then((label) => {
             const sceneid = model.newSceneId();
             const spawn = preset.spawn || {position: [0, 0, 0], yaw: 0};
             const scene = {
@@ -413,7 +431,7 @@ const start = (root, cmid, response, strings) => {
             model.select({scene: sceneid, kind: 'environment', id: sceneid});
             announce(label);
             return null;
-        })).catch(Notification.exception);
+        }).catch(Notification.exception);
     };
 
     /**
@@ -480,7 +498,11 @@ const start = (root, cmid, response, strings) => {
         },
     };
 
-    /** Switch between the Room and Tasks tabs. */
+    /**
+     * Switch between the Room and Tasks tabs.
+     *
+     * @param {string} tab room or tasks.
+     */
     const showTab = (tab) => {
         const roomtab = tab !== 'tasks';
         region(root, 'mavr-editor-room').classList.toggle('d-none', !roomtab);
@@ -551,6 +573,8 @@ const start = (root, cmid, response, strings) => {
         const savepending = new Pending('mod_mavr/editor_app:save');
         saving = true;
         savebutton.disabled = true;
+        // The document being sent, once the checks have passed: a failure after that is a failed save.
+        let savedoc = null;
         checkLogic(doc).then((problem) => {
             if (problem) {
                 showTab('tasks');
@@ -566,31 +590,37 @@ const start = (root, cmid, response, strings) => {
                 graph: doc.graph,
                 bindings: doc.bindings,
             };
-            const savedoc = doc;
-            return Promise.resolve(Ajax.call([{methodname: 'mod_mavr_editor_save',
-                args: {cmid: cmid, documentjson: JSON.stringify(payload)}}])[0]).then((result) => {
-                // Only what was sent is stored; edits made while saving stay unsaved.
-                model.markSaved(result.revision, savedoc);
-                const used = usedAssetItemids(savedoc);
-                context.assets = context.assets.filter((a) => a.area !== 'assets' || used.has(Number(a.itemid)));
-                eversaved = true;
-                const text = model.isDirty() ? strings.editorunsaved : strings.editorsaved;
+            savedoc = doc;
+            return Ajax.call([{methodname: 'mod_mavr_editor_save',
+                args: {cmid: cmid, documentjson: JSON.stringify(payload)}}])[0];
+        }).then((result) => {
+            if (!result) {
+                return null;
+            }
+            // Only what was sent is stored; edits made while saving stay unsaved.
+            model.markSaved(result.revision, savedoc);
+            const used = usedAssetItemids(savedoc);
+            context.assets = context.assets.filter((a) => a.area !== 'assets' || used.has(Number(a.itemid)));
+            eversaved = true;
+            return model.isDirty() ? strings.editorunsaved : strings.editorsaved;
+        }).catch((error) => {
+            if (!savedoc) {
+                // The checks themselves failed: nothing was sent.
+                Notification.exception(error);
+                return null;
+            }
+            return getString('editorsavefailed', 'mod_mavr', plain(error && error.message));
+        }).then((text) => {
+            if (text) {
                 setStatus(text);
                 announce(text);
-                return null;
-            }).catch((error) => {
-                return getString('editorsavefailed', 'mod_mavr', plain(error && error.message)).then((text) => {
-                    setStatus(text);
-                    announce(text);
-                    return null;
-                });
-            });
-        }).catch(Notification.exception).then(() => {
+            }
+            return null;
+        }).catch(Notification.exception).finally(() => {
             saving = false;
             savebutton.disabled = false;
             updateToolbar();
             savepending.resolve();
-            return null;
         });
     };
 

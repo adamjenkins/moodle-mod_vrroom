@@ -145,8 +145,11 @@ final class bridge {
      * @param string $prefix The attempt's field prefix.
      * @return array[]|null The choices, or null when one of them cannot be shown as plain text.
      */
-    private static function multichoice_choices(\question_attempt $qa, \question_definition $question,
-            string $prefix): ?array {
+    private static function multichoice_choices(
+        \question_attempt $qa,
+        \question_definition $question,
+        string $prefix
+    ): ?array {
         $single = $question instanceof \qtype_multichoice_single_question;
         $multi = $question instanceof \qtype_multichoice_multi_question;
         if (!$single && !$multi) {
@@ -158,8 +161,14 @@ final class bridge {
                 return null;
             }
             $answer = $question->answers[$ansid];
-            $label = self::to_plain($question->format_text($answer->answer, $answer->answerformat, $qa,
-                'question', 'answer', $ansid), self::MAX_LABEL);
+            $label = self::to_plain($question->format_text(
+                $answer->answer,
+                $answer->answerformat,
+                $qa,
+                'question',
+                'answer',
+                $ansid
+            ), self::MAX_LABEL);
             if ($label === null) {
                 return null;
             }

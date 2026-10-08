@@ -101,7 +101,8 @@ export const slerp = (qa, qb, t) => {
  * @param {*} value
  * @returns {boolean}
  */
-const isPose = (value) => Array.isArray(value) && value.length === 7 && value.every((v) => typeof v === 'number' && Number.isFinite(v));
+const isPose = (value) => Array.isArray(value) && value.length === 7
+    && value.every((v) => typeof v === 'number' && Number.isFinite(v));
 
 /**
  * Interpolate between two poses.

@@ -32,7 +32,6 @@ use mod_mavr\local\instance_manager;
 #[\PHPUnit\Framework\Attributes\CoversClass(get_question::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(submit_question::class)]
 final class question_services_test extends \advanced_testcase {
-
     /**
      * Course, gallery with a true/false question at station "Vase", a started attempt.
      *
@@ -84,9 +83,14 @@ final class question_services_test extends \advanced_testcase {
      * @return void
      */
     private function visit(\stdClass $fx): void {
-        event_store::insert((int)$fx->attempt->id, \core\uuid::generate(),
+        event_store::insert(
+            (int)$fx->attempt->id,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $fx->vase, 'scene' => $fx->sceneid, 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
     }
 
     /**
@@ -133,8 +137,10 @@ final class question_services_test extends \advanced_testcase {
         $this->assert_error('errorinvalidslot', fn() => get_question::execute($attemptid, 0));
 
         $this->visit($fx);
-        $result = external_api::clean_returnvalue(get_question::execute_returns(),
-            get_question::execute($attemptid, $fx->slot));
+        $result = external_api::clean_returnvalue(
+            get_question::execute_returns(),
+            get_question::execute($attemptid, $fx->slot)
+        );
         $this->assertSame($fx->slot, $result['slot']);
         $this->assertFalse($result['answered']);
         $this->assertStringContainsString('q' . $fx->attempt->uniqueid . ':', $result['html']);
@@ -151,21 +157,27 @@ final class question_services_test extends \advanced_testcase {
         $fx = $this->setup_attempt();
         $attemptid = (int)$fx->attempt->id;
 
-        $this->assert_error('errorquestionlocked',
-            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1')));
+        $this->assert_error(
+            'errorquestionlocked',
+            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
         $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
 
         $this->visit($fx);
 
         // No answer: not graded, nothing recorded.
-        $result = external_api::clean_returnvalue(submit_question::execute_returns(),
-            submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '')));
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($attemptid, $fx->slot, $this->responses($fx, ''))
+        );
         $this->assertNull($result['fraction'] ?? null);
         $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
 
-        $result = external_api::clean_returnvalue(submit_question::execute_returns(),
-            submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1')));
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
         $this->assertSame('gradedright', $result['status']);
         $this->assertEqualsWithDelta(1.0, $result['fraction'], 1e-6);
         $this->assertEqualsWithDelta(2.0, $result['state']['earnedpoints'], 1e-6);
@@ -179,8 +191,10 @@ final class question_services_test extends \advanced_testcase {
         $this->assertSame((string)$fx->slot, $row->objectid);
         $this->assertEqualsWithDelta(1.0, json_decode($row->resultjson, true)['fraction'], 1e-6);
 
-        $this->assert_error('errorquestionanswered',
-            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '0')));
+        $this->assert_error(
+            'errorquestionanswered',
+            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '0'))
+        );
         $this->assertCount(1, $DB->get_records('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
 
         // The answered question renders with feedback.
@@ -201,13 +215,17 @@ final class question_services_test extends \advanced_testcase {
         $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
         $this->setUser($other);
         $this->assert_error('errornotyourattempt', fn() => get_question::execute($attemptid, $fx->slot));
-        $this->assert_error('errornotyourattempt',
-            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1')));
+        $this->assert_error(
+            'errornotyourattempt',
+            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
 
         $this->setUser($fx->student);
         finish_attempt::execute($attemptid);
         $this->assert_error('errorattemptclosed', fn() => get_question::execute($attemptid, $fx->slot));
-        $this->assert_error('errorattemptclosed',
-            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1')));
+        $this->assert_error(
+            'errorattemptclosed',
+            fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
     }
 }

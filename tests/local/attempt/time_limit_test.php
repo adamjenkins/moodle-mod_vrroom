@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 namespace mod_mavr\local\attempt;
 
 use core_external\external_api;
@@ -37,7 +36,6 @@ use mod_mavr\task\finish_overdue_attempts;
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_mavr\external\helper::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(finish_attempt::class)]
 final class time_limit_test extends \advanced_testcase {
-
     /** @var int The time limit of the escape fixture, in seconds. */
     private const LIMIT = 900;
 
@@ -216,8 +214,10 @@ final class time_limit_test extends \advanced_testcase {
         $deadline = $this->make_overdue($attempt);
         $this->setUser($fx->student);
 
-        $state = external_api::clean_returnvalue(get_attempt_state::execute_returns(),
-            get_attempt_state::execute((int)$attempt->id));
+        $state = external_api::clean_returnvalue(
+            get_attempt_state::execute_returns(),
+            get_attempt_state::execute((int)$attempt->id)
+        );
         $this->assertSame(attempt_manager::STATE_FINISHED, $state['state']);
         $this->assertSame($deadline, $state['timedue']);
         $this->assertArrayHasKey('servertime', $state);
@@ -235,8 +235,10 @@ final class time_limit_test extends \advanced_testcase {
         $deadline = $this->make_overdue($attempt);
         $this->setUser($fx->student);
 
-        $result = external_api::clean_returnvalue(finish_attempt::execute_returns(),
-            finish_attempt::execute((int)$attempt->id));
+        $result = external_api::clean_returnvalue(
+            finish_attempt::execute_returns(),
+            finish_attempt::execute((int)$attempt->id)
+        );
         $this->assertSame((int)$attempt->id, $result['attemptid']);
         $this->assertSame(attempt_manager::STATE_FINISHED, $result['state']);
         $this->assertEquals($deadline, attempt_manager::get_attempt((int)$attempt->id)->timefinish);

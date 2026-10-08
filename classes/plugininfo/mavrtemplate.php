@@ -44,11 +44,4 @@ class mavrtemplate extends base {
     public static function plugintype_supports_disabling(): bool {
         return false;
     }
-
-    /**
-     * Pre-uninstall hook.
-     */
-    public function uninstall_cleanup() {
-        parent::uninstall_cleanup();
-    }
 }

@@ -87,8 +87,10 @@ final class chooser_test extends \advanced_testcase {
             $item = $items[$position];
             $this->assertSame($position + 1, $item->get_id());
             $this->assertSame('mavr_' . $name, $item->get_name());
-            $this->assertSame(get_string('choosertitle', 'mod_mavr', $template->get_display_name()),
-                $item->get_title()->get_value());
+            $this->assertSame(
+                get_string('choosertitle', 'mod_mavr', $template->get_display_name()),
+                $item->get_title()->get_value()
+            );
             $this->assertSame(get_string('chooserhelp', 'mavrtemplate_' . $name), $item->get_help());
 
             $link = $item->get_link();
@@ -106,16 +108,27 @@ final class chooser_test extends \advanced_testcase {
             $this->assertSame('Default summary', $item->get_summary());
             $position++;
         }
-        $this->assertSame(['mavr_blank', 'mavr_escape', 'mavr_gallery'],
-            array_slice(array_map(fn (content_item $item) => $item->get_name(), $items), 0, 3));
+        $this->assertSame(
+            ['mavr_blank', 'mavr_escape', 'mavr_gallery'],
+            array_slice(array_map(fn (content_item $item) => $item->get_name(), $items), 0, 3)
+        );
     }
 
     /**
      * Without a course scope the default link is kept and gains the template parameter.
      */
     public function test_content_items_without_course(): void {
-        $default = new content_item(1, 'mavr', new string_title('MAVR'), new \moodle_url(''), '', 'Help',
-            MOD_ARCHETYPE_OTHER, 'mod_mavr', MOD_PURPOSE_INTERACTIVECONTENT);
+        $default = new content_item(
+            1,
+            'mavr',
+            new string_title('MAVR'),
+            new \moodle_url(''),
+            '',
+            'Help',
+            MOD_ARCHETYPE_OTHER,
+            'mod_mavr',
+            MOD_PURPOSE_INTERACTIVECONTENT
+        );
         foreach (chooser::content_items($default) as $item) {
             $this->assertNotNull($item->get_link()->param('template'));
             $this->assertNull($item->get_link()->param('add'));
@@ -161,6 +174,7 @@ final class chooser_test extends \advanced_testcase {
         require_once($CFG->dirroot . '/mod/mavr/mod_form.php');
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
+        $PAGE->set_url('/course/modedit.php', ['add' => 'mavr', 'course' => $course->id, 'section' => 0]);
         [, , $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'mavr', 0);
         $form = new \mod_mavr_mod_form($data, $cw->section, $cm, $course);
         $form->set_data($data);

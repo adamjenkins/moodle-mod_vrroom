@@ -156,8 +156,10 @@ final class lib_test extends \advanced_testcase {
         ]);
         $context = \context_module::instance($mavr->cmid);
         $this->assertEquals(1, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
-        $this->assertEquals(1, $DB->count_records('question_references',
-            ['component' => 'mod_mavr', 'usingcontextid' => $context->id]));
+        $this->assertEquals(1, $DB->count_records(
+            'question_references',
+            ['component' => 'mod_mavr', 'usingcontextid' => $context->id]
+        ));
 
         $student = $generator->create_and_enrol($course, 'student');
         $mavrgenerator = $generator->get_plugin_generator('mod_mavr');
@@ -219,8 +221,10 @@ final class lib_test extends \advanced_testcase {
         $this->assertArrayNotHasKey('customcompletionrules', (array)$info->customdata);
 
         $cm = get_fast_modinfo($course)->get_cm($mavr->cmid);
-        $this->assertSame([get_string('completiondetail:objectives', 'mavr')],
-            mod_mavr_get_completion_active_rule_descriptions($cm));
+        $this->assertSame(
+            [get_string('completiondetail:objectives', 'mavr')],
+            mod_mavr_get_completion_active_rule_descriptions($cm)
+        );
     }
 
     /**
@@ -232,7 +236,7 @@ final class lib_test extends \advanced_testcase {
         $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id]);
         $cm = get_coursemodule_from_instance('mavr', $mavr->id);
         $areas = mavr_get_file_areas($course, $cm, \context_module::instance($cm->id));
-        $this->assertSame(['models', 'media', 'environment'], array_keys($areas));
+        $this->assertSame(['models', 'media', 'environment', 'assets'], array_keys($areas));
     }
 
     /**

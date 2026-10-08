@@ -33,7 +33,6 @@ use mod_mavr\local\instance_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(bridge::class)]
 final class bridge_test extends \advanced_testcase {
-
     /**
      * A gallery with one station per question, a started attempt with every station visited.
      *
@@ -85,9 +84,14 @@ final class bridge_test extends \advanced_testcase {
 
         $scene = instance_manager::get_scenes((int)$module->id)[0];
         foreach ($scene['zones'] as $zone) {
-            event_store::insert((int)$attempt->id, \core\uuid::generate(),
+            event_store::insert(
+                (int)$attempt->id,
+                \core\uuid::generate(),
                 ['verb' => 'entered', 'type' => 'zone', 'id' => $zone['id'], 'scene' => $scene['id'], 'fraction' => null],
-                true, null, time());
+                true,
+                null,
+                time()
+            );
         }
 
         return (object) [
@@ -239,7 +243,10 @@ final class bridge_test extends \advanced_testcase {
         $view = bridge::get_view($fx->attempt, $fx->slots['truefalse'], $fx->context, false);
         $true = $view['choices'][0];
         $result = external_api::clean_returnvalue(submit_question::execute_returns(), submit_question::execute(
-            $attemptid, $fx->slots['truefalse'], [['name' => $true['name'], 'value' => $true['value']]]));
+            $attemptid,
+            $fx->slots['truefalse'],
+            [['name' => $true['name'], 'value' => $true['value']]]
+        ));
         $this->assertSame('gradedright', $result['status']);
         $this->assertEqualsWithDelta(1.0, $result['fraction'], 1e-6);
 
@@ -253,7 +260,10 @@ final class bridge_test extends \advanced_testcase {
         }
         $this->assertNotNull($one);
         $result = external_api::clean_returnvalue(submit_question::execute_returns(), submit_question::execute(
-            $attemptid, $fx->slots['single'], [['name' => $one['name'], 'value' => $one['value']]]));
+            $attemptid,
+            $fx->slots['single'],
+            [['name' => $one['name'], 'value' => $one['value']]]
+        ));
         $this->assertSame('gradedright', $result['status']);
 
         // Multiple answers: "One" and "Three" are right.
@@ -266,7 +276,10 @@ final class bridge_test extends \advanced_testcase {
         }
         $this->assertCount(2, $responses);
         $result = external_api::clean_returnvalue(submit_question::execute_returns(), submit_question::execute(
-            $attemptid, $fx->slots['multi'], $responses));
+            $attemptid,
+            $fx->slots['multi'],
+            $responses
+        ));
         $this->assertSame('gradedright', $result['status']);
         $this->assertEqualsWithDelta(1.0, $result['fraction'], 1e-6);
 
@@ -292,10 +305,12 @@ final class bridge_test extends \advanced_testcase {
         $this->assertSame('abcd…', bridge::to_plain('<p>abcdefghij</p>', 5));
         $this->assertSame(5, \core_text::strlen(bridge::to_plain('<p>abcdefghij</p>', 5)));
 
-        foreach (['<img src="a.png" alt="">', '<video src="a.mp4"></video>', '<audio src="a.mp3"></audio>',
+        foreach (
+            ['<img src="a.png" alt="">', '<video src="a.mp4"></video>', '<audio src="a.mp3"></audio>',
                 '<iframe src="https://example.com"></iframe>', '<object data="a"></object>', '<embed src="a">',
                 '<svg></svg>', '<math><mi>x</mi></math>', '<canvas></canvas>', 'Solve $$x^2$$',
-                'Solve \\(x^2\\)', 'Solve \\[x^2\\]', 'Solve [tex]x^2[/tex]'] as $html) {
+                'Solve \\(x^2\\)', 'Solve \\[x^2\\]', 'Solve [tex]x^2[/tex]'] as $html
+        ) {
             $this->assertNull(bridge::to_plain('<p>' . $html . '</p>', 100), $html);
         }
     }

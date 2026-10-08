@@ -29,7 +29,6 @@ use mod_mavr\local\questions\slots;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(editor_manager::class)]
 final class editor_manager_test extends \advanced_testcase {
-
     /**
      * A course with a two-station gallery, as the admin.
      *
@@ -120,8 +119,13 @@ final class editor_manager_test extends \advanced_testcase {
      * @param string $component component
      * @return \stored_file
      */
-    private static function store_file(\context $context, string $area, int $itemid, string $filename,
-            string $component = 'mod_mavr'): \stored_file {
+    private static function store_file(
+        \context $context,
+        string $area,
+        int $itemid,
+        string $filename,
+        string $component = 'mod_mavr'
+    ): \stored_file {
         return get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
             'component' => $component,

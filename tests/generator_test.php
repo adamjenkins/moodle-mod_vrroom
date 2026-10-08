@@ -27,7 +27,6 @@ use mod_mavr\local\instance_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(\mod_mavr_generator::class)]
 final class generator_test extends \advanced_testcase {
-
     /**
      * The default activity has two text-only stations and a compiled scene and graph.
      */
@@ -67,8 +66,10 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
 
-        $mavr = $this->getDataGenerator()->create_module('mavr',
-            ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4]);
+        $mavr = $this->getDataGenerator()->create_module(
+            'mavr',
+            ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4]
+        );
 
         $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
         $this->assertEquals(1, $record->livemode);
@@ -147,7 +148,7 @@ final class generator_test extends \advanced_testcase {
         $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
         $this->assertEquals(1, $attempt->attempt);
         $this->assertSame('inprogress', $attempt->state);
-        $this->assertSame($attempt->id, $mavrgen->create_attempt((int)$mavr->id, (int)$student->id)->id);
+        $this->assertSame((int)$attempt->id, (int)$mavrgen->create_attempt((int)$mavr->id, (int)$student->id)->id);
 
         $scene = instance_manager::get_scenes((int)$mavr->id)[0];
         $zoneid = $scene['zones'][0]['id'];
@@ -159,8 +160,10 @@ final class generator_test extends \advanced_testcase {
         $row = $DB->get_record('mavr_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
         $this->assertEquals(1, $row->requireddone);
         $this->assertEqualsWithDelta(1.0, (float)$row->score, 1e-6);
-        $this->assertTrue($DB->record_exists('mavr_events',
-            ['attemptid' => $attempt->id, 'verb' => 'completed', 'objecttype' => 'objective']));
+        $this->assertTrue($DB->record_exists(
+            'mavr_events',
+            ['attemptid' => $attempt->id, 'verb' => 'completed', 'objecttype' => 'objective']
+        ));
     }
 
     /**

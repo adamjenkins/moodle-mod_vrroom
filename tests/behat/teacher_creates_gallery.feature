@@ -26,11 +26,14 @@ Feature: A teacher builds a gallery walk with the form
 
   Scenario: Create a gallery walk with two stations and one question
     Given I log in as "teacher1"
-    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1" and I fill the form with:
-      | Name                | Museum walk |
-      | gallery_title[0]    | Vase        |
-      | gallery_title[1]    | Portrait    |
-      | gallery_question[0] | Q1          |
+    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1"
+    And I set the following fields to these values:
+      | Name             | Museum walk |
+      | gallery_title[0] | Vase        |
+      | gallery_title[1] | Portrait    |
+    # The question picker is an autocomplete: its named select is hidden, so set it by label.
+    And I set the field "Question" in the "#fitem_id_gallery_question_0" "css_element" to "Q1"
+    And I press "Save and return to course"
     Then I should see "Museum walk"
     And I am on the "Museum walk" "mavr activity" page
     And I should see "Preview the list view"

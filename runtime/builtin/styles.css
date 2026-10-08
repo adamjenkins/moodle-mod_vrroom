@@ -7,7 +7,8 @@
 .mavr-stage {
     position: relative;
     width: 100%;
-    height: min(75vh, 720px);
+    height: 75vh;
+    max-height: 720px;
     min-height: 320px;
     overflow: hidden;
     background-color: #20242a;
@@ -91,7 +92,8 @@
     position: absolute;
     top: 3rem;
     right: 0.5rem;
-    width: min(420px, calc(100% - 1rem));
+    width: calc(100% - 1rem);
+    max-width: 420px;
     max-height: calc(100% - 3.5rem);
     overflow-y: auto;
 }
@@ -116,11 +118,25 @@
 }
 
 .mavr-question-form .que {
+    flex-direction: column;
+    gap: 0.25rem;
     margin-bottom: 0.5rem;
 }
 
+/* Keep only the question state (e.g. "Correct") from core's info box. */
 .mavr-question-form .que .info {
+    width: auto;
+    padding: 0;
+    background-color: transparent;
+    border: 0;
+}
+
+.mavr-question-form .que .info > :not(.state) {
     display: none;
+}
+
+.mavr-question-form .que .info .state {
+    font-weight: bold;
 }
 
 .mavr-xr-status {
@@ -137,11 +153,17 @@
     position: absolute;
     right: 0.5rem;
     bottom: 0.5rem;
-    max-width: min(360px, calc(100% - 1rem));
+    max-width: 360px;
     margin: 0;
     padding: 0.25rem 0.5rem;
     background-color: rgba(255, 255, 255, 0.85);
     border-radius: 0.25rem;
+}
+
+@media (max-width: 400px) {
+    .mavr-xr-note {
+        max-width: calc(100% - 1rem);
+    }
 }
 
 /* AR with a DOM overlay: the camera image shows through the stage. */

@@ -237,6 +237,15 @@ class LiveController extends Emitter {
             return Promise.resolve();
         }
         const pending = new Pending('mavrruntime_builtin/live/controller:render');
+        const handlers = {
+            join: () => this.join().catch(Notification.exception),
+            leave: () => this.leave().catch(Notification.exception),
+            mic: () => this.toggleMic(),
+            mute: () => this.toggleMute(),
+            ptt: (on) => this.setPushToTalk(on),
+            talk: (on) => this.talk(on),
+            mutepeer: (peerid) => this.toggleMutePeer(peerid),
+        };
         return getStrings(STRINGS.map((key) => ({key: key, component: 'mavrruntime_builtin'}))).then((values) => {
             STRINGS.forEach((key, i) => {
                 this.strings[key] = values[i];
@@ -246,15 +255,7 @@ class LiveController extends Emitter {
                 live: this.liveconfig,
                 secure: this.voice.canSend(),
                 str: (key, a) => this.str(key, a),
-                handlers: {
-                    join: () => this.join().catch(Notification.exception),
-                    leave: () => this.leave().catch(Notification.exception),
-                    mic: () => this.toggleMic(),
-                    mute: () => this.toggleMute(),
-                    ptt: (on) => this.setPushToTalk(on),
-                    talk: (on) => this.talk(on),
-                    mutepeer: (peerid) => this.toggleMutePeer(peerid),
-                },
+                handlers: handlers,
             });
             return this.panel.render();
         }).then(() => {
@@ -306,23 +307,7 @@ class LiveController extends Emitter {
             }
             const transport = factory(liveconfig, {});
             this.bind(transport);
-            return Promise.resolve().then(() => transport.join()).then((result) => {
-                if (this.transport !== transport) {
-                    return undefined;
-                }
-                if (result && result.self) {
-                    this.names.set(result.self.peerid, String(result.self.name || ''));
-                }
-                this.onJoined();
-                return undefined;
-            }).catch((error) => {
-                if (this.transport !== transport) {
-                    return undefined;
-                }
-                const code = error && error.errorcode ? String(error.errorcode) : '';
-                this.onFailed(ERRORCODES[code] || 'error');
-                return undefined;
-            });
+            return this.joinTransport(transport);
         }).catch((error) => {
             // The transport could not be created.
             giveUp();
@@ -330,6 +315,32 @@ class LiveController extends Emitter {
             return undefined;
         }).then(() => {
             pending.resolve();
+            return undefined;
+        });
+    }
+
+    /**
+     * Join through a bound transport; a join failure is shown, not thrown.
+     *
+     * @param {Object} transport The transport (already bound).
+     * @returns {Promise}
+     */
+    joinTransport(transport) {
+        return Promise.resolve().then(() => transport.join()).then((result) => {
+            if (this.transport !== transport) {
+                return undefined;
+            }
+            if (result && result.self) {
+                this.names.set(result.self.peerid, String(result.self.name || ''));
+            }
+            this.onJoined();
+            return undefined;
+        }).catch((error) => {
+            if (this.transport !== transport) {
+                return undefined;
+            }
+            const code = error && error.errorcode ? String(error.errorcode) : '';
+            this.onFailed(ERRORCODES[code] || 'error');
             return undefined;
         });
     }
@@ -804,10 +815,9 @@ class LiveController extends Emitter {
             if (this.panel) {
                 this.panel.setStatus(this.str('livemicdenied'));
             }
-        }).then(() => {
+        }).finally(() => {
             this.updateVoiceControls();
             pending.resolve();
-            return undefined;
         });
     }
 
@@ -988,16 +998,16 @@ class LiveController extends Emitter {
             this.refreshtimer = null;
             const pending = this.refreshpending;
             this.refreshpending = null;
-            const done = () => {
+            const release = () => {
                 if (pending) {
                     pending.resolve();
                 }
             };
             if (!this.panel || !this.joined) {
-                done();
+                release();
                 return;
             }
-            this.panel.setParticipants(this.participants()).catch(Notification.exception).then(done, done);
+            this.panel.setParticipants(this.participants()).catch(Notification.exception).finally(release);
         }, 100);
     }
 

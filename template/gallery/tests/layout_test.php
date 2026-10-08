@@ -148,7 +148,7 @@ final class layout_test extends \advanced_testcase {
         $this->assertSame(-90.0, layout::normalise_yaw(270));
         $this->assertSame(0.0, layout::normalise_yaw(-360));
         $this->assertSame(45.0, layout::normalise_yaw(45));
-        $this->assertSame('0.0', json_encode(layout::round3(-0.0001)));
+        $this->assertSame('0.0', json_encode(layout::round3(-0.0001), JSON_PRESERVE_ZERO_FRACTION));
         $this->assertSame(6.364, layout::round3(6.36396));
     }
 }

@@ -28,7 +28,6 @@ use mod_mavr\local\attempt\attempt_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(reset::class)]
 final class reset_test extends \advanced_testcase {
-
     /**
      * A course with one gallery walk and a student who finished an attempt with a grade.
      *

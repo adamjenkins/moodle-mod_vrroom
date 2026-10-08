@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 namespace mod_mavr\task;
 
 use mod_mavr\local\attempt\attempt_manager;
@@ -31,7 +30,6 @@ use mod_mavr\local\attempt\attempt_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class finish_overdue_attempts extends \core\task\scheduled_task {
-
     /** @var int Most attempts finished in one run; the rest wait for the next run. */
     public const BATCH = 500;
 
@@ -53,10 +51,15 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
         global $DB;
         $now = time();
         $cutoff = $now - attempt_manager::DEADLINE_GRACE;
-        $rows = $DB->get_records_select('mavr_attempts',
+        $rows = $DB->get_records_select(
+            'mavr_attempts',
             'state = :state AND timedue > 0 AND timedue < :cutoff',
             ['state' => attempt_manager::STATE_INPROGRESS, 'cutoff' => $cutoff],
-            'timedue ASC, id ASC', 'id', 0, self::BATCH);
+            'timedue ASC, id ASC',
+            'id',
+            0,
+            self::BATCH
+        );
 
         $finished = 0;
         foreach ($rows as $row) {

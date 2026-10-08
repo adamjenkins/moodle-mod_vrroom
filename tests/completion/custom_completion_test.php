@@ -30,7 +30,6 @@ use mod_mavr\local\instance_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(custom_completion::class)]
 final class custom_completion_test extends \advanced_testcase {
-
     /**
      * The rule is incomplete until a finished attempt completed every required objective.
      *
@@ -61,8 +60,10 @@ final class custom_completion_test extends \advanced_testcase {
         $completion = new custom_completion($cm, (int)$student->id);
         $this->assertSame(['completionobjectives'], custom_completion::get_defined_custom_rules());
         $this->assertArrayHasKey('completionobjectives', $completion->get_custom_rule_descriptions());
-        $this->assertSame(['completionview', 'completionobjectives', 'completionusegrade', 'completionpassgrade'],
-            $completion->get_sort_order());
+        $this->assertSame(
+            ['completionview', 'completionobjectives', 'completionusegrade', 'completionpassgrade'],
+            $completion->get_sort_order()
+        );
         $this->assertSame(COMPLETION_INCOMPLETE, $completion->get_state('completionobjectives'));
 
         // A finished attempt that missed the required station does not complete the rule.
@@ -79,9 +80,14 @@ final class custom_completion_test extends \advanced_testcase {
             }
         }
         [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
-        event_store::insert((int)$attempt->id, \core\uuid::generate(),
+        event_store::insert(
+            (int)$attempt->id,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $vase, 'scene' => $scene['id'], 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
         attempt_manager::recompute($attempt);
         $this->assertSame(COMPLETION_INCOMPLETE, $completion->get_state('completionobjectives'));
 

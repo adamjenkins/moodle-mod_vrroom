@@ -26,7 +26,6 @@ namespace mod_mavr\local\xapi;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(iri::class)]
 final class iri_test extends \advanced_testcase {
-
     /**
      * Objects for the round trip.
      *
@@ -55,8 +54,13 @@ final class iri_test extends \advanced_testcase {
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('objects_provider')]
-    public function test_round_trip(string $type, ?string $sceneid, ?string $id, ?string $expectscene,
-            ?string $expectid): void {
+    public function test_round_trip(
+        string $type,
+        ?string $sceneid,
+        ?string $id,
+        ?string $expectscene,
+        ?string $expectid
+    ): void {
         global $CFG;
         $this->resetAfterTest();
         $built = iri::for_object(12, $type, $sceneid, $id);

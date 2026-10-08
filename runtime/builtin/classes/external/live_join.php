@@ -56,8 +56,10 @@ class live_join extends external_api {
      */
     public static function execute(int $cmid, int $attemptid = 0, int $groupid = 0): array {
         global $USER;
-        $params = self::validate_parameters(self::execute_parameters(),
-            ['cmid' => $cmid, 'attemptid' => $attemptid, 'groupid' => $groupid]);
+        $params = self::validate_parameters(
+            self::execute_parameters(),
+            ['cmid' => $cmid, 'attemptid' => $attemptid, 'groupid' => $groupid]
+        );
 
         [$cm, $context, $mavr] = access::load_by_cmid((int)$params['cmid']);
         self::validate_context($context);

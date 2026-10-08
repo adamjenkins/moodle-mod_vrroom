@@ -40,7 +40,6 @@ use mod_mavr\local\questions\usage;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class submit_question extends external_api {
-
     /**
      * Parameters.
      *
@@ -70,8 +69,10 @@ class submit_question extends external_api {
      */
     public static function execute(int $attemptid, int $slot, array $responses): array {
         global $USER;
-        $params = self::validate_parameters(self::execute_parameters(),
-            ['attemptid' => $attemptid, 'slot' => $slot, 'responses' => $responses]);
+        $params = self::validate_parameters(
+            self::execute_parameters(),
+            ['attemptid' => $attemptid, 'slot' => $slot, 'responses' => $responses]
+        );
         $attemptid = $params['attemptid'];
         $slot = $params['slot'];
         $responses = $params['responses'];
@@ -103,16 +104,24 @@ class submit_question extends external_api {
             $retry = false;
             $passfraction = $objective['pass_fraction'] ?? null;
             $objectivestatus = (string)($result->objectives[(string)$objective['id']]['status'] ?? '');
-            if ((is_int($passfraction) || is_float($passfraction))
+            if (
+                (is_int($passfraction) || is_float($passfraction))
                     && max(0.0, min(1.0, (float)($fraction ?? 0.0))) < (float)$passfraction - 1e-9
-                    && $objectivestatus === evaluator::OBJECTIVE_AVAILABLE) {
+                    && $objectivestatus === evaluator::OBJECTIVE_AVAILABLE
+            ) {
                 // Not good enough: keep the graded try and start a fresh one in the same slot.
                 usage::restart($attempt, $slot, time());
                 $retry = true;
             }
             $events = event_store::get_events((int)$attempt->id);
-            $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state,
-                (int)$attempt->graphversion, $result, count($events), (int)($attempt->timedue ?? 0));
+            $state = attempt_manager::build_state(
+                (int)$attempt->id,
+                (string)$attempt->state,
+                (int)$attempt->graphversion,
+                $result,
+                count($events),
+                (int)($attempt->timedue ?? 0)
+            );
             return [
                 'slot' => $slot,
                 'status' => (string)$outcome['status'],
@@ -127,8 +136,14 @@ class submit_question extends external_api {
         // Not graded (empty or invalid response): the engine's own message is in the HTML.
         [$html, $javascript] = usage::render($attempt, $slot, false);
         $events = event_store::get_events((int)$attempt->id);
-        $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state,
-            (int)$attempt->graphversion, $result, count($events), (int)($attempt->timedue ?? 0));
+        $state = attempt_manager::build_state(
+            (int)$attempt->id,
+            (string)$attempt->state,
+            (int)$attempt->graphversion,
+            $result,
+            count($events),
+            (int)($attempt->timedue ?? 0)
+        );
         return [
             'slot' => $slot,
             'status' => (string)$outcome['status'],
@@ -153,8 +168,12 @@ class submit_question extends external_api {
             'html' => new external_value(PARAM_RAW, 'Question HTML'),
             'javascript' => new external_value(PARAM_RAW, 'JavaScript the question needs'),
             'state' => helper::attempt_state_structure(),
-            'retry' => new external_value(PARAM_BOOL, 'Whether the answer fell short and the question was restarted',
-                VALUE_DEFAULT, false),
+            'retry' => new external_value(
+                PARAM_BOOL,
+                'Whether the answer fell short and the question was restarted',
+                VALUE_DEFAULT,
+                false
+            ),
         ]);
     }
 }

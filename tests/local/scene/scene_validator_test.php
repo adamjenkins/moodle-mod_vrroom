@@ -72,7 +72,8 @@ final class scene_validator_test extends \advanced_testcase {
      "rotation": [0, 0, 0], "text": "Welcome", "width": 2.0}
   ]
 }
-JSON, true, 512, JSON_THROW_ON_ERROR);
+JSON
+, true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -267,13 +268,17 @@ JSON, true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame([], scene_validator::validate_set([$first, $second]));
 
         $this->assertSame(['an activity needs between 1 and 20 rooms'], scene_validator::validate_set([]));
-        $this->assertSame(['an activity needs between 1 and 20 rooms'],
-            scene_validator::validate_set(array_fill(0, scene_validator::MAX_SCENES + 1, $second)));
+        $this->assertSame(
+            ['an activity needs between 1 and 20 rooms'],
+            scene_validator::validate_set(array_fill(0, scene_validator::MAX_SCENES + 1, $second))
+        );
 
         // The portal's room is missing.
         $errors = scene_validator::validate_set([$first]);
-        $this->assertSame(['scenes[0].interactables[4].target does not name a start point of a room of this activity'],
-            $errors);
+        $this->assertSame(
+            ['scenes[0].interactables[4].target does not name a start point of a room of this activity'],
+            $errors
+        );
 
         // A room's own errors carry its index.
         $broken = $second;

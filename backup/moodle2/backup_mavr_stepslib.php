@@ -31,7 +31,6 @@
  * name: mavr_slots.slot as slotnumber and mavr_attempts.attempt as attemptnum (as mod_quiz).
  */
 class backup_mavr_activity_structure_step extends backup_questions_activity_structure_step {
-
     /**
      * Build the element tree.
      *

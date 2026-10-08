@@ -455,16 +455,17 @@ class Run {
         do {
             changed = false;
             const earnedPoints = this.earnedPoints();
-            this.objectives.forEach((objective, pos) => {
+            for (let pos = 0; pos < this.objectives.length; pos++) {
+                const objective = this.objectives[pos];
                 if (this.status[pos] !== OBJECTIVE.LOCKED || !this.conditionsMet(objective, earnedPoints)) {
-                    return;
+                    continue;
                 }
                 this.status[pos] = OBJECTIVE.AVAILABLE;
                 changed = true;
                 if (triggers) {
                     this.queue.push({on: 'objective_unlocked', objective: objective.id});
                 }
-            });
+            }
         } while (changed);
     }
 
@@ -550,10 +551,10 @@ class Run {
                 break;
             case 'teleport':
             case 'play_media':
-                this.effects.push({event: i, rule: ruleId, do: what, target: str(action.target)});
+                this.effects.push({event: i, rule: ruleId, 'do': what, target: str(action.target)});
                 break;
             case 'open_question':
-                this.effects.push({event: i, rule: ruleId, do: what, target: slotString(action.slot)});
+                this.effects.push({event: i, rule: ruleId, 'do': what, target: slotString(action.slot)});
                 break;
         }
     }
@@ -586,7 +587,12 @@ class Run {
             score = round5(done / total);
         }
         const hidden = Array.from(this.hidden);
-        hidden.sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)));
+        hidden.sort((a, b) => {
+            if (a === b) {
+                return 0;
+            }
+            return a < b ? -1 : 1;
+        });
         return {
             eventstatus: this.eventStatus.slice(),
             objectives,
@@ -873,6 +879,138 @@ const findCycles = (node, after, state, errors) => {
 };
 
 /**
+ * Pass 1 checks of one objective's id, type, title, points, required flag and unlock block.
+ *
+ * @param {Object} objective the objective
+ * @param {string} where error prefix, e.g. "objectives[0]"
+ * @param {Map} types objective id => type, filled here
+ * @param {string[]} errors collected errors
+ */
+const validateObjectiveFields = (objective, where, types, errors) => {
+    const id = objective.id;
+    if (!isId(id)) {
+        errors.push(`${where}.id is not a valid id`);
+    } else if (DIGITS_PATTERN.test(id)) {
+        // An all-digit id would turn the objectives map into a JSON list in PHP.
+        errors.push(`${where}.id must not be all digits`);
+    } else if (types.has(id)) {
+        errors.push(`duplicate objective id "${id}"`);
+    } else {
+        types.set(id, typeof objective.type === 'string' ? objective.type : '');
+    }
+    const type = objective.type;
+    if (typeof type !== 'string' || !OBJECTIVE_TYPES.includes(type)) {
+        errors.push(`${where}.type is unknown`);
+    }
+    if (typeof objective.title !== 'string') {
+        errors.push(`${where}.title must be a string`);
+    }
+    if (has(objective, 'points') && (!isFiniteNumber(objective.points) || objective.points < 0)) {
+        errors.push(`${where}.points must be a number >= 0`);
+    }
+    if (has(objective, 'required') && typeof objective.required !== 'boolean') {
+        errors.push(`${where}.required must be true or false`);
+    }
+    if (has(objective, 'unlock')) {
+        validateUnlock(objective.unlock, where, errors);
+    }
+};
+
+/**
+ * Pass 1 checks of an objective's unlock block.
+ *
+ * @param {*} unlock the unlock value
+ * @param {string} where error prefix
+ * @param {string[]} errors collected errors
+ */
+const validateUnlock = (unlock, where, errors) => {
+    if (!isObject(unlock)) {
+        errors.push(`${where}.unlock must be an object`);
+        return;
+    }
+    if (has(unlock, 'after') && !isIdList(unlock.after, true)) {
+        errors.push(`${where}.unlock.after must be an array of ids`);
+    }
+    if (has(unlock, 'score_at_least') && unlock.score_at_least !== null
+            && !isFiniteNumber(unlock.score_at_least)) {
+        errors.push(`${where}.unlock.score_at_least must be a number or null`);
+    }
+};
+
+/**
+ * Pass 1 check of an objective's pass_fraction.
+ *
+ * @param {Object} objective the objective
+ * @param {string} where error prefix
+ * @param {string[]} errors collected errors
+ */
+const validatePassFraction = (objective, where, errors) => {
+    if (!has(objective, 'pass_fraction') || objective.pass_fraction === null) {
+        return;
+    }
+    const passFraction = objective.pass_fraction;
+    if (objective.type !== 'answer_question') {
+        errors.push(`${where}.pass_fraction is only allowed on answer_question`);
+    } else if (!isFiniteNumber(passFraction) || passFraction <= 0 || passFraction > 1) {
+        errors.push(`${where}.pass_fraction must be a number greater than 0 and at most 1`);
+    }
+};
+
+/**
+ * Pass 1 checks of the type-specific fields of an objective.
+ *
+ * @param {Object} objective the objective
+ * @param {string} where error prefix
+ * @param {Set} slots question slots seen so far, filled here
+ * @param {string[]} errors collected errors
+ */
+const validateObjectiveTarget = (objective, where, slots, errors) => {
+    switch (objective.type) {
+        case 'visit_zone':
+            if (!isId(objective.zone)) {
+                errors.push(`${where}.zone is not a valid id`);
+            }
+            if (has(objective, 'scene') && objective.scene !== null && !isId(objective.scene)) {
+                errors.push(`${where}.scene is not a valid id`);
+            }
+            break;
+        case 'interact':
+            if (!isId(objective.target)) {
+                errors.push(`${where}.target is not a valid id`);
+            }
+            break;
+        case 'answer_question': {
+            const slot = objective.slot;
+            if (!Number.isInteger(slot) || slot < 1) {
+                errors.push(`${where}.slot must be an integer >= 1`);
+            } else if (slots.has(slot)) {
+                errors.push(`duplicate question slot ${slot}`);
+            } else {
+                slots.add(slot);
+            }
+            break;
+        }
+        case 'collect': {
+            const targets = objective.targets;
+            if (!isIdList(targets, false)) {
+                errors.push(`${where}.targets must be a non-empty array of distinct ids`);
+                break;
+            }
+            const count = objective.count;
+            if (!Number.isInteger(count) || count < 1 || count > targets.length) {
+                errors.push(`${where}.count must be an integer from 1 to the number of targets`);
+            }
+            break;
+        }
+        case 'sequence':
+            if (!isIdList(objective.steps, false)) {
+                errors.push(`${where}.steps must be a non-empty array of distinct ids`);
+            }
+            break;
+    }
+};
+
+/**
  * Validate a decoded graph (same checks, order and messages as the PHP graph_validator).
  *
  * @param {Object} graph decoded mavr-graph/1 document
@@ -933,98 +1071,12 @@ export const validate = (graph) => {
             errors.push(`${where} must be an object`);
             return;
         }
-        const id = objective.id;
-        if (!isId(id)) {
-            errors.push(`${where}.id is not a valid id`);
-        } else if (DIGITS_PATTERN.test(id)) {
-            // An all-digit id would turn the objectives map into a JSON list in PHP.
-            errors.push(`${where}.id must not be all digits`);
-        } else if (types.has(id)) {
-            errors.push(`duplicate objective id "${id}"`);
-        } else {
-            types.set(id, typeof objective.type === 'string' ? objective.type : '');
-        }
-        const type = objective.type;
-        if (typeof type !== 'string' || !OBJECTIVE_TYPES.includes(type)) {
-            errors.push(`${where}.type is unknown`);
-        }
-        if (typeof objective.title !== 'string') {
-            errors.push(`${where}.title must be a string`);
-        }
-        if (has(objective, 'points') && (!isFiniteNumber(objective.points) || objective.points < 0)) {
-            errors.push(`${where}.points must be a number >= 0`);
-        }
-        if (has(objective, 'required') && typeof objective.required !== 'boolean') {
-            errors.push(`${where}.required must be true or false`);
-        }
-        if (has(objective, 'unlock')) {
-            const unlock = objective.unlock;
-            if (!isObject(unlock)) {
-                errors.push(`${where}.unlock must be an object`);
-            } else {
-                if (has(unlock, 'after') && !isIdList(unlock.after, true)) {
-                    errors.push(`${where}.unlock.after must be an array of ids`);
-                }
-                if (has(unlock, 'score_at_least') && unlock.score_at_least !== null
-                        && !isFiniteNumber(unlock.score_at_least)) {
-                    errors.push(`${where}.unlock.score_at_least must be a number or null`);
-                }
-            }
-        }
+        validateObjectiveFields(objective, where, types, errors);
         if (has(objective, 'hints')) {
-            validateHints(objective.hints, type, where, hintIds, errors);
+            validateHints(objective.hints, objective.type, where, hintIds, errors);
         }
-        if (has(objective, 'pass_fraction') && objective.pass_fraction !== null) {
-            const passFraction = objective.pass_fraction;
-            if (type !== 'answer_question') {
-                errors.push(`${where}.pass_fraction is only allowed on answer_question`);
-            } else if (!isFiniteNumber(passFraction) || passFraction <= 0 || passFraction > 1) {
-                errors.push(`${where}.pass_fraction must be a number greater than 0 and at most 1`);
-            }
-        }
-        switch (type) {
-            case 'visit_zone':
-                if (!isId(objective.zone)) {
-                    errors.push(`${where}.zone is not a valid id`);
-                }
-                if (has(objective, 'scene') && objective.scene !== null && !isId(objective.scene)) {
-                    errors.push(`${where}.scene is not a valid id`);
-                }
-                break;
-            case 'interact':
-                if (!isId(objective.target)) {
-                    errors.push(`${where}.target is not a valid id`);
-                }
-                break;
-            case 'answer_question': {
-                const slot = objective.slot;
-                if (!Number.isInteger(slot) || slot < 1) {
-                    errors.push(`${where}.slot must be an integer >= 1`);
-                } else if (slots.has(slot)) {
-                    errors.push(`duplicate question slot ${slot}`);
-                } else {
-                    slots.add(slot);
-                }
-                break;
-            }
-            case 'collect': {
-                const targets = objective.targets;
-                if (!isIdList(targets, false)) {
-                    errors.push(`${where}.targets must be a non-empty array of distinct ids`);
-                    break;
-                }
-                const count = objective.count;
-                if (!Number.isInteger(count) || count < 1 || count > targets.length) {
-                    errors.push(`${where}.count must be an integer from 1 to the number of targets`);
-                }
-                break;
-            }
-            case 'sequence':
-                if (!isIdList(objective.steps, false)) {
-                    errors.push(`${where}.steps must be a non-empty array of distinct ids`);
-                }
-                break;
-        }
+        validatePassFraction(objective, where, errors);
+        validateObjectiveTarget(objective, where, slots, errors);
     });
 
     // Pass 2: objective references.

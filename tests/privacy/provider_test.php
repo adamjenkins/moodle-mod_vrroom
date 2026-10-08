@@ -33,7 +33,6 @@ use mod_mavr\local\instance_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 final class provider_test extends \core_privacy\tests\provider_testcase {
-
     /** @var \stdClass the course */
     private \stdClass $course;
 
@@ -79,8 +78,15 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
             $this->students[$key] = $generator->create_and_enrol($this->course, 'student');
             $attempt = $mavrgen->create_attempt((int)$this->mavr->id, (int)$this->students[$key]->id);
             $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
-            $mavrgen->record_event($attempt, 'answered', 'question', null, '1', false,
-                ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]);
+            $mavrgen->record_event(
+                $attempt,
+                'answered',
+                'question',
+                null,
+                '1',
+                false,
+                ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]
+            );
             $this->attempts[$key] = $attempt;
             $DB->insert_record('xapi_states', (object)[
                 'component' => 'mod_mavr',
@@ -151,7 +157,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         provider::get_users_in_context($userlist);
         $this->assertEqualsCanonicalizing(
             [(int)$this->students[1]->id, (int)$this->students[2]->id],
-            array_map('intval', $userlist->get_userids()));
+            array_map('intval', $userlist->get_userids())
+        );
 
         $courselist = new userlist(\context_course::instance($this->course->id), 'mod_mavr');
         provider::get_users_in_context($courselist);

@@ -83,11 +83,4 @@ class mavrruntime extends base {
             $ADMIN->add($parentnodename, $settings);
         }
     }
-
-    /**
-     * Pre-uninstall hook.
-     */
-    public function uninstall_cleanup() {
-        parent::uninstall_cleanup();
-    }
 }

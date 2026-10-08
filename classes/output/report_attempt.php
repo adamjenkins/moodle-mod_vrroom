@@ -40,7 +40,6 @@ use mod_mavr\local\instance_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report_attempt implements renderable, templatable {
-
     /** @var array<string, string> scene id => name, zone/interactable id => name (raw). */
     protected array $names = [];
 
@@ -91,8 +90,11 @@ class report_attempt implements renderable, templatable {
         return [
             'cmid' => (int)$this->cm->id,
             'attemptid' => (int)$this->attempt->id,
-            'heading' => get_string('reportattemptdetails', 'mod_mavr',
-                (object)['attempt' => (int)$this->attempt->attempt, 'user' => $fullname]),
+            'heading' => get_string(
+                'reportattemptdetails',
+                'mod_mavr',
+                (object)['attempt' => (int)$this->attempt->attempt, 'user' => $fullname]
+            ),
             'user' => $fullname,
             'state' => report_overview::state_label((string)$this->attempt->state),
             'score' => report_overview::format_score($score),

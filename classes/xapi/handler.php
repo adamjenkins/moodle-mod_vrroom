@@ -44,7 +44,6 @@ use mod_mavr\local\xapi\iri;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class handler extends \core_xapi\handler {
-
     /** @var string Pattern of a lowercase uuid. */
     private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
 
@@ -264,7 +263,8 @@ class handler extends \core_xapi\handler {
         return $DB->record_exists_sql(
             'SELECT 1 FROM {mavr_events} e JOIN {mavr_attempts} a ON a.id = e.attemptid
               WHERE e.statementid = :sid AND a.userid = :userid',
-            ['sid' => $statementid, 'userid' => $userid]);
+            ['sid' => $statementid, 'userid' => $userid]
+        );
     }
 
     /**

@@ -30,7 +30,6 @@ use mod_mavr\local\graph\evaluator;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class event_store {
-
     /** @var string[] Server verbs derived from the evaluation itself; never fed back to the evaluator. */
     public const DERIVED_VERBS = ['completed', 'passed', 'failed'];
 
@@ -67,8 +66,14 @@ final class event_store {
      * @param int $timestamp time the action happened (client time, already clamped)
      * @return int new row id
      */
-    public static function insert(int $attemptid, string $statementid, array $event, bool $clientasserted,
-            ?array $result, int $timestamp): int {
+    public static function insert(
+        int $attemptid,
+        string $statementid,
+        array $event,
+        bool $clientasserted,
+        ?array $result,
+        int $timestamp
+    ): int {
         global $DB;
         $type = (string)$event['type'];
         $id = isset($event['id']) && $event['id'] !== '' ? (string)$event['id'] : null;
@@ -106,13 +111,24 @@ final class event_store {
      * @param array|null $result server result
      * @return string the new statement id
      */
-    public static function record_server(\stdClass $attempt, string $verb, string $type, ?string $sceneid, ?string $id,
-            ?array $result = null): string {
+    public static function record_server(
+        \stdClass $attempt,
+        string $verb,
+        string $type,
+        ?string $sceneid,
+        ?string $id,
+        ?array $result = null
+    ): string {
         $statementid = strtolower(\core\uuid::generate());
         $now = time();
-        self::insert((int)$attempt->id, $statementid,
+        self::insert(
+            (int)$attempt->id,
+            $statementid,
             ['verb' => $verb, 'type' => $type, 'id' => $id, 'scene' => $sceneid, 'fraction' => null],
-            false, $result, $now);
+            false,
+            $result,
+            $now
+        );
         return $statementid;
     }
 

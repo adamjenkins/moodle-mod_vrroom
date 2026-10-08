@@ -31,7 +31,6 @@
  * has been restored (inform_new_usage_id), as mod_quiz does with quiz_attempts.
  */
 class restore_mavr_activity_structure_step extends restore_questions_activity_structure_step {
-
     /** @var stdClass|null The attempt read from the XML, waiting for its new usage id. */
     protected $currentattempt = null;
 
@@ -271,12 +270,18 @@ class restore_mavr_activity_structure_step extends restore_questions_activity_st
             // The template is not installed on this site: its config stays as it was.
             return;
         }
-        $changed = $template->remap_question_entries($config,
-            fn(int $old): int => (int)($this->get_mappingid('question_bank_entry', $old) ?: $old));
+        $changed = $template->remap_question_entries(
+            $config,
+            fn(int $old): int => (int)($this->get_mappingid('question_bank_entry', $old) ?: $old)
+        );
         if ($changed) {
             // Same flags as instance_manager, so link markers awaiting decoding stay intact.
-            $DB->set_field('mavr', 'templateconfig',
-                json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ['id' => $mavrid]);
+            $DB->set_field(
+                'mavr',
+                'templateconfig',
+                json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                ['id' => $mavrid]
+            );
         }
     }
 }

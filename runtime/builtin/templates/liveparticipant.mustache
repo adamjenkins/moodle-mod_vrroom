@@ -49,7 +49,7 @@
         "mutelabel": "Mute Alex Learner for me"
     }
 }}
-<li class="mavr-live-participant d-flex flex-wrap align-items-center gap-2 py-1" data-peerid="{{peerid}}">
+<div class="mavr-live-participant d-flex flex-wrap align-items-center gap-2 py-1" data-peerid="{{peerid}}">
     <span class="mavr-live-speaking" aria-hidden="true"></span>
     <span class="fw-bold">{{name}}</span>
     {{#kindpreview}}<span class="badge bg-secondary">{{#str}}livekindpreview, mavrruntime_builtin{{/str}}</span>{{/kindpreview}}
@@ -58,4 +58,4 @@
     {{^isself}}
     <button type="button" class="btn btn-link btn-sm p-0" data-action="mavr-live-mutepeer" aria-pressed="{{#mutedforme}}true{{/mutedforme}}{{^mutedforme}}false{{/mutedforme}}">{{mutelabel}}</button>
     {{/isself}}
-</li>
+</div>

@@ -37,7 +37,6 @@ use mod_mavr\local\questions\bridge;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_question_view extends external_api {
-
     /**
      * Parameters.
      *
@@ -59,8 +58,10 @@ class get_question_view extends external_api {
      */
     public static function execute(int $attemptid, int $slot): array {
         global $USER;
-        ['attemptid' => $attemptid, 'slot' => $slot] = self::validate_parameters(self::execute_parameters(),
-            ['attemptid' => $attemptid, 'slot' => $slot]);
+        ['attemptid' => $attemptid, 'slot' => $slot] = self::validate_parameters(
+            self::execute_parameters(),
+            ['attemptid' => $attemptid, 'slot' => $slot]
+        );
 
         $context = helper::context_for_attempt($attemptid);
         self::validate_context($context);
@@ -96,8 +97,13 @@ class get_question_view extends external_api {
             ),
             'answered' => new external_value(PARAM_BOOL, 'Whether the question has been answered'),
             'state' => new external_value(PARAM_ALPHA, 'Question engine state of the question attempt'),
-            'fraction' => new external_value(PARAM_FLOAT, 'Fraction awarded, only once answered', VALUE_DEFAULT, null,
-                NULL_ALLOWED),
+            'fraction' => new external_value(
+                PARAM_FLOAT,
+                'Fraction awarded, only once answered',
+                VALUE_DEFAULT,
+                null,
+                NULL_ALLOWED
+            ),
         ]);
     }
 }

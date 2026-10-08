@@ -30,7 +30,6 @@ use mod_mavr\local\runtime\registry;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_preview extends external_api {
-
     /**
      * Parameters.
      *

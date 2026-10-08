@@ -95,8 +95,10 @@ class live_send extends external_api {
             'results' => new external_multiple_structure(new external_single_structure([
                 'to' => new external_value(PARAM_ALPHANUM, 'Recipient peer id'),
                 'accepted' => new external_value(PARAM_BOOL, 'Whether the message was stored'),
-                'error' => new external_value(PARAM_ALPHA,
-                    'Empty, unknownpeer, invalid, toolarge, ratelimited or mailboxfull'),
+                'error' => new external_value(
+                    PARAM_ALPHA,
+                    'Empty, unknownpeer, invalid, toolarge, ratelimited or mailboxfull'
+                ),
             ]), 'One result per message, in the order sent'),
         ]);
     }

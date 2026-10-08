@@ -25,11 +25,18 @@
 defined('MOODLE_INTERNAL') || die();
 
 // A category with the general settings and one page per run mode (pattern of mod/assign/settings.php).
-$ADMIN->add('modsettings', new admin_category('modmavrfolder', new lang_string('pluginname', 'mod_mavr'),
-    $module->is_enabled() === false));
+$ADMIN->add('modsettings', new admin_category(
+    'modmavrfolder',
+    new lang_string('pluginname', 'mod_mavr'),
+    $module->is_enabled() === false
+));
 
-$settings = new admin_settingpage($section, get_string('generalsettings', 'admin'), 'moodle/site:config',
-    $module->is_enabled() === false);
+$settings = new admin_settingpage(
+    $section,
+    get_string('generalsettings', 'admin'),
+    'moodle/site:config',
+    $module->is_enabled() === false
+);
 if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configtext(
         'mod_mavr/maxmodelsize',

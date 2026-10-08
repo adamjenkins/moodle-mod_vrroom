@@ -30,7 +30,6 @@ use mod_mavr\local\instance_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class helper {
-
     /**
      * External structure of the §4.6 attempt state.
      *

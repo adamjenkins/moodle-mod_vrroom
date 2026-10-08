@@ -274,7 +274,19 @@ export const createProgress = (host, session, options = {}) => getStrings([
     {key: 'finishattempt', component: 'mavrruntime_builtin'},
     {key: 'timeup', component: 'mavrruntime_builtin'},
     {key: 'nomorehints', component: 'mavrruntime_builtin'},
-]).then(([locked, available, completed, confirmtitle, confirmtext, finishlabel, timeuptext, nomorehints]) => {
+]).then((strings) => buildProgress(host, session, options, strings));
+
+/**
+ * Build the progress panel once its strings are loaded (see createProgress).
+ *
+ * @param {HTMLElement} host Where the progress is rendered.
+ * @param {Object} session The session.
+ * @param {Object} options Options.
+ * @param {string[]} strings The strings createProgress loaded, in its order.
+ * @returns {Promise<Object>} {refresh(), destroy()}
+ */
+const buildProgress = (host, session, options, strings) => {
+    const [locked, available, completed, confirmtitle, confirmtext, finishlabel, timeuptext, nomorehints] = strings;
     const labels = {locked: locked, available: available, completed: completed};
     const root = options.root || host.closest('[data-region="mavr-shell"]') || host;
     const shared = timerFor(session);
@@ -316,18 +328,21 @@ export const createProgress = (host, session, options = {}) => getStrings([
         sequence++;
         const mine = sequence;
         const state = session.getState();
+        let scoretext = '';
         return getString('scoreprogress', 'mavrruntime_builtin', {
             earned: formatPoints(state.earnedpoints),
             max: formatPoints(state.maxpoints),
-        }).then((scoretext) => Promise.all(state.objectives
-            .filter((o) => !state.hidden.has(o.id))
-            .map((o) => objectiveContext(o, session, labels))
-        ).then((objectives) => Templates.renderForPromise('mavrruntime_builtin/progress', {
+        }).then((text) => {
+            scoretext = text;
+            return Promise.all(state.objectives
+                .filter((o) => !state.hidden.has(o.id))
+                .map((o) => objectiveContext(o, session, labels)));
+        }).then((objectives) => Templates.renderForPromise('mavrruntime_builtin/progress', {
             scoretext: scoretext,
             objectives: objectives,
             canfinish: !session.preview && !session.closed,
             preview: session.preview,
-        }))).then(({html, js}) => {
+        })).then(({html, js}) => {
             if (!destroyed && mine === sequence) {
                 Templates.replaceNodeContents(host, html, js);
                 tick();
@@ -385,6 +400,23 @@ export const createProgress = (host, session, options = {}) => getStrings([
             .catch(() => pending.resolve());
     };
 
+    /**
+     * Finish the attempt from the Finish button (after the confirmation).
+     *
+     * @param {HTMLButtonElement} button The Finish button.
+     * @returns {Promise}
+     */
+    const runFinish = (button) => {
+        button.disabled = true;
+        const pending = new Pending('mavrruntime_builtin/panels:finish');
+        return Promise.resolve(options.onFinish ? options.onFinish() : null)
+            .catch((error) => {
+                button.disabled = false;
+                Notification.exception(error);
+            })
+            .then(() => pending.resolve());
+    };
+
     const onClick = (e) => {
         const hintbutton = e.target.closest('[data-action="mavr-get-hint"]');
         if (hintbutton) {
@@ -400,16 +432,7 @@ export const createProgress = (host, session, options = {}) => getStrings([
         }
         e.preventDefault();
         Notification.saveCancelPromise(confirmtitle, confirmtext, finishlabel, {triggerElement: button})
-            .then(() => {
-                button.disabled = true;
-                const pending = new Pending('mavrruntime_builtin/panels:finish');
-                return Promise.resolve(options.onFinish ? options.onFinish() : null)
-                    .catch((error) => {
-                        button.disabled = false;
-                        Notification.exception(error);
-                    })
-                    .then(() => pending.resolve());
-            })
+            .then(() => runFinish(button))
             .catch(() => {
                 // Cancelled.
             });
@@ -444,7 +467,7 @@ export const createProgress = (host, session, options = {}) => getStrings([
             host.replaceChildren();
         },
     }));
-});
+};
 
 /**
  * Plain-text status label of an objective state.

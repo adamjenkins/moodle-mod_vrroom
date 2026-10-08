@@ -91,8 +91,10 @@ final class config_test extends \advanced_testcase {
             $lines[] = "stun:stun{$i}.example.org";
         }
         $text = implode("\n", $lines);
-        $this->assertSame(get_string('errortoomanyiceurls', 'mavrruntime_builtin'),
-            config::validate_urls($text, ['stun', 'stuns']));
+        $this->assertSame(
+            get_string('errortoomanyiceurls', 'mavrruntime_builtin'),
+            config::validate_urls($text, ['stun', 'stuns'])
+        );
         $this->assertTrue(config::validate_urls(implode("\n", array_slice($lines, 0, 10)), ['stun', 'stuns']));
 
         $parsed = config::parse_urls("  stun:a.example.org \nbad line\n\n" . $text, ['stun', 'stuns']);
@@ -140,8 +142,10 @@ final class config_test extends \advanced_testcase {
         $this->assertSame(['urls', 'username', 'credential'], array_keys($turn));
         $this->assertSame(['turn:turn.example.org:3478?transport=udp'], $turn['urls']);
         $this->assertSame(($now + 3600) . ':' . self::PEERID, $turn['username']);
-        $this->assertSame(base64_encode(hash_hmac('sha1', ($now + 3600) . ':' . self::PEERID, $secret, true)),
-            $turn['credential']);
+        $this->assertSame(
+            base64_encode(hash_hmac('sha1', ($now + 3600) . ':' . self::PEERID, $secret, true)),
+            $turn['credential']
+        );
         $this->assertStringNotContainsString($secret, json_encode($ice));
 
         // A lifetime below a minute is raised to a minute.
@@ -185,9 +189,12 @@ final class config_test extends \advanced_testcase {
         $this->assertStringContainsString('livestunurls', $html);
         $this->assertStringContainsString('liveturnsecret', $html);
 
-        $setting = new \mavrruntime_builtin\admin\setting_iceurls('mavrruntime_builtin/livestunurls',
+        $setting = new \mavrruntime_builtin\admin\setting_iceurls(
+            'mavrruntime_builtin/livestunurls',
             new \lang_string('livestunurls', 'mavrruntime_builtin'),
-            new \lang_string('livestunurls_desc', 'mavrruntime_builtin'), ['stun', 'stuns']);
+            new \lang_string('livestunurls_desc', 'mavrruntime_builtin'),
+            ['stun', 'stuns']
+        );
         $this->assertTrue($setting->validate('stun:stun.example.org'));
         $this->assertSame(get_string('errorinvalidstunurl', 'mavrruntime_builtin', 1), $setting->validate('nonsense'));
     }

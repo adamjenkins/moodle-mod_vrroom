@@ -123,8 +123,12 @@ class template extends \mod_mavr\local\template\base {
         $mform->addElement('header', 'escape_heading', get_string('escapeheading', self::COMPONENT));
         $mform->setExpanded('escape_heading');
 
-        $mform->addElement('select', 'escape_environment', get_string('environment', self::COMPONENT),
-            presets::get_choices());
+        $mform->addElement(
+            'select',
+            'escape_environment',
+            get_string('environment', self::COMPONENT),
+            presets::get_choices()
+        );
         $mform->setDefault('escape_environment', self::DEFAULT_ENVIRONMENT);
         $mform->addHelpButton('escape_environment', 'environment', self::COMPONENT);
 
@@ -132,8 +136,12 @@ class template extends \mod_mavr\local\template\base {
         $mform->setType('escape_story', PARAM_TEXT);
         $mform->addHelpButton('escape_story', 'story', self::COMPONENT);
 
-        $mform->addElement('duration', 'escape_timelimit', get_string('timelimit', self::COMPONENT),
-            ['optional' => true, 'defaultunit' => 60]);
+        $mform->addElement(
+            'duration',
+            'escape_timelimit',
+            get_string('timelimit', self::COMPONENT),
+            ['optional' => true, 'defaultunit' => 60]
+        );
         $mform->addHelpButton('escape_timelimit', 'timelimit', self::COMPONENT);
 
         $mform->addElement('float', 'escape_hintpenalty', get_string('hintpenalty', self::COMPONENT));
@@ -153,28 +161,56 @@ class template extends \mod_mavr\local\template\base {
         $repeated = [
             $mform->createElement('static', 'escape_puzzleheader', get_string('puzzle', self::COMPONENT), ''),
             $mform->createElement('hidden', 'escape_puzzleid', ''),
-            $mform->createElement('text', 'escape_title', get_string('puzzletitle', self::COMPONENT),
-                ['size' => 50, 'maxlength' => self::MAX_TITLE_LENGTH]),
-            $mform->createElement('editor', 'escape_clue', get_string('clue', self::COMPONENT),
-                ['rows' => 5], ['maxfiles' => 0, 'noclean' => false]),
+            $mform->createElement(
+                'text',
+                'escape_title',
+                get_string('puzzletitle', self::COMPONENT),
+                ['size' => 50, 'maxlength' => self::MAX_TITLE_LENGTH]
+            ),
+            $mform->createElement(
+                'editor',
+                'escape_clue',
+                get_string('clue', self::COMPONENT),
+                ['rows' => 5],
+                ['maxfiles' => 0, 'noclean' => false]
+            ),
             $mform->createElement('select', 'escape_cluemedia', get_string('cluemedia', self::COMPONENT), [
                 self::MEDIA_NONE => get_string('cluemedia_none', self::COMPONENT),
                 self::MEDIA_IMAGE => get_string('cluemedia_image', self::COMPONENT),
                 self::MEDIA_MODEL => get_string('cluemedia_model', self::COMPONENT),
             ]),
-            $mform->createElement('filemanager', 'escape_clueimage', get_string('clueimage', self::COMPONENT),
-                null, self::image_file_options()),
-            $mform->createElement('filemanager', 'escape_cluemodel', get_string('cluemodel', self::COMPONENT),
-                null, self::model_file_options()),
+            $mform->createElement(
+                'filemanager',
+                'escape_clueimage',
+                get_string('clueimage', self::COMPONENT),
+                null,
+                self::image_file_options()
+            ),
+            $mform->createElement(
+                'filemanager',
+                'escape_cluemodel',
+                get_string('cluemodel', self::COMPONENT),
+                null,
+                self::model_file_options()
+            ),
             $mform->createElement('select', 'escape_locktype', get_string('locktype', self::COMPONENT), [
                 self::LOCK_NONE => get_string('locktype_none', self::COMPONENT),
                 self::LOCK_KEY => get_string('locktype_key', self::COMPONENT),
                 self::LOCK_QUESTION => get_string('locktype_question', self::COMPONENT),
             ]),
-            $mform->createElement('text', 'escape_keyname', get_string('keyname', self::COMPONENT),
-                ['size' => 30, 'maxlength' => self::MAX_TITLE_LENGTH]),
-            $mform->createElement('autocomplete', 'escape_question', get_string('question', self::COMPONENT),
-                $questions, ['multiple' => false]),
+            $mform->createElement(
+                'text',
+                'escape_keyname',
+                get_string('keyname', self::COMPONENT),
+                ['size' => 30, 'maxlength' => self::MAX_TITLE_LENGTH]
+            ),
+            $mform->createElement(
+                'autocomplete',
+                'escape_question',
+                get_string('question', self::COMPONENT),
+                $questions,
+                ['multiple' => false]
+            ),
             $mform->createElement('textarea', 'escape_hint1', get_string('hint1', self::COMPONENT), ['rows' => 2, 'cols' => 60]),
             $mform->createElement('textarea', 'escape_hint2', get_string('hint2', self::COMPONENT), ['rows' => 2, 'cols' => 60]),
             $mform->createElement('float', 'escape_points', get_string('points', self::COMPONENT)),
@@ -259,15 +295,35 @@ class template extends \mod_mavr\local\template\base {
             $defaultvalues['escape_hint2'][$i] = $hints[1] ?? '';
             $defaultvalues['escape_points'][$i] = self::clean_points($puzzle->points ?? 0);
 
+            // The repeat_elements() 'default' options are stored under flat keys such as
+            // 'escape_locktype[0]', and QuickForm looks a flat key up before the nested array,
+            // so the stored values must be given under the same flat keys to win (as mod_quiz does).
+            $defaulted = ['escape_cluemedia', 'escape_locktype', 'escape_keyname', 'escape_question', 'escape_points'];
+            foreach ($defaulted as $field) {
+                $defaultvalues["{$field}[{$i}]"] = $defaultvalues[$field][$i];
+            }
+
             if ($context !== null) {
                 $itemid = (int)($puzzle->fileitemid ?? ($i + 1));
                 $imagedraft = 0;
-                file_prepare_draft_area($imagedraft, $context->id, 'mod_mavr', 'media', $itemid,
-                    self::image_file_options());
+                file_prepare_draft_area(
+                    $imagedraft,
+                    $context->id,
+                    'mod_mavr',
+                    'media',
+                    $itemid,
+                    self::image_file_options()
+                );
                 $defaultvalues['escape_clueimage'][$i] = $imagedraft;
                 $modeldraft = 0;
-                file_prepare_draft_area($modeldraft, $context->id, 'mod_mavr', 'models', $itemid,
-                    self::model_file_options());
+                file_prepare_draft_area(
+                    $modeldraft,
+                    $context->id,
+                    'mod_mavr',
+                    'models',
+                    $itemid,
+                    self::model_file_options()
+                );
                 $defaultvalues['escape_cluemodel'][$i] = $modeldraft;
             }
         }
@@ -342,8 +398,10 @@ class template extends \mod_mavr\local\template\base {
             }
 
             $locktype = self::clean_locktype($data['escape_locktype'][$i] ?? null);
-            if ($locktype === self::LOCK_KEY
-                    && \core_text::strlen(self::row_keyname($data, $i)) > self::MAX_TITLE_LENGTH) {
+            if (
+                $locktype === self::LOCK_KEY
+                    && \core_text::strlen(self::row_keyname($data, $i)) > self::MAX_TITLE_LENGTH
+            ) {
                 $errors["escape_keyname[{$i}]"] = get_string('maximumchars', '', self::MAX_TITLE_LENGTH);
             }
             if ($locktype === self::LOCK_QUESTION) {
@@ -479,8 +537,14 @@ class template extends \mod_mavr\local\template\base {
 
             if ($cluemedia === self::MEDIA_IMAGE) {
                 if (!empty($data['escape_clueimage'][$i])) {
-                    file_save_draft_area_files((int)$data['escape_clueimage'][$i], $context->id, 'mod_mavr', 'media',
-                        $itemid, self::image_file_options());
+                    file_save_draft_area_files(
+                        (int)$data['escape_clueimage'][$i],
+                        $context->id,
+                        'mod_mavr',
+                        'media',
+                        $itemid,
+                        self::image_file_options()
+                    );
                 }
             } else {
                 $fs->delete_area_files($context->id, 'mod_mavr', 'media', $itemid);
@@ -488,8 +552,14 @@ class template extends \mod_mavr\local\template\base {
 
             if ($cluemedia === self::MEDIA_MODEL) {
                 if (!empty($data['escape_cluemodel'][$i])) {
-                    file_save_draft_area_files((int)$data['escape_cluemodel'][$i], $context->id, 'mod_mavr', 'models',
-                        $itemid, self::model_file_options());
+                    file_save_draft_area_files(
+                        (int)$data['escape_cluemodel'][$i],
+                        $context->id,
+                        'mod_mavr',
+                        'models',
+                        $itemid,
+                        self::model_file_options()
+                    );
                 }
             } else {
                 $fs->delete_area_files($context->id, 'mod_mavr', 'models', $itemid);
@@ -532,8 +602,12 @@ class template extends \mod_mavr\local\template\base {
         }
         $available = count($preset['anchors'] ?? []);
         if ($count > $available) {
-            throw new \moodle_exception('invalidscene', 'mod_mavr', '',
-                "The environment has room for {$available} puzzles.");
+            throw new \moodle_exception(
+                'invalidscene',
+                'mod_mavr',
+                '',
+                "The environment has room for {$available} puzzles."
+            );
         }
         $environment = [
             'type' => 'preset',
@@ -1029,8 +1103,10 @@ class template extends \mod_mavr\local\template\base {
         if (self::clean_cluemedia($data['escape_cluemedia'][$i] ?? null) !== self::MEDIA_NONE) {
             return true;
         }
-        if (self::clean_locktype($data['escape_locktype'][$i] ?? null) === self::LOCK_QUESTION
-                && (int)($data['escape_question'][$i] ?? 0) > 0) {
+        if (
+            self::clean_locktype($data['escape_locktype'][$i] ?? null) === self::LOCK_QUESTION
+                && (int)($data['escape_question'][$i] ?? 0) > 0
+        ) {
             return true;
         }
         return self::clean_hints([$data['escape_hint1'][$i] ?? '', $data['escape_hint2'][$i] ?? '']) !== [];

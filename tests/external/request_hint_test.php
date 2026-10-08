@@ -32,7 +32,6 @@ use mod_mavr\local\template\compiled_activity;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(request_hint::class)]
 final class request_hint_test extends \advanced_testcase {
-
     /**
      * A gallery activity with a graph that has hints, a student and their started attempt.
      *
@@ -90,8 +89,10 @@ final class request_hint_test extends \advanced_testcase {
         global $DB;
         $fx = $this->setup_attempt();
 
-        $result = external_api::clean_returnvalue(request_hint::execute_returns(),
-            request_hint::execute($fx->attemptid, 'v-1'));
+        $result = external_api::clean_returnvalue(
+            request_hint::execute_returns(),
+            request_hint::execute($fx->attemptid, 'v-1')
+        );
         $this->assertSame('hn-1', $result['hintid']);
         $this->assertSame('Walk to the vase.', $result['text']);
         $this->assertSame(1, $result['hintsused']);
@@ -100,13 +101,20 @@ final class request_hint_test extends \advanced_testcase {
         $this->assertSame('v-1', $result['state']['objectives'][0]['id']);
         $this->assertSame(1, $result['state']['objectives'][0]['hintsused']);
         $this->assertArrayHasKey('timedue', $result['state']);
-        $this->assertTrue($DB->record_exists('mavr_events',
-            ['attemptid' => $fx->attemptid, 'verb' => 'requested', 'objecttype' => 'hint', 'objectid' => 'hn-1']));
+        $this->assertTrue($DB->record_exists(
+            'mavr_events',
+            ['attemptid' => $fx->attemptid, 'verb' => 'requested', 'objecttype' => 'hint', 'objectid' => 'hn-1']
+        ));
 
         // Visiting now earns 1 - 0.25 points.
-        event_store::insert($fx->attemptid, \core\uuid::generate(),
+        event_store::insert(
+            $fx->attemptid,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $fx->zone, 'scene' => $fx->sceneid, 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
         $state = attempt_manager::get_state(attempt_manager::get_attempt($fx->attemptid));
         $this->assertEqualsWithDelta(0.75, $state['earnedpoints'], 1e-6);
     }

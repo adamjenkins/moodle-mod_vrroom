@@ -86,8 +86,11 @@ $finalgrade = '';
 if ((int)$mavr->grade > 0 && $attempts) {
     $score = grader::calculate_user_score($mavr, (int)$USER->id);
     if ($score !== null) {
-        $finalgrade = get_string('yourfinalgrade', 'mavr',
-            grader::format_grade($mavr, $score) . ' / ' . format_float((float)$mavr->grade, 2));
+        $finalgrade = get_string(
+            'yourfinalgrade',
+            'mavr',
+            grader::format_grade($mavr, $score) . ' / ' . format_float((float)$mavr->grade, 2)
+        );
     }
 }
 

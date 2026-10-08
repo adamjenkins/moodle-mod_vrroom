@@ -37,7 +37,6 @@ use mod_mavr\local\xapi\iri;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class config_builder {
-
     /** @var string Launch config schema. */
     public const SCHEMA = 'mavr-launch/1';
 
@@ -57,8 +56,13 @@ final class config_builder {
      * @param \stdClass $user the user launching
      * @return array
      */
-    public static function build(\cm_info $cm, \context_module $context, \stdClass $mavr, ?\stdClass $attempt,
-            \stdClass $user): array {
+    public static function build(
+        \cm_info $cm,
+        \context_module $context,
+        \stdClass $mavr,
+        ?\stdClass $attempt,
+        \stdClass $user
+    ): array {
         global $CFG;
 
         $preview = $attempt === null;
@@ -78,8 +82,14 @@ final class config_builder {
         } else {
             $events = event_store::get_events((int)$attempt->id);
             $result = (new evaluator($graph))->evaluate($events);
-            $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state, $graphversion, $result,
-                count($events), (int)($attempt->timedue ?? 0));
+            $state = attempt_manager::build_state(
+                (int)$attempt->id,
+                (string)$attempt->state,
+                $graphversion,
+                $result,
+                count($events),
+                (int)($attempt->timedue ?? 0)
+            );
             $slotmap = json_decode((string)$attempt->slotmap, true) ?: [];
         }
 
@@ -219,8 +229,14 @@ final class config_builder {
             return $ref;
         }
         $filepath = (string)($ref['filepath'] ?? '/');
-        $ref['url'] = \moodle_url::make_pluginfile_url($context->id, 'mod_mavr', $area, (int)($ref['itemid'] ?? 0),
-            $filepath === '' ? '/' : $filepath, (string)$ref['filename'])->out(false);
+        $ref['url'] = \moodle_url::make_pluginfile_url(
+            $context->id,
+            'mod_mavr',
+            $area,
+            (int)($ref['itemid'] ?? 0),
+            $filepath === '' ? '/' : $filepath,
+            (string)$ref['filename']
+        )->out(false);
         return $ref;
     }
 
@@ -234,6 +250,8 @@ final class config_builder {
     private static function plain(string $text, \context_module $context): string {
         return html_entity_decode(
             strip_tags(format_string($text, true, ['context' => $context, 'escape' => false])),
-            ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
     }
 }

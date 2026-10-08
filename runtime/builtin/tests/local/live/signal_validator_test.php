@@ -29,16 +29,20 @@ final class signal_validator_test extends \basic_testcase {
      * Descriptions: accepted shapes are rebuilt in key order without unknown keys.
      */
     public function test_description_valid(): void {
-        [$json, $error] = signal_validator::canonical('description',
-            json_encode(['sdp' => "v=0\r\ns=-\r\n", 'zzz' => 1, 'type' => 'answer', 'gen' => 1000000]));
+        [$json, $error] = signal_validator::canonical(
+            'description',
+            json_encode(['sdp' => "v=0\r\ns=-\r\n", 'zzz' => 1, 'type' => 'answer', 'gen' => 1000000])
+        );
         $this->assertSame('', $error);
         $this->assertSame('{"gen":1000000,"type":"answer","sdp":"v=0\r\ns=-\r\n"}', $json);
 
         $sdp = 'v=0' . str_repeat('a', signal_validator::MAX_SDP - 3);
         [$json] = signal_validator::canonical('description', json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => $sdp]));
         $this->assertNotNull($json);
-        $this->assertSame([null, 'invalid'],
-            signal_validator::canonical('description', json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => $sdp . 'a'])));
+        $this->assertSame(
+            [null, 'invalid'],
+            signal_validator::canonical('description', json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => $sdp . 'a']))
+        );
     }
 
     /**
@@ -60,12 +64,17 @@ final class signal_validator_test extends \basic_testcase {
             'sdp non-ascii' => ['sdp' => "v=0\r\n\u{e9}"] + $base,
         ];
         foreach ($cases as $name => $payload) {
-            $this->assertSame([null, 'invalid'], signal_validator::canonical('description', json_encode($payload)), $name);
+            $this->assertSame(
+                [null, 'invalid'],
+                signal_validator::canonical('description', json_encode($payload)),
+                $name
+            );
         }
         $this->assertSame([null, 'invalid'], signal_validator::canonical('description', '{not json'));
         $this->assertSame([null, 'invalid'], signal_validator::canonical('description', '"v=0"'));
         $this->assertSame([null, 'invalid'], signal_validator::canonical('description', '[1,2]'));
-        $this->assertSame([null, 'invalid'], signal_validator::canonical('description', '{"a":{"b":{"c":{"d":{"e":{"f":{"g":1}}}}}}}'));
+        $deep = '{"a":{"b":{"c":{"d":{"e":{"f":{"g":1}}}}}}}';
+        $this->assertSame([null, 'invalid'], signal_validator::canonical('description', $deep));
         $this->assertSame([null, 'invalid'], signal_validator::canonical('offer', json_encode($base)));
     }
 
@@ -84,11 +93,15 @@ final class signal_validator_test extends \basic_testcase {
         $this->assertSame(['gen', 'candidates'], array_keys($decoded));
         $this->assertSame(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment'], array_keys($decoded['candidates'][0]));
         $this->assertArrayNotHasKey('foo', $decoded['candidates'][0]);
-        $this->assertSame(['candidate' => '', 'sdpMid' => null, 'sdpMLineIndex' => null, 'usernameFragment' => null],
-            $decoded['candidates'][1]);
+        $this->assertSame(
+            ['candidate' => '', 'sdpMid' => null, 'sdpMLineIndex' => null, 'usernameFragment' => null],
+            $decoded['candidates'][1]
+        );
 
-        $this->assertSame(['{"gen":0,"candidates":[]}', ''],
-            signal_validator::canonical('candidates', '{"gen":0,"candidates":[]}'));
+        $this->assertSame(
+            ['{"gen":0,"candidates":[]}', ''],
+            signal_validator::canonical('candidates', '{"gen":0,"candidates":[]}')
+        );
         $thirty = ['gen' => 0, 'candidates' => array_fill(0, 30, ['candidate' => 'x'])];
         $this->assertSame('', signal_validator::canonical('candidates', json_encode($thirty))[1]);
     }
@@ -114,8 +127,11 @@ final class signal_validator_test extends \basic_testcase {
             'entry list' => [['a', 'b']],
         ];
         foreach ($cases as $name => $list) {
-            $this->assertSame([null, 'invalid'],
-                signal_validator::canonical('candidates', json_encode(['gen' => 0, 'candidates' => $list])), $name);
+            $this->assertSame(
+                [null, 'invalid'],
+                signal_validator::canonical('candidates', json_encode(['gen' => 0, 'candidates' => $list])),
+                $name
+            );
         }
         $this->assertSame([null, 'invalid'], signal_validator::canonical('candidates', '{"gen":0,"candidates":{"a":1}}'));
         $this->assertSame([null, 'invalid'], signal_validator::canonical('candidates', '{"gen":0}'));
@@ -131,8 +147,10 @@ final class signal_validator_test extends \basic_testcase {
 
         // CR LF doubles in JSON: a 14999-character description is above the cap once encoded.
         $sdp = 'v=0' . str_repeat("\r\n", 7498);
-        $this->assertSame([null, 'toolarge'],
-            signal_validator::canonical('description', json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => $sdp])));
+        $this->assertSame(
+            [null, 'toolarge'],
+            signal_validator::canonical('description', json_encode(['gen' => 0, 'type' => 'offer', 'sdp' => $sdp]))
+        );
 
         $huge = '{"gen":0,"candidates":[],"pad":"' . str_repeat('x', 2 * room_manager::MAX_PAYLOAD) . '"}';
         $this->assertSame([null, 'toolarge'], signal_validator::canonical('candidates', $huge));

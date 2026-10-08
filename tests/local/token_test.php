@@ -26,7 +26,6 @@ namespace mod_mavr\local;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(token::class)]
 final class token_test extends \advanced_testcase {
-
     /**
      * The secret is created once and kept.
      *

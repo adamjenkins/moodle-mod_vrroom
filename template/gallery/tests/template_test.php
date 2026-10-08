@@ -151,7 +151,7 @@ final class template_test extends \advanced_testcase {
         }
         $this->assertSame([], graph_validator::validate($compiled->graph));
         // The documents survive a JSON round trip unchanged (they are stored as JSON).
-        $this->assertSame($compiled->graph, json_decode(json_encode($compiled->graph), true));
+        $this->assertSame($compiled->graph, json_decode(json_encode($compiled->graph, JSON_PRESERVE_ZERO_FRACTION), true));
     }
 
     /**
@@ -283,8 +283,10 @@ final class template_test extends \advanced_testcase {
         $this->assertEquals(0, $objectives['s-order']['points']);
         $this->assertSame(get_string('objectiveordered', 'mavrtemplate_gallery'), $objectives['s-order']['title']);
 
-        $this->assertSame([['slot' => 1, 'questionbankentryid' => 55, 'maxmark' => 1.0, 'objectiveid' => 'q-st2']],
-            $compiled->slots);
+        $this->assertSame(
+            [['slot' => 1, 'questionbankentryid' => 55, 'maxmark' => 1.0, 'objectiveid' => 'q-st2']],
+            $compiled->slots
+        );
     }
 
     /**
@@ -347,8 +349,10 @@ final class template_test extends \advanced_testcase {
         $this->assert_valid($compiled);
         $scene = $compiled->scenes[0];
         $this->assertSame('model', $scene['environment']['type']);
-        $this->assertSame(['area' => 'environment', 'itemid' => 0, 'filepath' => '/', 'filename' => 'room.glb'],
-            $scene['environment']['file']);
+        $this->assertSame(
+            ['area' => 'environment', 'itemid' => 0, 'filepath' => '/', 'filename' => 'room.glb'],
+            $scene['environment']['file']
+        );
         $this->assertSame(['min' => [-9.0, 0.0, -9.0], 'max' => [9.0, 0.0, 9.0]], $scene['environment']['bounds']);
         $this->assertSame([0.0, 0.0, 0.0], $scene['spawn'][0]['position']);
 
@@ -612,9 +616,12 @@ final class template_test extends \advanced_testcase {
 
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
+        $PAGE->set_url('/course/modedit.php');
         $mavr = $this->getDataGenerator()->create_module('mavr', [
             'course' => $course->id,
             'stationtitles' => 'Vase|Portrait',
+            'stationrequired' => '1|0',
+            'stationpoints' => '1|2',
         ]);
         $cm = get_coursemodule_from_instance('mavr', $mavr->id, 0, false, MUST_EXIST);
         [$cm, , , $data, $cw] = get_moduleinfo_data($cm, $course);
@@ -629,6 +636,30 @@ final class template_test extends \advanced_testcase {
         $this->assertStringContainsString('value="Vase"', $html);
         $this->assertStringContainsString('value="Portrait"', $html);
         $this->assertStringContainsString('name="gallery_addstations"', $html);
+
+        // Stored values beat the repeat_elements() defaults (required 1, points 1).
+        $xpath = self::form_xpath($html);
+        $required = $xpath->query('//input[@type="checkbox"][@name="gallery_required[1]"]')->item(0);
+        $this->assertNotNull($required);
+        $this->assertFalse($required->hasAttribute('checked'));
+        $points = $xpath->query('//input[@name="gallery_points[1]"]')->item(0);
+        $this->assertNotNull($points);
+        $this->assertEquals(2.0, (float)$points->getAttribute('value'));
+    }
+
+    /**
+     * Parse rendered form HTML for XPath queries.
+     *
+     * @param string $html
+     * @return \DOMXPath
+     */
+    private static function form_xpath(string $html): \DOMXPath {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8"?>' . $html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        return new \DOMXPath($dom);
     }
 
     /**
@@ -672,7 +703,8 @@ final class template_test extends \advanced_testcase {
         /** @var \core_question_generator $questiongenerator */
         $questiongenerator = $this->getDataGenerator()->get_plugin_generator('core_question');
         $category = $questiongenerator->create_question_category(
-            ['contextid' => \context_module::instance($qbank->cmid)->id]);
+            ['contextid' => \context_module::instance($qbank->cmid)->id]
+        );
         $question = $questiongenerator->create_question('shortanswer', null, ['category' => $category->id]);
         return (int)$DB->get_field('question_versions', 'questionbankentryid', ['questionid' => $question->id]);
     }

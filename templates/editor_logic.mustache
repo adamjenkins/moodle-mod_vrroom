@@ -79,21 +79,21 @@
 
     <section class="mb-4" aria-labelledby="mavr-logic-{{uid}}-objectives">
         <h3 class="h5" id="mavr-logic-{{uid}}-objectives">{{#str}}logicobjectives, mod_mavr{{/str}}</h3>
-        <ol class="list-unstyled" data-region="mavr-logic-objectives">
+        <div role="list" data-region="mavr-logic-objectives">
             {{#objectives}}
-            {{> mod_mavr/editor_logic_objective}}
+            <div role="listitem">{{> mod_mavr/editor_logic_objective}}</div>
             {{/objectives}}
-        </ol>
+        </div>
         <button type="button" class="btn btn-secondary" data-action="mavr-logic-add-objective">{{#str}}logicaddobjective, mod_mavr{{/str}}</button>
     </section>
 
     <section class="mb-4" aria-labelledby="mavr-logic-{{uid}}-rules">
         <h3 class="h5" id="mavr-logic-{{uid}}-rules">{{#str}}logicrules, mod_mavr{{/str}}</h3>
-        <ol class="list-unstyled" data-region="mavr-logic-rules">
+        <div role="list" data-region="mavr-logic-rules">
             {{#rules}}
-            {{> mod_mavr/editor_logic_rule}}
+            <div role="listitem">{{> mod_mavr/editor_logic_rule}}</div>
             {{/rules}}
-        </ol>
+        </div>
         <button type="button" class="btn btn-secondary" data-action="mavr-logic-add-rule">{{#str}}logicaddrule, mod_mavr{{/str}}</button>
     </section>
 </div>

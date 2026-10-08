@@ -46,8 +46,17 @@ final class files {
      * @param bool $forcedownload Whether to force download.
      * @param array $options Additional file serving options.
      */
-    public static function serve_question_file($course, $context, $component, $filearea, $qubaid, $slot, $args,
-            $forcedownload, array $options = []): void {
+    public static function serve_question_file(
+        $course,
+        $context,
+        $component,
+        $filearea,
+        $qubaid,
+        $slot,
+        $args,
+        $forcedownload,
+        array $options = []
+    ): void {
         global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/question/engine/lib.php');
@@ -80,8 +89,10 @@ final class files {
         }
 
         $quba = \question_engine::load_questions_usage_by_activity((int)$qubaid);
-        if ($quba->get_owning_component() !== 'mod_mavr'
-                || (int)$quba->get_owning_context()->id !== (int)$modulecontext->id) {
+        if (
+            $quba->get_owning_component() !== 'mod_mavr'
+                || (int)$quba->get_owning_context()->id !== (int)$modulecontext->id
+        ) {
             send_file_not_found();
         }
         $slot = (int)$slot;

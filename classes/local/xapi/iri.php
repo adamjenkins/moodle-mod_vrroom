@@ -27,7 +27,6 @@ namespace mod_mavr\local\xapi;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class iri {
-
     /** @var string Base of MAVR's own context extension IRIs. */
     public const EXT_BASE = 'https://wisecat.net/xapi/mavr/ext/';
 

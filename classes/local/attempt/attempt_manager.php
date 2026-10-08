@@ -37,7 +37,6 @@ use mod_mavr\local\questions\usage;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class attempt_manager {
-
     /** @var string Attempt in progress. */
     public const STATE_INPROGRESS = 'inprogress';
 
@@ -67,8 +66,14 @@ final class attempt_manager {
         global $DB;
         $timenow = $timenow ?? time();
 
-        $open = $DB->get_records('mavr_attempts',
-            ['mavrid' => $mavr->id, 'userid' => $userid, 'state' => self::STATE_INPROGRESS], 'attempt DESC', '*', 0, 1);
+        $open = $DB->get_records(
+            'mavr_attempts',
+            ['mavrid' => $mavr->id, 'userid' => $userid, 'state' => self::STATE_INPROGRESS],
+            'attempt DESC',
+            '*',
+            0,
+            1
+        );
         if ($open) {
             $current = reset($open);
             if (!self::close_if_overdue($current, $timenow)) {
@@ -81,8 +86,10 @@ final class attempt_manager {
             throw new \moodle_exception('errornomoreattempts', 'mod_mavr');
         }
         // Attempt numbers continue after the highest one, so a deleted attempt never causes a clash.
-        $last = (int)$DB->get_field_sql('SELECT MAX(attempt) FROM {mavr_attempts} WHERE mavrid = :mavrid AND userid = :userid',
-            ['mavrid' => $mavr->id, 'userid' => $userid]);
+        $last = (int)$DB->get_field_sql(
+            'SELECT MAX(attempt) FROM {mavr_attempts} WHERE mavrid = :mavrid AND userid = :userid',
+            ['mavrid' => $mavr->id, 'userid' => $userid]
+        );
 
         $graph = instance_manager::get_graph((int)$mavr->id, (int)$mavr->graphversion);
         $timelimit = max(0, (int)($graph['timelimit'] ?? 0));
@@ -238,9 +245,12 @@ final class attempt_manager {
         $attempt->requireddone = $update->requireddone;
         $attempt->timemodified = $now;
 
-        $recorded = $DB->get_fieldset_select('mavr_events', 'objectid',
+        $recorded = $DB->get_fieldset_select(
+            'mavr_events',
+            'objectid',
             'attemptid = :attemptid AND verb = :verb AND objecttype = :type',
-            ['attemptid' => $attempt->id, 'verb' => 'completed', 'type' => 'objective']);
+            ['attemptid' => $attempt->id, 'verb' => 'completed', 'type' => 'objective']
+        );
         $recorded = array_flip(array_map('strval', $recorded));
         foreach ($result->completed_ids() as $objectiveid) {
             $objectiveid = (string)$objectiveid;
@@ -275,8 +285,14 @@ final class attempt_manager {
         $events = event_store::get_events((int)$attempt->id);
         $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
         $result = (new evaluator($graph))->evaluate($events);
-        return self::build_state((int)$attempt->id, (string)$attempt->state, (int)$attempt->graphversion, $result,
-            count($events), (int)($attempt->timedue ?? 0));
+        return self::build_state(
+            (int)$attempt->id,
+            (string)$attempt->state,
+            (int)$attempt->graphversion,
+            $result,
+            count($events),
+            (int)($attempt->timedue ?? 0)
+        );
     }
 
     /**
@@ -290,8 +306,14 @@ final class attempt_manager {
      * @param int $timedue deadline of the attempt (0 = none, and always 0 for a preview)
      * @return array
      */
-    public static function build_state(int $attemptid, string $state, int $graphversion, evaluation_result $result,
-            int $eventcount, int $timedue = 0): array {
+    public static function build_state(
+        int $attemptid,
+        string $state,
+        int $graphversion,
+        evaluation_result $result,
+        int $eventcount,
+        int $timedue = 0
+    ): array {
         $objectives = [];
         foreach ($result->objectives as $id => $objective) {
             $objectives[] = [

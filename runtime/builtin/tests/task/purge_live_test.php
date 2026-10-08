@@ -67,8 +67,10 @@ final class purge_live_test extends \advanced_testcase {
         (new purge_live())->execute();
 
         $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['id' => $stale->id]));
-        $this->assertEqualsCanonicalizing([$fresh->peerid, $otherfresh->peerid, $otherfresh2->peerid],
-            $DB->get_fieldset_select('mavrruntime_builtin_peers', 'peerid', '1 = 1'));
+        $this->assertEqualsCanonicalizing(
+            [$fresh->peerid, $otherfresh->peerid, $otherfresh2->peerid],
+            $DB->get_fieldset_select('mavrruntime_builtin_peers', 'peerid', '1 = 1')
+        );
         $signalids = $DB->get_fieldset_select('mavrruntime_builtin_signals', 'id', '1 = 1');
         $this->assertSame([(int)$kept->id], array_map('intval', $signalids));
         $this->assertNotEmpty((new purge_live())->get_name());

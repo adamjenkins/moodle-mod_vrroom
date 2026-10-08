@@ -54,7 +54,7 @@
         {{/canpreview}}
     </div>
     <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="mavr-message" role="status">{{#nolaunch}}{{#str}}nolaunch, mavrruntime_builtin{{/str}}{{/nolaunch}}</div>
-    <section class="mavr-liveroom d-none mb-3" data-region="mavr-liveroom" aria-labelledby="mavr-liveroom-heading-{{cmid}}"></section>
+    <section class="mavr-liveroom d-none mb-3" data-region="mavr-liveroom" aria-label="{{#str}}liveroom, mavrruntime_builtin{{/str}}"></section>
     <div class="mavr-stage d-none" data-region="mavr-stage">
         <canvas class="mavr-canvas" data-region="mavr-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, mavrruntime_builtin{{/str}}" aria-describedby="mavr-controlshelp-{{cmid}}"></canvas>
         <p class="visually-hidden" id="mavr-controlshelp-{{cmid}}">{{#str}}controlshelp, mavrruntime_builtin{{/str}}</p>

@@ -28,7 +28,6 @@ use core_external\external_api;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(finish_attempt::class)]
 final class finish_attempt_test extends \advanced_testcase {
-
     /**
      * The owner finishes once; the grade reaches the gradebook; others and repeats are refused.
      *
@@ -62,8 +61,10 @@ final class finish_attempt_test extends \advanced_testcase {
         $this->assertSame($attemptid, $result['attemptid']);
         $this->assertSame('finished', $result['state']);
         $this->assertEqualsWithDelta(0.0, $result['score'], 1e-6);
-        $this->assertSame((new \moodle_url('/mod/mavr/view.php', ['id' => $module->cmid]))->out(false),
-            $result['redirecturl']);
+        $this->assertSame(
+            (new \moodle_url('/mod/mavr/view.php', ['id' => $module->cmid]))->out(false),
+            $result['redirecturl']
+        );
 
         $grades = grade_get_grades($course->id, 'mod', 'mavr', $module->id, (int)$student->id);
         $this->assertEqualsWithDelta(0.0, (float)$grades->items[0]->grades[$student->id]->grade, 1e-6);

@@ -72,8 +72,12 @@ class mod_mavr_mod_form extends moodleform_mod {
         $name = $this->resolve_template();
         if ($name === null && $this->_instance) {
             // The activity's template is no longer installed: nothing to show or change.
-            $mform->addElement('static', 'templatemissing', get_string('template', 'mavr'),
-                get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? ''))));
+            $mform->addElement(
+                'static',
+                'templatemissing',
+                get_string('template', 'mavr'),
+                get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? '')))
+            );
         } else if ($name !== null) {
             $template = template_registry::get($name);
             $mform->addElement('hidden', 'template', $name);
@@ -206,8 +210,12 @@ class mod_mavr_mod_form extends moodleform_mod {
             $mform->addElement('static', 'livemodeunavailable', '', get_string('livemodeunavailable', 'mavr'));
             return;
         }
-        $mform->addElement('select', 'livemode', get_string('livemode', 'mavr'),
-            [0 => get_string('livemodeoff', 'mavr'), 1 => get_string('livemodeon', 'mavr')]);
+        $mform->addElement(
+            'select',
+            'livemode',
+            get_string('livemode', 'mavr'),
+            [0 => get_string('livemodeoff', 'mavr'), 1 => get_string('livemodeon', 'mavr')]
+        );
         $mform->setDefault('livemode', 0);
         $mform->addHelpButton('livemode', 'livemode', 'mavr');
         $options = [];

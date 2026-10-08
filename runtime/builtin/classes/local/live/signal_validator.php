@@ -106,8 +106,10 @@ final class signal_validator {
             return null;
         }
         $length = strlen($sdp);
-        if ($length < 1 || $length > self::MAX_SDP || strpos($sdp, 'v=0') !== 0
-                || !preg_match('/^[\t\r\n\x20-\x7E]*$/', $sdp)) {
+        if (
+            $length < 1 || $length > self::MAX_SDP || strpos($sdp, 'v=0') !== 0
+                || !preg_match('/^[\t\r\n\x20-\x7E]*$/', $sdp)
+        ) {
             return null;
         }
         return ['gen' => $gen, 'type' => $kind, 'sdp' => $sdp];
@@ -131,13 +133,17 @@ final class signal_validator {
                 return null;
             }
             $candidate = $entry['candidate'] ?? null;
-            if (!is_string($candidate) || strlen($candidate) > self::MAX_CANDIDATE
-                    || !preg_match('/^[\x20-\x7E]*$/', $candidate)) {
+            if (
+                !is_string($candidate) || strlen($candidate) > self::MAX_CANDIDATE
+                    || !preg_match('/^[\x20-\x7E]*$/', $candidate)
+            ) {
                 return null;
             }
             $mid = $entry['sdpMid'] ?? null;
-            if ($mid !== null && (!is_string($mid) || strlen($mid) > self::MAX_MID
-                    || !preg_match('/^[A-Za-z0-9_-]*$/', $mid))) {
+            if (
+                $mid !== null && (!is_string($mid) || strlen($mid) > self::MAX_MID
+                    || !preg_match('/^[A-Za-z0-9_-]*$/', $mid))
+            ) {
                 return null;
             }
             $mline = $entry['sdpMLineIndex'] ?? null;
@@ -145,8 +151,10 @@ final class signal_validator {
                 return null;
             }
             $ufrag = $entry['usernameFragment'] ?? null;
-            if ($ufrag !== null && (!is_string($ufrag) || strlen($ufrag) > self::MAX_UFRAG
-                    || !preg_match('/^[\x20-\x7E]*$/', $ufrag))) {
+            if (
+                $ufrag !== null && (!is_string($ufrag) || strlen($ufrag) > self::MAX_UFRAG
+                    || !preg_match('/^[\x20-\x7E]*$/', $ufrag))
+            ) {
                 return null;
             }
             $clean[] = [

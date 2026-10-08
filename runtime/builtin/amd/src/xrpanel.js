@@ -104,6 +104,20 @@ const STRINGKEYS = [
 ];
 
 /**
+ * The button look of a question choice.
+ *
+ * @param {Object} context Question context {busy, selected}.
+ * @param {number} index Choice index.
+ * @returns {string} 'disabled', 'selected' or 'choice'
+ */
+const choiceLook = (context, index) => {
+    if (context.busy) {
+        return 'disabled';
+    }
+    return context.selected.has(index) ? 'selected' : 'choice';
+};
+
+/**
  * Whether the page is written right to left.
  *
  * @returns {boolean}
@@ -523,19 +537,20 @@ class XrPanels {
     loadView(slot, generation) {
         const config = this.session.getConfig();
         return Promise.resolve(this.session.flush())
-            .then(() => Promise.resolve(Ajax.call([{
+            .then(() => Ajax.call([{
                 methodname: 'mod_mavr_get_question_view',
                 args: {attemptid: Number(config.attemptid), slot: slot},
-            }])[0]))
+            }])[0])
             .then((view) => {
                 if (generation !== this.generation || !this.context) {
-                    return;
+                    return undefined;
                 }
                 this.context.view = view;
                 this.context.selected = new Set();
                 this.context.result = null;
                 this.context.message = null;
                 this.renderQuestion();
+                return undefined;
             })
             .catch((error) => {
                 if (generation !== this.generation) {
@@ -636,7 +651,7 @@ class XrPanels {
         const choices = view.choices.map((choice, index) => ({
             action: `choice:${index}`,
             label: String(choice.label || ''),
-            look: context.busy ? 'disabled' : (context.selected.has(index) ? 'selected' : 'choice'),
+            look: choiceLook(context, index),
             selected: context.selected.has(index),
         }));
         const buttons = [{
@@ -732,7 +747,7 @@ class XrPanels {
         Promise.resolve(this.session.submitResponses(context.slot, responses))
             .then((result) => {
                 if (generation !== this.generation || this.context !== context) {
-                    return;
+                    return undefined;
                 }
                 context.busy = false;
                 if (!result || !result.answered) {
@@ -741,10 +756,11 @@ class XrPanels {
                         style: 'warning',
                     };
                     this.renderQuestion();
-                    return;
+                    return undefined;
                 }
                 context.result = {state: result.status, fraction: result.fraction, retry: !!result.retry};
                 this.renderQuestion();
+                return undefined;
             })
             .catch((error) => {
                 if (generation !== this.generation || this.context !== context) {
@@ -772,11 +788,12 @@ class XrPanels {
         Promise.resolve(this.session.requestHint(hints.objective.id))
             .then(() => {
                 if (generation !== this.generation || this.context !== context) {
-                    return;
+                    return undefined;
                 }
                 context.busy = false;
                 context.message = null;
                 this.renderQuestion();
+                return undefined;
             })
             .catch((error) => {
                 if (generation !== this.generation || this.context !== context) {

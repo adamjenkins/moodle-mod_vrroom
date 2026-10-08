@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 namespace mod_mavr\event;
 
 /**
@@ -29,7 +28,6 @@ namespace mod_mavr\event;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class scene_updated extends \core\event\base {
-
     /**
      * Init method.
      *

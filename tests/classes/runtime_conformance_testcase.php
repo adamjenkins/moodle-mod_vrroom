@@ -39,7 +39,6 @@ use mod_mavr\local\xapi\iri;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class runtime_conformance_testcase extends \advanced_testcase {
-
     /**
      * Short name of the run mode under test, e.g. 'builtin'.
      *
@@ -134,8 +133,12 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
             $this->statement($student, 'initialized', iri::activity($cmid), (int)$attempt->id),
             $this->statement($student, 'entered', iri::for_object($cmid, 'scene', $scene['id'], null), (int)$attempt->id),
             $this->statement($student, 'entered', iri::for_object($cmid, 'zone', $scene['id'], $vasezone), (int)$attempt->id),
-            $this->statement($student, 'interacted', iri::for_object($cmid, 'object', $scene['id'], $vasehotspot),
-                (int)$attempt->id),
+            $this->statement(
+                $student,
+                'interacted',
+                iri::for_object($cmid, 'object', $scene['id'], $vasehotspot),
+                (int)$attempt->id
+            ),
         ]);
         $this->assertSame([true, true, true, true], array_values($result));
 

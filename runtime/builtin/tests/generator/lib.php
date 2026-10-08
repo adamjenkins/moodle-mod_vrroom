@@ -33,7 +33,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mavrruntime_builtin_generator extends component_generator_base {
-
     /**
      * Create a presence in a live room.
      *

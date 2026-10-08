@@ -75,8 +75,10 @@ final class scene_validator {
             $xr = $scene['xr'];
             if (!is_array($xr) || ($xr !== [] && array_is_list($xr))) {
                 $errors[] = 'xr must be an object';
-            } else if (array_key_exists('arscale', $xr) && $xr['arscale'] !== null
-                    && (!self::is_number($xr['arscale']) || $xr['arscale'] < 0.01 || $xr['arscale'] > 1)) {
+            } else if (
+                array_key_exists('arscale', $xr) && $xr['arscale'] !== null
+                    && (!self::is_number($xr['arscale']) || $xr['arscale'] < 0.01 || $xr['arscale'] > 1)
+            ) {
                 $errors[] = 'xr.arscale must be null or a number from 0.01 to 1';
             }
         }
@@ -243,8 +245,10 @@ final class scene_validator {
                     break;
                 case 'portal':
                     $target = $item['target'] ?? null;
-                    if (!is_array($target) || !self::is_id($target['scene'] ?? null)
-                            || strlen($target['scene']) > self::MAX_SCENE_ID_LENGTH || !self::is_id($target['spawn'] ?? null)) {
+                    if (
+                        !is_array($target) || !self::is_id($target['scene'] ?? null)
+                            || strlen($target['scene']) > self::MAX_SCENE_ID_LENGTH || !self::is_id($target['spawn'] ?? null)
+                    ) {
                         $errors[] = "{$where}.target must name a room and a start point";
                     }
                     break;
@@ -367,8 +371,10 @@ final class scene_validator {
                 $target = $item['target'] ?? null;
                 $targetscene = is_array($target) ? ($target['scene'] ?? null) : null;
                 $targetspawn = is_array($target) ? ($target['spawn'] ?? null) : null;
-                if (!is_string($targetscene) || !is_string($targetspawn)
-                        || !isset($spawnsbyscene[$targetscene][$targetspawn])) {
+                if (
+                    !is_string($targetscene) || !is_string($targetspawn)
+                        || !isset($spawnsbyscene[$targetscene][$targetspawn])
+                ) {
                     $errors[] = "scenes[{$i}].interactables[{$j}].target does not name a start point of a room of " .
                         "this activity";
                 }

@@ -104,6 +104,73 @@ const clockText = (seconds) => {
 };
 
 /**
+ * Set up the renderer and the first room once the strings are loaded, then run the room.
+ *
+ * @param {Object} base {root, session, config, live, stage, canvas, scenes} from start().
+ * @param {string[]} values The strings start() loaded, in its order.
+ * @returns {Promise<Object>} {stop()}
+ */
+const prepareRoom = (base, values) => {
+    const {root, session, config, live, stage, canvas, scenes} = base;
+    const [loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace] = values;
+    const strings = {loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace};
+    if (!startScene(config)) {
+        throw new Error('No scene in the launch config');
+    }
+    stage.classList.remove('d-none');
+    showMessage(root, loading, 'info');
+
+    const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.xr.enabled = true;
+    const scene3 = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 300);
+    const rig = new THREE.Group();
+    rig.name = 'mavr-rig';
+    rig.add(camera);
+    scene3.add(rig);
+    const loader = new GLTFLoader();
+    const textureloader = new THREE.TextureLoader();
+    let stopped = false;
+
+    const roomOptions = () => ({
+        loader: loader,
+        textureloader: textureloader,
+        hidden: session.getState().hidden,
+        onLoadError: (error) => {
+            Log.debug(error);
+            if (!stopped) {
+                showMessage(root, strings.modelfailed, 'warning');
+            }
+        },
+        roomName: (sceneid) => {
+            const target = scenes.find((s) => s.id === sceneid);
+            return target ? target.name : null;
+        },
+    });
+
+    let doc = null;
+    let resumestate = null;
+    return session.loadResume().then((resume) => {
+        const resumed = resume ? scenes.find((s) => s.id === resume.scene) : null;
+        doc = resumed || startScene(config);
+        resumestate = resumed ? resume : null;
+        return buildScene(THREE, doc, roomOptions());
+    }).then((handle) => run({
+        root, session, config, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions,
+        doc, handle, resume: resumestate, live: live, setStopped: () => {
+            stopped = true;
+        },
+    })).catch((error) => {
+        stopped = true;
+        renderer.setAnimationLoop(null);
+        renderer.dispose();
+        clearMessage(root, loading);
+        throw error;
+    });
+};
+
+/**
  * Start the 3D view.
  *
  * @param {HTMLElement} root The MAVR root element (holding the shell).
@@ -130,60 +197,7 @@ export const start = (root, session, config, options = {}) => {
         {key: 'xrinsecure', component: 'mavrruntime_builtin'},
         {key: 'xrfailed', component: 'mavrruntime_builtin'},
         {key: 'xrplace', component: 'mavrruntime_builtin'},
-    ]).then(([loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace]) => {
-        const strings = {loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace};
-        if (!startScene(config)) {
-            throw new Error('No scene in the launch config');
-        }
-        stage.classList.remove('d-none');
-        showMessage(root, loading, 'info');
-
-        const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        renderer.xr.enabled = true;
-        const scene3 = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 300);
-        const rig = new THREE.Group();
-        rig.name = 'mavr-rig';
-        rig.add(camera);
-        scene3.add(rig);
-        const loader = new GLTFLoader();
-        const textureloader = new THREE.TextureLoader();
-        let stopped = false;
-
-        const roomOptions = () => ({
-            loader: loader,
-            textureloader: textureloader,
-            hidden: session.getState().hidden,
-            onLoadError: (error) => {
-                Log.debug(error);
-                if (!stopped) {
-                    showMessage(root, strings.modelfailed, 'warning');
-                }
-            },
-            roomName: (sceneid) => {
-                const target = scenes.find((s) => s.id === sceneid);
-                return target ? target.name : null;
-            },
-        });
-
-        return session.loadResume().then((resume) => {
-            const resumed = resume ? scenes.find((s) => s.id === resume.scene) : null;
-            const doc = resumed || startScene(config);
-            return buildScene(THREE, doc, roomOptions()).then((handle) => run({
-                root, session, config, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions,
-                doc, handle, resume: resumed ? resume : null, live: live, setStopped: () => {
-                    stopped = true;
-                },
-            }));
-        }).catch((error) => {
-            stopped = true;
-            renderer.setAnimationLoop(null);
-            renderer.dispose();
-            clearMessage(root, loading);
-            throw error;
-        });
-    }).then((handle) => {
+    ]).then((values) => prepareRoom({root, session, config, live, stage, canvas, scenes}, values)).then((handle) => {
         pending.resolve();
         return handle;
     }, (error) => {

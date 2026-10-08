@@ -52,9 +52,9 @@ export const STATES = Object.freeze(['idle', 'joining', 'joined', 'reconnecting'
  * @param {*} error The error a listener threw.
  */
 const report = (error) => {
-    if (typeof console !== 'undefined' && console && typeof console.error === 'function') {
-        // eslint-disable-next-line no-console
-        console.error(error);
+    const con = typeof globalThis !== 'undefined' ? globalThis.console : undefined;
+    if (con && typeof con.error === 'function') {
+        con.error(error);
     }
 };
 

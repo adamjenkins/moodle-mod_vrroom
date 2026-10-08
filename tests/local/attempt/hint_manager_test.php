@@ -31,7 +31,6 @@ use mod_mavr\local\template\compiled_activity;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(hint_manager::class)]
 final class hint_manager_test extends \advanced_testcase {
-
     /**
      * A gallery activity whose graph is replaced by one with hints, and a student's attempt.
      *
@@ -108,9 +107,14 @@ final class hint_manager_test extends \advanced_testcase {
      * @param string $id object id
      */
     private function record(\stdClass $fx, string $verb, string $type, string $id): void {
-        event_store::insert((int)$fx->attempt->id, \core\uuid::generate(),
+        event_store::insert(
+            (int)$fx->attempt->id,
+            \core\uuid::generate(),
             ['verb' => $verb, 'type' => $type, 'id' => $id, 'scene' => $fx->sceneid, 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
     }
 
     /**
@@ -190,8 +194,11 @@ final class hint_manager_test extends \advanced_testcase {
 
         $this->assert_error('errornomorehints', fn() => hint_manager::request($fx->attempt, 'x-1', $fx->context));
 
-        $rows = array_values($DB->get_records('mavr_events',
-            ['attemptid' => $fx->attempt->id, 'verb' => 'requested'], 'id ASC'));
+        $rows = array_values($DB->get_records(
+            'mavr_events',
+            ['attemptid' => $fx->attempt->id, 'verb' => 'requested'],
+            'id ASC'
+        ));
         $this->assertCount(2, $rows);
         $this->assertSame('hint', $rows[0]->objecttype);
         $this->assertSame('hn-1', $rows[0]->objectid);
@@ -215,14 +222,18 @@ final class hint_manager_test extends \advanced_testcase {
     public function test_launch_hints(): void {
         $fx = $this->setup_attempt();
 
-        $this->assertSame(['x-1' => ['total' => 2, 'used' => []]],
-            hint_manager::launch_hints($fx->graph, [], $fx->context));
+        $this->assertSame(
+            ['x-1' => ['total' => 2, 'used' => []]],
+            hint_manager::launch_hints($fx->graph, [], $fx->context)
+        );
 
         $this->record($fx, 'entered', 'zone', $fx->zone);
         hint_manager::request($fx->attempt, 'x-1', $fx->context);
         $events = event_store::get_events((int)$fx->attempt->id);
-        $this->assertSame(['x-1' => ['total' => 2, 'used' => [['id' => 'hn-1', 'text' => 'First hint & more']]]],
-            hint_manager::launch_hints($fx->graph, $events, $fx->context));
+        $this->assertSame(
+            ['x-1' => ['total' => 2, 'used' => [['id' => 'hn-1', 'text' => 'First hint & more']]]],
+            hint_manager::launch_hints($fx->graph, $events, $fx->context)
+        );
 
         // A graph without hints has none to release.
         $this->assertSame([], hint_manager::launch_hints(['schema' => 'mavr-graph/1', 'objectives' => []], [], $fx->context));

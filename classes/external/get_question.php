@@ -32,7 +32,6 @@ use mod_mavr\local\questions\usage;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_question extends external_api {
-
     /**
      * Parameters.
      *
@@ -54,8 +53,10 @@ class get_question extends external_api {
      */
     public static function execute(int $attemptid, int $slot): array {
         global $USER;
-        ['attemptid' => $attemptid, 'slot' => $slot] = self::validate_parameters(self::execute_parameters(),
-            ['attemptid' => $attemptid, 'slot' => $slot]);
+        ['attemptid' => $attemptid, 'slot' => $slot] = self::validate_parameters(
+            self::execute_parameters(),
+            ['attemptid' => $attemptid, 'slot' => $slot]
+        );
 
         $context = helper::context_for_attempt($attemptid);
         self::validate_context($context);

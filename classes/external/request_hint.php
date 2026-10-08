@@ -35,7 +35,6 @@ use mod_mavr\local\attempt\hint_manager;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class request_hint extends external_api {
-
     /**
      * Parameters.
      *
@@ -57,8 +56,10 @@ class request_hint extends external_api {
      */
     public static function execute(int $attemptid, string $objectiveid): array {
         global $USER;
-        $params = self::validate_parameters(self::execute_parameters(),
-            ['attemptid' => $attemptid, 'objectiveid' => $objectiveid]);
+        $params = self::validate_parameters(
+            self::execute_parameters(),
+            ['attemptid' => $attemptid, 'objectiveid' => $objectiveid]
+        );
         $attemptid = $params['attemptid'];
         $objectiveid = $params['objectiveid'];
 
@@ -68,8 +69,14 @@ class request_hint extends external_api {
 
         $hint = hint_manager::request($attempt, $objectiveid, $context);
         $events = event_store::get_events((int)$attempt->id);
-        $state = attempt_manager::build_state((int)$attempt->id, (string)$attempt->state,
-            (int)$attempt->graphversion, $hint['result'], count($events), (int)($attempt->timedue ?? 0));
+        $state = attempt_manager::build_state(
+            (int)$attempt->id,
+            (string)$attempt->state,
+            (int)$attempt->graphversion,
+            $hint['result'],
+            count($events),
+            (int)($attempt->timedue ?? 0)
+        );
 
         return [
             'hintid' => $hint['hintid'],

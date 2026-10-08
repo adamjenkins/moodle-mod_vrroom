@@ -130,8 +130,14 @@ final class hint_manager {
         $penalty = $hint['penalty'] ?? 0;
         $penalty = (is_int($penalty) || is_float($penalty)) ? (float)$penalty : 0.0;
 
-        event_store::record_server($attempt, 'requested', 'hint', null, (string)$hint['id'],
-            ['penalty' => $penalty, 'objective' => $objectiveid]);
+        event_store::record_server(
+            $attempt,
+            'requested',
+            'hint',
+            null,
+            (string)$hint['id'],
+            ['penalty' => $penalty, 'objective' => $objectiveid]
+        );
         $result = attempt_manager::recompute($attempt);
 
         return [
@@ -168,8 +174,10 @@ final class hint_manager {
     private static function objectives_with_hints(array $graph): array {
         $objectives = [];
         foreach ((array)($graph['objectives'] ?? []) as $objective) {
-            if (!is_array($objective) || !isset($objective['id']) || !is_string($objective['id'])
-                    || !isset($objective['hints']) || !is_array($objective['hints'])) {
+            if (
+                !is_array($objective) || !isset($objective['id']) || !is_string($objective['id'])
+                    || !isset($objective['hints']) || !is_array($objective['hints'])
+            ) {
                 continue;
             }
             $hints = [];

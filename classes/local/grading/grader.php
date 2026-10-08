@@ -27,7 +27,6 @@ namespace mod_mavr\local\grading;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class grader {
-
     /** @var int The highest finished attempt counts. */
     public const GRADE_HIGHEST = 1;
 
@@ -59,10 +58,13 @@ final class grader {
      */
     public static function calculate_user_score(\stdClass $mavr, int $userid): ?float {
         global $DB;
-        $scores = $DB->get_records_select_menu('mavr_attempts',
+        $scores = $DB->get_records_select_menu(
+            'mavr_attempts',
             'mavrid = :mavrid AND userid = :userid AND state = :state AND score IS NOT NULL',
             ['mavrid' => $mavr->id, 'userid' => $userid, 'state' => 'finished'],
-            'attempt ASC', 'attempt, score');
+            'attempt ASC',
+            'attempt, score'
+        );
         return self::combine($mavr, array_map('floatval', $scores));
     }
 
@@ -81,8 +83,13 @@ final class grader {
             $where .= ' AND userid = :userid';
             $params['userid'] = $userid;
         }
-        $rs = $DB->get_recordset_select('mavr_attempts', $where, $params, 'userid ASC, attempt ASC',
-            'id, userid, attempt, score');
+        $rs = $DB->get_recordset_select(
+            'mavr_attempts',
+            $where,
+            $params,
+            'userid ASC, attempt ASC',
+            'id, userid, attempt, score'
+        );
         $byuser = [];
         foreach ($rs as $row) {
             $byuser[(int)$row->userid][(int)$row->attempt] = (float)$row->score;

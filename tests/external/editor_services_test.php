@@ -29,7 +29,6 @@ use core_external\external_api;
 #[\PHPUnit\Framework\Attributes\CoversClass(editor_load::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(editor_save::class)]
 final class editor_services_test extends \advanced_testcase {
-
     /**
      * A course with a gallery, a student, a non-editing teacher, an editing teacher and an outsider.
      *
@@ -90,8 +89,10 @@ final class editor_services_test extends \advanced_testcase {
         }
         $this->assertSame('mavr-editdoc/1', json_decode($loaded['documentjson'], true)['schema']);
 
-        $result = external_api::clean_returnvalue(editor_save::execute_returns(),
-            editor_save::execute((int)$fx->module->cmid, self::payload($loaded)));
+        $result = external_api::clean_returnvalue(
+            editor_save::execute_returns(),
+            editor_save::execute((int)$fx->module->cmid, self::payload($loaded))
+        );
         $this->assertMatchesRegularExpression('/^[0-9a-f]{40}$/', $result['revision']);
         $this->assertSame(1, $result['graphversion']);
         $this->assertFalse($result['scenesupdated']);

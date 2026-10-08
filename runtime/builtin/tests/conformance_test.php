@@ -35,4 +35,13 @@ final class conformance_test extends \mod_mavr\tests\runtime_conformance_testcas
     protected function get_runtime_name(): string {
         return 'builtin';
     }
+
+    /**
+     * The registry resolves this run mode's short name to this plugin's runtime class.
+     *
+     * @return void
+     */
+    public function test_registry_resolves_runtime(): void {
+        $this->assertInstanceOf(runtime::class, \mod_mavr\local\runtime\registry::get($this->get_runtime_name()));
+    }
 }

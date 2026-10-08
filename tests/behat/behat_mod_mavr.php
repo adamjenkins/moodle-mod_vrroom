@@ -39,7 +39,6 @@ use Behat\Mink\Exception\ExpectationException;
  * carries data-mavr-editor-ready once its document has loaded.
  */
 class behat_mod_mavr extends behat_base {
-
     /** @var string CSS selector of a started room. */
     private const READY_SELECTOR = '[data-region="mavr-root"][data-mavr-ready]';
 
@@ -77,8 +76,11 @@ class behat_mod_mavr extends behat_base {
      * @param string $coursefullname course full name
      * @param string $sectionnum section number
      */
-    public function i_add_a_mavr_activity_using_the_template(string $template, string $coursefullname,
-            string $sectionnum): void {
+    public function i_add_a_mavr_activity_using_the_template(
+        string $template,
+        string $coursefullname,
+        string $sectionnum
+    ): void {
         $courseid = $this->get_course_id($coursefullname);
         if (!$courseid) {
             throw new ExpectationException('There is no course "' . $coursefullname . '".', $this->getSession());
@@ -92,6 +94,8 @@ class behat_mod_mavr extends behat_base {
         $this->execute('behat_general::i_visit', [$addurl]);
     }
 
+    // phpcs:disable moodle.Files.LineLength.TooLong -- a Behat step definition cannot be wrapped.
+
     /**
      * Add a MAVR activity built by one template, fill the form and save it.
      *
@@ -101,13 +105,19 @@ class behat_mod_mavr extends behat_base {
      * @param string $sectionnum section number
      * @param TableNode $data the form fields and values
      */
-    public function i_add_a_mavr_activity_using_the_template_and_fill_the_form(string $template, string $coursefullname,
-            string $sectionnum, TableNode $data): void {
+    public function i_add_a_mavr_activity_using_the_template_and_fill_the_form(
+        string $template,
+        string $coursefullname,
+        string $sectionnum,
+        TableNode $data
+    ): void {
         $this->i_add_a_mavr_activity_using_the_template($template, $coursefullname, $sectionnum);
         $this->execute('behat_general::wait_until_the_page_is_ready');
         $this->execute('behat_forms::i_set_the_following_fields_to_these_values', $data);
         $this->execute('behat_forms::press_button', get_string('savechangesandreturntocourse'));
     }
+
+    // phpcs:enable
 
     /**
      * Wait until the MAVR room editor has loaded its document.

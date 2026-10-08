@@ -68,12 +68,12 @@ const MIN_YAW_LENGTH = 0.05;
  */
 const hueOf = (peerid) => {
     const text = String(peerid || '');
-    let hash = 2166136261;
+    // Polynomial string hash kept below 2^31 so it stays exact in floating point.
+    let hash = 7;
     for (let i = 0; i < text.length; i++) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
+        hash = (hash * 31 + text.charCodeAt(i)) % 2147483647;
     }
-    return (hash >>> 0) % 360;
+    return hash % 360;
 };
 
 /**
@@ -165,7 +165,12 @@ export const createAvatar = (THREE, options) => {
     group.add(label);
 
     // Speaking ring above the label.
-    const ringmaterial = keep(materials, new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0, depthWrite: false}));
+    const ringmaterial = keep(materials, new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+    }));
     const ring = new THREE.Mesh(keep(geometries, new THREE.TorusGeometry(0.07, 0.007, 8, 40)), ringmaterial);
     ring.name = 'ring';
     ring.rotation.x = Math.PI / 2;

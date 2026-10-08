@@ -31,7 +31,6 @@ use mod_mavr\local\instance_manager;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(get_question_view::class)]
 final class get_question_view_test extends \advanced_testcase {
-
     /**
      * Course, gallery with a true/false question at station "Vase", a started attempt.
      *
@@ -83,9 +82,14 @@ final class get_question_view_test extends \advanced_testcase {
      * @return void
      */
     private function visit(\stdClass $fx): void {
-        event_store::insert((int)$fx->attempt->id, \core\uuid::generate(),
+        event_store::insert(
+            (int)$fx->attempt->id,
+            \core\uuid::generate(),
             ['verb' => 'entered', 'type' => 'zone', 'id' => $fx->vase, 'scene' => $fx->sceneid, 'fraction' => null],
-            true, null, time());
+            true,
+            null,
+            time()
+        );
     }
 
     /**
@@ -118,8 +122,10 @@ final class get_question_view_test extends \advanced_testcase {
         $this->assert_error('errorinvalidslot', fn() => get_question_view::execute($attemptid, 0));
 
         $this->visit($fx);
-        $result = external_api::clean_returnvalue(get_question_view::execute_returns(),
-            get_question_view::execute($attemptid, $fx->slot));
+        $result = external_api::clean_returnvalue(
+            get_question_view::execute_returns(),
+            get_question_view::execute($attemptid, $fx->slot)
+        );
         $this->assertSame($fx->slot, $result['slot']);
         $this->assertTrue($result['supported']);
         $this->assertSame('truefalse', $result['qtype']);
@@ -131,10 +137,15 @@ final class get_question_view_test extends \advanced_testcase {
         $this->assertStringStartsWith('q' . $fx->attempt->uniqueid . ':', $result['choices'][0]['name']);
 
         // Answered: the view says so and carries the fraction.
-        submit_question::execute($attemptid, $fx->slot,
-            [['name' => $result['choices'][1]['name'], 'value' => $result['choices'][1]['value']]]);
-        $result = external_api::clean_returnvalue(get_question_view::execute_returns(),
-            get_question_view::execute($attemptid, $fx->slot));
+        submit_question::execute(
+            $attemptid,
+            $fx->slot,
+            [['name' => $result['choices'][1]['name'], 'value' => $result['choices'][1]['value']]]
+        );
+        $result = external_api::clean_returnvalue(
+            get_question_view::execute_returns(),
+            get_question_view::execute($attemptid, $fx->slot)
+        );
         $this->assertTrue($result['answered']);
         $this->assertSame('gradedwrong', $result['state']);
         $this->assertEqualsWithDelta(0.0, $result['fraction'], 1e-6);
