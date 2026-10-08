@@ -196,7 +196,8 @@ final class runtime_test extends \advanced_testcase {
             $peers[$vrroom->id] = [$mine, $theirs];
         }
         $runtime = new runtime();
-        $count = fn(int $vrroomid, string $table) => $DB->count_records('vrroomruntime_builtin_' . $table, ['vrroomid' => $vrroomid]);
+        $count = fn(int $vrroomid, string $table) =>
+            $DB->count_records('vrroomruntime_builtin_' . $table, ['vrroomid' => $vrroomid]);
 
         // A user's data in one activity: their presence and every signal from or to it.
         $runtime->cleanup(new cleanup_scope(cleanup_scope::USER_DELETE, 0, (int)$one->id, (int)$user->id));

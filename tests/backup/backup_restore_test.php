@@ -373,6 +373,6 @@ final class backup_restore_test extends \advanced_testcase {
         $this->resetAfterTest();
         $content = $CFG->wwwroot . '/mod/vrroom/view.php?id=12 and ' . $CFG->wwwroot . '/mod/vrroom/index.php?id=3';
         $encoded = \backup_vrroom_activity_task::encode_content_links($content);
-        $this->assertSame('$@VR roomVIEWBYID*12@$ and $@VR roomINDEX*3@$', $encoded);
+        $this->assertSame('$@VRROOMVIEWBYID*12@$ and $@VRROOMINDEX*3@$', $encoded);
     }
 }

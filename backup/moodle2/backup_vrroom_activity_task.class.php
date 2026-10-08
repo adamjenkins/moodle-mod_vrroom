@@ -67,11 +67,11 @@ class backup_vrroom_activity_task extends backup_activity_task {
 
         // Link to the list of VR room activities.
         $search = '/(' . $base . '\/mod\/vrroom\/index.php\?id\=)([0-9]+)/';
-        $content = preg_replace($search, '$@VR roomINDEX*$2@$', $content);
+        $content = preg_replace($search, '$@VRROOMINDEX*$2@$', $content);
 
         // Link to a VR room activity by course module id.
         $search = '/(' . $base . '\/mod\/vrroom\/view.php\?id\=)([0-9]+)/';
-        $content = preg_replace($search, '$@VR roomVIEWBYID*$2@$', $content);
+        $content = preg_replace($search, '$@VRROOMVIEWBYID*$2@$', $content);
 
         return $content;
     }

@@ -151,7 +151,8 @@ final class instance_manager {
         }
         $vrroom->timemodified = time();
 
-        $cmid = $data->coursemodule ?? get_coursemodule_from_instance('vrroom', $vrroom->id, $vrroom->course, false, MUST_EXIST)->id;
+        $cmid = $data->coursemodule
+            ?? get_coursemodule_from_instance('vrroom', $vrroom->id, $vrroom->course, false, MUST_EXIST)->id;
         $context = \context_module::instance($cmid);
 
         $transaction = $DB->start_delegated_transaction();

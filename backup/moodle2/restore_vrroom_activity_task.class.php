@@ -70,8 +70,8 @@ class restore_vrroom_activity_task extends restore_activity_task {
      */
     public static function define_decode_rules() {
         return [
-            new restore_decode_rule('VR roomVIEWBYID', '/mod/vrroom/view.php?id=$1', 'course_module'),
-            new restore_decode_rule('VR roomINDEX', '/mod/vrroom/index.php?id=$1', 'course'),
+            new restore_decode_rule('VRROOMVIEWBYID', '/mod/vrroom/view.php?id=$1', 'course_module'),
+            new restore_decode_rule('VRROOMINDEX', '/mod/vrroom/index.php?id=$1', 'course'),
         ];
     }
 
