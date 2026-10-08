@@ -5,8 +5,23 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the plugin from `mod_mavr` to `mod_vrroom` ("VR room"); sub-plugin types
+  `vrroomruntime` and `vrroomtemplate`. Never released under the old name.
+- `$plugin->supported` widened to `[502, 503]`.
+
 ### Added
 
+- Bar under the 3D room: Fullscreen toggle; user preferences `mod_vrroom_invertx`,
+  `mod_vrroom_inverty`, `mod_vrroom_locky` (exported by the privacy provider).
+- Collision for walking: 0.3 m body radius against the environment, props and 3D models, with
+  wall sliding.
+- Activity settings `questionmode` (`once` / `retry`) and `retrypenalty`; both task-graph
+  evaluators take them as options; fixtures `question_once_mode`, `question_retry_mode`.
+- GitHub Actions workflow (Moodle 5.3; PHP 8.3 + MariaDB 11.4, PHP 8.4 + PostgreSQL 17), with
+  extra steps for the bundled sub-plugins' PHPUnit suites and the built-in run mode's AMD lint and
+  build check, and the JavaScript fixture tests.
 - Live mode for the built-in run mode (activity setting *Live mode*, 2 to 6 people per room):
   avatars with head and hand poses, positional voice with mute, push to talk and per-person mute,
   and a participant list. Browser-to-browser WebRTC with signalling relayed by Moodle web services

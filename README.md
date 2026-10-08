@@ -12,7 +12,7 @@ when a browser cannot show 3D.
 
 ## Requirements
 
-- Moodle 5.2 (`$plugin->supported = [502, 502]`).
+- Moodle 5.2 or 5.3 (`$plugin->supported = [502, 503]`). Continuous integration currently tests Moodle 5.3 only.
 - A browser with WebGL for the 3D room. The list view needs nothing special.
 - No external services: the 3D viewer (three.js) is bundled in the plugin and makes no calls to
   other sites. Live mode (below) connects the participants' browsers directly to each other; STUN

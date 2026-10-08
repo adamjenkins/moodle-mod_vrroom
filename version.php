@@ -30,4 +30,4 @@ $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 // Moodle 5.2.0 (the v5.2.0 tag's public/version.php: 2026042000.00).
 $plugin->requires = 2026042000;
-$plugin->supported = [502, 502];
+$plugin->supported = [502, 503];

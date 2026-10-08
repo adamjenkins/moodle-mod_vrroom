@@ -29,5 +29,5 @@ $plugin->version = 2026100800;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->requires = 2026042000;
-$plugin->supported = [502, 502];
+$plugin->supported = [502, 503];
 $plugin->dependencies = ['mod_vrroom' => 2026100800];

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Renamed from MAVR (mod_mavr) to VR room (mod_vrroom); the sub-plugin types are now
+  vrroomruntime and vrroomtemplate.
+- A bar under the 3D room: Fullscreen, and three drag settings remembered per user (reverse
+  left/right, reverse up/down, lock up/down so the view stays level).
+- Walking stops at walls, furniture and 3D models instead of passing through them.
+- New activity settings for questions: one try per question (an answered question now says so),
+  or try again until correct, with a chosen share of the points lost per wrong try.
+- Supports Moodle 5.3 as well as 5.2; GitHub Actions CI on Moodle 5.3 (PHP 8.3 with MariaDB 11.4,
+  PHP 8.4 with PostgreSQL 17), including the bundled sub-plugins' tests and builds.
 - Live mode (Phase 3): people working on the same activity at the same time can join a live room
   of up to six, see each other as avatars (3D, VR, AR and MR) and talk. Everyone keeps their own
   attempt and grade. Browsers connect directly to each other (WebRTC); Moodle relays the connection
