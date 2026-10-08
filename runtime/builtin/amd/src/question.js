@@ -119,6 +119,14 @@ const wire = (host, session, slot) => {
 };
 
 /**
+ * Whether the activity allows one try per question (its question mode is not retry).
+ *
+ * @param {Object} session The session.
+ * @returns {boolean}
+ */
+const onceMode = (session) => !(session.config && session.config.questionmode && session.config.questionmode.mode === 'retry');
+
+/**
  * Show the graded question after a submit and wire what it needs next.
  *
  * @param {HTMLElement} host The question region.
@@ -134,6 +142,7 @@ const showSubmitted = (host, session, slot, result) => place(host, {
     locked: false,
     lockedmessage: '',
     retry: !!result.retry,
+    oncenotice: !!result.answered && !result.retry && onceMode(session),
 }, result.javascript).then(() => {
     let state = 'open';
     if (result.retry) {
@@ -171,6 +180,7 @@ const showFetched = (host, session, slot, result) => place(host, {
     locked: false,
     lockedmessage: '',
     retry: false,
+    oncenotice: !!result.answered && onceMode(session),
 }, result.javascript).then(() => {
     host.dataset.vrroomQuestionState = result.answered ? 'answered' : 'open';
     if (!result.answered) {

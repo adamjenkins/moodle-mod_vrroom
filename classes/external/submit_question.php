@@ -30,10 +30,10 @@ use mod_vrroom\local\questions\usage;
  * Submit a response to one question; the question engine grades it and the server records the
  * `answered` statement and replays the attempt.
  *
- * When the objective needs a minimum fraction (pass_fraction) and the answer falls short, the
- * objective stays available and the question is restarted in place, so the student can try
- * again (Phase 2 contract §4.2.3); the response then carries retry = true and the feedback HTML
- * of the try that fell short.
+ * When the answer leaves the objective open after the server's replay (below the objective's
+ * pass_fraction, or not fully correct when the activity's question mode is retry), the question is
+ * restarted in place so the student can try again (Phase 2 contract §4.2.3); the response then
+ * carries retry = true and the feedback HTML of the try that fell short.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -102,14 +102,10 @@ class submit_question extends external_api {
             $result = attempt_manager::recompute($attempt);
             [$html, $javascript] = usage::render($attempt, $slot, true);
             $retry = false;
-            $passfraction = $objective['pass_fraction'] ?? null;
             $objectivestatus = (string)($result->objectives[(string)$objective['id']]['status'] ?? '');
-            if (
-                (is_int($passfraction) || is_float($passfraction))
-                    && max(0.0, min(1.0, (float)($fraction ?? 0.0))) < (float)$passfraction - 1e-9
-                    && $objectivestatus === evaluator::OBJECTIVE_AVAILABLE
-            ) {
-                // Not good enough: keep the graded try and start a fresh one in the same slot.
+            if ($objectivestatus === evaluator::OBJECTIVE_AVAILABLE) {
+                // The replay left the objective open (below its pass_fraction, or not fully correct in the
+                // activity's retry question mode): keep the graded try and start a fresh one in the same slot.
                 usage::restart($attempt, $slot, time());
                 $retry = true;
             }

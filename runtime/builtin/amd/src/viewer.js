@@ -217,6 +217,16 @@ export const start = (root, session, config, options = {}) => {
 const run = (p) => {
     const {root, session, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions, resume} = p;
     let current = {doc: p.doc, handle: p.handle};
+    // Bumped whenever the set of obstacles may have changed (see obstacleMeshes()).
+    let obstacleversion = 0;
+    const refreshObstaclesWhenLoaded = (handle) => {
+        Promise.resolve(handle.ready).then(() => {
+            obstacleversion++;
+            return undefined;
+        }).catch(() => {
+            obstacleversion++;
+        });
+    };
     let stopped = false;
     let switching = null;
     const inside = new Set();
@@ -549,6 +559,7 @@ const run = (p) => {
 
     // Hidden objects and locked hotspots follow the state.
     const applyState = () => {
+        obstacleversion++;
         current.handle.setHidden(session.getState().hidden);
         current.handle.setLocked((item) => item.kind === 'hotspot' && !!item.zone && session.isZoneLocked(item.zone));
     };
@@ -583,6 +594,7 @@ const run = (p) => {
             }
             current.handle.dispose();
             current = {doc: doc, handle: handle};
+            refreshObstaclesWhenLoaded(handle);
             grabbed.clear();
             scene3.add(handle.root);
             session.setScene(doc.id);
@@ -662,8 +674,40 @@ const run = (p) => {
         }
     };
 
+    // What the walker cannot pass through: the environment (walls, an uploaded room), props and 3D models.
+    // Hotspot markers, labels, images and grabbable objects stay walk-through. Rebuilt when the room,
+    // its loaded models or the shown/hidden state change.
+    let obstaclecache = null;
+    const obstacleMeshes = () => {
+        const handle = current.handle;
+        if (obstaclecache && obstaclecache.handle === handle && obstaclecache.version === obstacleversion) {
+            return obstaclecache.list;
+        }
+        const list = [];
+        const add = (object) => {
+            if (object) {
+                object.traverseVisible((node) => {
+                    if (node.isMesh) {
+                        list.push(node);
+                    }
+                });
+            }
+        };
+        add(handle.environment && handle.environment.group);
+        handle.props.forEach((record) => add(record.mesh));
+        handle.items.forEach((record) => {
+            if (record.kind === 'model') {
+                add(record.group);
+            }
+        });
+        obstaclecache = {handle: handle, version: obstacleversion, list: list};
+        return list;
+    };
+    refreshObstaclesWhenLoaded(current.handle);
+
     // Controls (desktop and touch) move the rig.
     const controls = attach(camera, canvas, {
+        obstacles: obstacleMeshes,
         bounds: current.handle.environment.bounds,
         eyeHeight: EYE,
         rig: rig,

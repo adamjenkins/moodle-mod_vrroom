@@ -110,12 +110,23 @@ final class evaluator {
     /** @var string[] Run state: status per processed event. */
     private array $eventstatus = [];
 
+    /** @var bool Option: questions are retried until fully correct (activity question mode retry). */
+    private bool $retry = false;
+
+    /** @var float Option: share of an objective's points lost per wrong try in retry mode. */
+    private float $retrypenalty = 0.0;
+
     /**
      * Constructor.
      *
      * @param array $graph decoded, validated vrroom-graph/1 (assoc arrays). Pure: no DB, no globals.
+     * @param array $options ['retry' => bool, 'retrypenalty' => float] from the activity's question mode
+     *     (\mod_vrroom\local\questions\mode::evaluator_options()); none = one try per question.
      */
-    public function __construct(array $graph) {
+    public function __construct(array $graph, array $options = []) {
+        $this->retry = !empty($options['retry']);
+        $penalty = $options['retrypenalty'] ?? 0;
+        $this->retrypenalty = $this->retry && is_numeric($penalty) ? max(0.0, min(1.0, (float)$penalty)) : 0.0;
         $position = 0;
         foreach (self::as_list($graph['objectives'] ?? []) as $raw) {
             if (!is_array($raw) || !isset($raw['id'])) {
@@ -359,8 +370,15 @@ final class evaluator {
                     case 'answer_question':
                         $fraction = $event['fraction'] ?? 0.0;
                         $fraction = max(0.0, min(1.0, $fraction));
-                        if ($objective['pass_fraction'] !== null && $fraction < $objective['pass_fraction'] - 1e-9) {
-                            // Not good enough: the objective stays available for another try.
+                        // Retry mode needs a fully correct answer; otherwise the objective's own pass_fraction.
+                        $threshold = $this->retry ? 1.0 : $objective['pass_fraction'];
+                        if ($threshold !== null && $fraction < $threshold - 1e-9) {
+                            // Not good enough: the objective stays available for another try, which in
+                            // retry mode costs a share of its points.
+                            if ($this->retrypenalty > 0) {
+                                $this->penalty[$pos] = self::round7($this->penalty[$pos]
+                                    + $objective['points'] * $this->retrypenalty);
+                            }
                             break;
                         }
                         $this->complete($pos, self::round7($objective['points'] * $fraction));

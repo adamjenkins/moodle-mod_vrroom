@@ -41,7 +41,7 @@ class backup_vrroom_activity_structure_step extends backup_questions_activity_st
 
         $vrroom = new backup_nested_element('vrroom', ['id'], [
             'name', 'intro', 'introformat', 'runtime', 'template', 'templateconfig', 'graphjson',
-            'graphversion', 'grade', 'grademethod', 'maxattempts', 'completionobjectives',
+            'graphversion', 'grade', 'grademethod', 'maxattempts', 'questionmode', 'retrypenalty', 'completionobjectives',
             'customised', 'livemode', 'livemaxusers', 'timecreated', 'timemodified',
         ]);
 

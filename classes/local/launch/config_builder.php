@@ -21,6 +21,7 @@ use mod_vrroom\local\attempt\event_store;
 use mod_vrroom\local\attempt\hint_manager;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\xapi\iri;
 
 /**
@@ -68,6 +69,7 @@ final class config_builder {
         $preview = $attempt === null;
         $graphversion = $preview ? (int)$vrroom->graphversion : (int)$attempt->graphversion;
         $graph = instance_manager::get_graph((int)$vrroom->id, $graphversion);
+        $evaluatoroptions = mode::evaluator_options($vrroom);
 
         $scenes = [];
         foreach (instance_manager::get_scenes((int)$vrroom->id) as $scene) {
@@ -76,12 +78,12 @@ final class config_builder {
 
         if ($preview) {
             $events = [];
-            $result = (new evaluator($graph))->evaluate([]);
+            $result = (new evaluator($graph, $evaluatoroptions))->evaluate([]);
             $state = attempt_manager::build_state(0, 'preview', $graphversion, $result, 0, 0);
             $slotmap = [];
         } else {
             $events = event_store::get_events((int)$attempt->id);
-            $result = (new evaluator($graph))->evaluate($events);
+            $result = (new evaluator($graph, $evaluatoroptions))->evaluate($events);
             $state = attempt_manager::build_state(
                 (int)$attempt->id,
                 (string)$attempt->state,
@@ -135,6 +137,10 @@ final class config_builder {
                 'stateid' => self::RESUME_STATEID,
             ],
             'finishurl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
+            'questionmode' => [
+                'mode' => $evaluatoroptions['retry'] ? mode::RETRY : mode::ONCE,
+                'retrypenalty' => $evaluatoroptions['retrypenalty'],
+            ],
             'look' => [
                 'invertx' => (bool)get_user_preferences('mod_vrroom_invertx', 0, $user),
                 'inverty' => (bool)get_user_preferences('mod_vrroom_inverty', 0, $user),

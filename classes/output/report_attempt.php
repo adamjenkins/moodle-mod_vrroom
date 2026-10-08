@@ -23,6 +23,7 @@ use mod_vrroom\local\attempt\event_store;
 use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\mode;
 
 /**
  * One attempt in the VR room report: its objectives and its statement timeline.
@@ -123,7 +124,8 @@ class report_attempt implements renderable, templatable {
         } catch (\moodle_exception $e) {
             return [];
         }
-        $result = (new evaluator($graph))->evaluate(event_store::get_events((int)$this->attempt->id));
+        $options = mode::evaluator_options_for((int)$this->attempt->vrroomid);
+        $result = (new evaluator($graph, $options))->evaluate(event_store::get_events((int)$this->attempt->id));
 
         $rows = [];
         foreach ($result->objectives as $id => $objective) {

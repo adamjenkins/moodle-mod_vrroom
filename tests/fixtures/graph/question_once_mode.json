@@ -1,0 +1,56 @@
+{
+  "name": "question_once_mode",
+  "intent": "Default question mode (no options): the first answer completes the objective with points x fraction, even a wrong one; a later answer to the completed objective is applied but changes nothing.",
+  "graph": {
+    "schema": "vrroom-graph/1",
+    "objectives": [
+      {
+        "id": "q-1",
+        "type": "answer_question",
+        "title": "Question 1",
+        "slot": 1,
+        "points": 4,
+        "required": true
+      }
+    ],
+    "rules": []
+  },
+  "events": [
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 0
+    },
+    {
+      "verb": "answered",
+      "type": "question",
+      "id": "1",
+      "scene": null,
+      "fraction": 1
+    }
+  ],
+  "expect": {
+    "eventstatus": [
+      "applied",
+      "applied"
+    ],
+    "objectives": {
+      "q-1": {
+        "status": "completed",
+        "earned": 0,
+        "hintsused": 0
+      }
+    },
+    "earnedpoints": 0,
+    "maxpoints": 4,
+    "score": 0,
+    "requireddone": 1,
+    "requiredtotal": 1,
+    "finished": false,
+    "allrequiredcompleted": true,
+    "hidden": [],
+    "effects": []
+  }
+}

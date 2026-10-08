@@ -19,6 +19,7 @@ namespace mod_vrroom\local;
 use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\questions\slots;
 use mod_vrroom\local\runtime\cleanup_scope;
 use mod_vrroom\local\runtime\registry as runtime_registry;
@@ -67,6 +68,8 @@ final class instance_manager {
         $vrroom->grade = self::clean_grade($data->grade ?? $template->default_grade());
         $vrroom->grademethod = self::clean_grademethod($data->grademethod ?? grader::GRADE_HIGHEST);
         $vrroom->maxattempts = max(0, (int)($data->maxattempts ?? 0));
+        $vrroom->questionmode = mode::clean($data->questionmode ?? mode::ONCE);
+        $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty ?? mode::DEFAULT_PENALTY);
         $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
         $vrroom->livemode = empty($data->livemode) ? 0 : 1;
         $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
@@ -143,6 +146,12 @@ final class instance_manager {
         if (property_exists($data, 'maxattempts')) {
             $vrroom->maxattempts = max(0, (int)$data->maxattempts);
         }
+        if (property_exists($data, 'questionmode')) {
+            $vrroom->questionmode = mode::clean($data->questionmode);
+        }
+        if (property_exists($data, 'retrypenalty')) {
+            $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty);
+        }
         $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
         if (property_exists($data, 'livemode')) {
             // Without these fields (no run mode can run a live room) the stored values stay.
@@ -168,6 +177,8 @@ final class instance_manager {
                     'grade' => $vrroom->grade,
                     'grademethod' => $vrroom->grademethod,
                     'maxattempts' => $vrroom->maxattempts,
+                    'questionmode' => mode::clean($vrroom->questionmode ?? null),
+                    'retrypenalty' => mode::clean_penalty($vrroom->retrypenalty ?? null),
                     'completionobjectives' => $vrroom->completionobjectives,
                     'livemode' => $vrroom->livemode,
                     'livemaxusers' => $vrroom->livemaxusers,

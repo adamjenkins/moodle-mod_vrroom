@@ -142,7 +142,10 @@ class Session {
         this.timer = null;
         this.timeupsent = false;
         this.setServerState(config.state || null, !!config.state);
-        this.local = evaluate(this.graph, this.allEvents());
+        // The activity's question mode, as the server's evaluator applies it.
+        const questionmode = config.questionmode || {};
+        this.evaluatoroptions = {retry: questionmode.mode === 'retry', retrypenalty: Number(questionmode.retrypenalty) || 0};
+        this.local = evaluate(this.graph, this.allEvents(), this.evaluatoroptions);
         this.effectsseen = this.local.effects.length;
         this.view = this.buildView();
         this.reconciling = null;
@@ -323,7 +326,7 @@ class Session {
      */
     update(fireeffects) {
         const previous = this.view;
-        this.local = evaluate(this.graph, this.allEvents());
+        this.local = evaluate(this.graph, this.allEvents(), this.evaluatoroptions);
         let effects = [];
         if (fireeffects && this.local.effects.length > this.effectsseen) {
             effects = this.local.effects.slice(this.effectsseen);
@@ -406,7 +409,7 @@ class Session {
             return 'closed';
         }
         const event = normaliseEvent({verb: verb, type: type, id: id, scene: sceneid || null, fraction: null});
-        const status = classify(this.graph, this.allEvents(), event);
+        const status = classify(this.graph, this.allEvents(), event, this.evaluatoroptions);
         if (status === STATUS.LOCKED) {
             return status;
         }
@@ -650,7 +653,7 @@ class Session {
      */
     isZoneLocked(zoneid) {
         const event = normaliseEvent({verb: 'entered', type: 'zone', id: zoneid, scene: this.sceneid});
-        return classify(this.graph, this.allEvents(), event) === STATUS.LOCKED;
+        return classify(this.graph, this.allEvents(), event, this.evaluatoroptions) === STATUS.LOCKED;
     }
 
     /**
@@ -661,7 +664,7 @@ class Session {
      */
     isObjectLocked(objectid) {
         const event = normaliseEvent({verb: 'interacted', type: 'object', id: objectid, scene: this.sceneid});
-        return classify(this.graph, this.allEvents(), event) === STATUS.LOCKED;
+        return classify(this.graph, this.allEvents(), event, this.evaluatoroptions) === STATUS.LOCKED;
     }
 
     /**

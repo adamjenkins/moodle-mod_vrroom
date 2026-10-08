@@ -90,7 +90,8 @@ test('the fixture set is complete', () => {
     assert.deepEqual(files.map((f) => f.replace(/\.json$/, '')), [
         'answer_while_locked', 'collect_keys_lock', 'collect_n_of_set', 'empty_graph', 'escape_chain',
         'finish_on_all_required', 'gallery_ordered', 'hint_locked_completed', 'hint_penalty',
-        'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'rules_show_hide', 'score_at_least',
+        'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'question_once_mode',
+        'question_retry_mode', 'rules_show_hide', 'score_at_least',
         'sequence_strict', 'single_visit', 'unlock_action_cascade', 'visit_then_question',
         'zero_points_required_ratio',
     ]);
@@ -119,7 +120,8 @@ for (const file of files) {
         assert.equal(fixture.name, file.replace(/\.json$/, ''));
         assert.deepEqual(validate(fixture.graph), [], 'fixture graph must be valid');
 
-        const result = evaluate(fixture.graph, fixture.events);
+        const options = fixture.options || {};
+        const result = evaluate(fixture.graph, fixture.events, options);
         assert.equal(result.eventstatus.length, fixture.events.length);
         assertMatches(fixture.expect, result, 'expect', true);
 
@@ -128,7 +130,7 @@ for (const file of files) {
 
         // Classify agrees with the status evaluate() records for the same event.
         fixture.events.forEach((event, i) => {
-            assert.equal(classify(fixture.graph, fixture.events.slice(0, i), event), result.eventstatus[i],
+            assert.equal(classify(fixture.graph, fixture.events.slice(0, i), event, options), result.eventstatus[i],
                 `classify event ${i}`);
         });
     });

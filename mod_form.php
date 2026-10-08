@@ -28,6 +28,7 @@ require_once($CFG->dirroot . '/course/moodleform_mod.php');
 
 use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\runtime\registry as runtime_registry;
 use mod_vrroom\local\template\registry as template_registry;
 
@@ -125,6 +126,24 @@ class mod_vrroom_mod_form extends moodleform_mod {
         }
         $mform->addElement('select', 'maxattempts', get_string('maxattempts', 'vrroom'), $attemptoptions);
         $mform->setDefault('maxattempts', 0);
+
+        $mform->addElement(
+            'select',
+            'questionmode',
+            get_string('questionmode', 'vrroom'),
+            mode::mode_options()
+        );
+        $mform->setDefault('questionmode', mode::ONCE);
+        $mform->addHelpButton('questionmode', 'questionmode', 'vrroom');
+        $mform->addElement(
+            'select',
+            'retrypenalty',
+            get_string('retrypenalty', 'vrroom'),
+            mode::penalty_options()
+        );
+        $mform->setDefault('retrypenalty', (string)mode::DEFAULT_PENALTY);
+        $mform->addHelpButton('retrypenalty', 'retrypenalty', 'vrroom');
+        $mform->hideIf('retrypenalty', 'questionmode', 'neq', mode::RETRY);
 
         $this->standard_grading_coursemodule_elements();
 

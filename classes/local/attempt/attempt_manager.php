@@ -23,6 +23,7 @@ use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\graph\evaluation_result;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\questions\slots;
 use mod_vrroom\local\questions\usage;
 
@@ -272,7 +273,8 @@ final class attempt_manager {
      */
     public static function evaluate(\stdClass $attempt): evaluation_result {
         $graph = instance_manager::get_graph((int)$attempt->vrroomid, (int)$attempt->graphversion);
-        return (new evaluator($graph))->evaluate(event_store::get_events((int)$attempt->id));
+        $options = mode::evaluator_options_for((int)$attempt->vrroomid);
+        return (new evaluator($graph, $options))->evaluate(event_store::get_events((int)$attempt->id));
     }
 
     /**
@@ -284,7 +286,7 @@ final class attempt_manager {
     public static function get_state(\stdClass $attempt): array {
         $events = event_store::get_events((int)$attempt->id);
         $graph = instance_manager::get_graph((int)$attempt->vrroomid, (int)$attempt->graphversion);
-        $result = (new evaluator($graph))->evaluate($events);
+        $result = (new evaluator($graph, mode::evaluator_options_for((int)$attempt->vrroomid)))->evaluate($events);
         return self::build_state(
             (int)$attempt->id,
             (string)$attempt->state,

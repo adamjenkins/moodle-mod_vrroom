@@ -47,14 +47,15 @@ final class evaluator_test extends \advanced_testcase {
     }
 
     /**
-     * There are exactly the 19 fixtures the contracts name (guards against a vacuous provider).
+     * There are exactly the 21 fixtures the contracts and the question modes name (guards against a vacuous provider).
      */
     public function test_fixture_set_is_complete(): void {
         $this->resetAfterTest();
         $expected = [
             'answer_while_locked', 'collect_keys_lock', 'collect_n_of_set', 'empty_graph', 'escape_chain',
             'finish_on_all_required', 'gallery_ordered', 'hint_locked_completed', 'hint_penalty',
-            'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'rules_show_hide', 'score_at_least',
+            'interacted_zone_counts', 'locked_until_after', 'pass_fraction_retry', 'question_once_mode',
+            'question_retry_mode', 'rules_show_hide', 'score_at_least',
             'sequence_strict', 'single_visit', 'unlock_action_cascade', 'visit_then_question',
             'zero_points_required_ratio',
         ];
@@ -74,7 +75,7 @@ final class evaluator_test extends \advanced_testcase {
 
         $this->assertSame([], graph_validator::validate($fixture['graph']), 'fixture graph must be valid');
 
-        $result = (new evaluator($fixture['graph']))->evaluate($fixture['events'])->to_array();
+        $result = (new evaluator($fixture['graph'], $fixture['options'] ?? []))->evaluate($fixture['events'])->to_array();
         $this->assertCount(count($fixture['events']), $result['eventstatus']);
         $this->assert_matches($fixture['expect'], $result, 'expect', true);
 
@@ -92,7 +93,7 @@ final class evaluator_test extends \advanced_testcase {
     public function test_classify_agrees_with_evaluate(string $file): void {
         $this->resetAfterTest();
         $fixture = json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
-        $evaluator = new evaluator($fixture['graph']);
+        $evaluator = new evaluator($fixture['graph'], $fixture['options'] ?? []);
         $statuses = $evaluator->evaluate($fixture['events'])->eventstatus;
         foreach ($fixture['events'] as $i => $event) {
             $before = array_slice($fixture['events'], 0, $i);

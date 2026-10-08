@@ -26,6 +26,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['allrequireddone'] = 'You have completed everything that is required. You can finish your attempt now or keep exploring.';
+$string['answeredonce'] = 'You have answered this question in this attempt. To answer it again, start a new attempt.';
 $string['controlshelp'] = 'Move with W, A, S and D or the arrow keys, and look around by dragging. Click the floor to walk there and press Enter to open what is in the middle of the screen. On a touch screen, use the stick to move and drag to look around.';
 $string['enter3d'] = 'Enter the 3D room';
 $string['enterar'] = 'Enter AR';

@@ -25,6 +25,7 @@ use mod_vrroom\local\attempt\event_store;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\launch\config_builder;
+use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\xapi\iri;
 
 /**
@@ -353,7 +354,10 @@ class handler extends \core_xapi\handler {
     private function get_evaluator(int $vrroomid, int $version): evaluator {
         $key = $vrroomid . ':' . $version;
         if (!isset($this->evaluators[$key])) {
-            $this->evaluators[$key] = new evaluator(instance_manager::get_graph($vrroomid, $version));
+            $this->evaluators[$key] = new evaluator(
+                instance_manager::get_graph($vrroomid, $version),
+                mode::evaluator_options_for($vrroomid)
+            );
         }
         return $this->evaluators[$key];
     }

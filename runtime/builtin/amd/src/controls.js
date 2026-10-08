@@ -45,6 +45,10 @@ const CLICK = 5;
 
 /** Bounds are shrunk by this margin (m). */
 const MARGIN = 0.3;
+/** @var {number} How close (metres) the walker's centre gets to a wall or piece of furniture. */
+const RADIUS = 0.3;
+/** @var {number[]} Heights (metres above the floor) of the rays that look for obstacles: knee and chest. */
+const STEPHEIGHTS = [0.4, 1.1];
 
 /** Radius of the virtual stick's travel (px). */
 const STICK = 60;
@@ -63,7 +67,8 @@ const MOVES = {
  * Options: bounds {min, max}; eyeHeight (default 1.6); stick (HTMLElement of the virtual stick);
  * rig (THREE.Object3D that holds the camera; optional); onClick(ndc {x, y}) → true when the click
  * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen);
- * invertX, invertY (reverse the drag-to-look direction on that axis); lockY (dragging never tilts).
+ * invertX, invertY (reverse the drag-to-look direction on that axis); lockY (dragging never tilts);
+ * obstacles() → THREE.Mesh[] the walker may not pass through (walls, furniture), or none.
  *
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
@@ -91,6 +96,10 @@ export const attach = (camera, canvas, options = {}) => {
     let stickpointer = null;
     const raycaster = new THREE.Raycaster();
     const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const obstacles = typeof options.obstacles === 'function' ? options.obstacles : () => [];
+    const ray = new THREE.Raycaster();
+    const origin = new THREE.Vector3();
+    const direction = new THREE.Vector3();
     const listeners = [];
 
     camera.rotation.order = 'YXZ';
@@ -112,6 +121,102 @@ export const attach = (camera, canvas, options = {}) => {
         p.z = minz <= maxz ? Math.min(maxz, Math.max(minz, p.z)) : (bounds.min[2] + bounds.max[2]) / 2;
         p.y = 0;
         return p;
+    };
+
+    /**
+     * The nearest obstacle within reach along a horizontal direction, at knee or chest height.
+     *
+     * Faces count from both sides, so single-sided walls stop the walker from either side.
+     *
+     * @param {number} dirx Unit direction x.
+     * @param {number} dirz Unit direction z.
+     * @param {number} reach How far to look, in metres.
+     * @returns {Object|null} {distance, normal (horizontal unit THREE.Vector3 facing the walker)}
+     */
+    const nearestObstacle = (dirx, dirz, reach) => {
+        const meshes = obstacles();
+        if (!meshes || !meshes.length) {
+            return null;
+        }
+        direction.set(dirx, 0, dirz);
+        ray.far = reach;
+        const sides = meshes.map((mesh) => {
+            const side = mesh.material && mesh.material.side;
+            if (mesh.material && !Array.isArray(mesh.material)) {
+                mesh.material.side = THREE.DoubleSide;
+            }
+            return side;
+        });
+        let best = null;
+        try {
+            STEPHEIGHTS.forEach((height) => {
+                origin.set(position.x, height, position.z);
+                ray.set(origin, direction);
+                const hit = ray.intersectObjects(meshes, false)[0];
+                if (hit && hit.face && (!best || hit.distance < best.distance)) {
+                    best = hit;
+                }
+            });
+        } finally {
+            meshes.forEach((mesh, i) => {
+                if (mesh.material && !Array.isArray(mesh.material)) {
+                    mesh.material.side = sides[i];
+                }
+            });
+        }
+        if (!best) {
+            return null;
+        }
+        const normal = best.face.normal.clone().transformDirection(best.object.matrixWorld);
+        normal.y = 0;
+        if (normal.lengthSq() < 1e-6) {
+            normal.set(-dirx, 0, -dirz);
+        }
+        normal.normalize();
+        if (normal.x * dirx + normal.z * dirz > 0) {
+            normal.negate();
+        }
+        return {distance: best.distance, normal: normal};
+    };
+
+    /**
+     * Move by (dx, dz), stopping a body radius short of obstacles and sliding along them.
+     *
+     * @param {number} dx Wanted move in x.
+     * @param {number} dz Wanted move in z.
+     * @returns {boolean} Whether the walker moved at all.
+     */
+    const moveBy = (dx, dz) => {
+        const length = Math.hypot(dx, dz);
+        if (length < 1e-6) {
+            return false;
+        }
+        const ux = dx / length;
+        const uz = dz / length;
+        const hit = nearestObstacle(ux, uz, length + RADIUS);
+        if (!hit) {
+            position.x += dx;
+            position.z += dz;
+            return true;
+        }
+        const allowed = Math.max(0, Math.min(length, hit.distance - RADIUS));
+        position.x += ux * allowed;
+        position.z += uz * allowed;
+        // Slide: the rest of the move without its component into the obstacle.
+        const restx = dx - ux * allowed;
+        const restz = dz - uz * allowed;
+        const into = restx * hit.normal.x + restz * hit.normal.z;
+        const slidex = restx - hit.normal.x * into;
+        const slidez = restz - hit.normal.z * into;
+        const slide = Math.hypot(slidex, slidez);
+        if (slide > 1e-4) {
+            const blocked = nearestObstacle(slidex / slide, slidez / slide, slide + RADIUS);
+            const free = blocked ? Math.max(0, Math.min(slide, blocked.distance - RADIUS)) : slide;
+            position.x += slidex / slide * free;
+            position.z += slidez / slide * free;
+            return allowed > 1e-4 || free > 1e-4;
+        }
+        return allowed > 1e-4;
     };
 
     const apply = () => {
@@ -326,21 +431,17 @@ export const attach = (camera, canvas, options = {}) => {
                 forward /= length;
                 right /= length;
                 // Yaw θ looks toward (−sin θ, 0, −cos θ); right is (cos θ, 0, −sin θ).
-                position.x += (-sin * forward + cos * right) * speed * step;
-                position.z += (-cos * forward - sin * right) * speed * step;
+                moveBy((-sin * forward + cos * right) * speed * step, (-cos * forward - sin * right) * speed * step);
                 clamp(position);
             } else if (target) {
                 const dx = target.x - position.x;
                 const dz = target.z - position.z;
                 const distance = Math.hypot(dx, dz);
                 const move = WALK * step;
-                if (distance <= Math.max(0.05, move)) {
-                    position.x = target.x;
-                    position.z = target.z;
+                const reach = Math.min(distance, move);
+                // A walk that an obstacle stops (no progress at all) ends there.
+                if (!moveBy(dx / distance * reach, dz / distance * reach) || distance <= Math.max(0.05, move)) {
                     target = null;
-                } else {
-                    position.x += dx / distance * move;
-                    position.z += dz / distance * move;
                 }
                 clamp(position);
             }

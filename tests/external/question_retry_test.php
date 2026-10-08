@@ -25,8 +25,9 @@ use mod_vrroom\local\questions\usage;
 use mod_vrroom\local\template\compiled_activity;
 
 /**
- * Tests of the code-lock retry: an answer below the objective's pass_fraction restarts the
- * question in place (mod_vrroom_submit_question returns retry).
+ * Tests of retries: an answer below the objective's pass_fraction, or not fully correct in the
+ * activity's retry question mode, restarts the question in place (mod_vrroom_submit_question
+ * returns retry).
  *
  * @package    mod_vrroom
  * @category   test
@@ -186,6 +187,34 @@ final class question_retry_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('errorquestionanswered', $e->errorcode);
         }
+    }
+
+    /**
+     * The activity's retry question mode: without pass_fraction a wrong answer still restarts the
+     * question, and the right answer then completes it less the penalty for the wrong try.
+     */
+    public function test_retry_question_mode(): void {
+        global $DB;
+        $fx = $this->setup_attempt(false);
+        $DB->update_record('vrroom', (object)['id' => $fx->attempt->vrroomid, 'questionmode' => 'retry',
+            'retrypenalty' => 0.5]);
+
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '0'))
+        );
+        $this->assertTrue($result['retry']);
+        $this->assertSame('available', $this->objective_status($result['state'], 'q-1'));
+        $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
+
+        $result = external_api::clean_returnvalue(
+            submit_question::execute_returns(),
+            submit_question::execute($fx->attemptid, $fx->slot, $this->responses($fx, '1'))
+        );
+        $this->assertFalse($result['retry']);
+        $this->assertSame('completed', $this->objective_status($result['state'], 'q-1'));
+        // 2 points less 0.5 x 2 for the one wrong try.
+        $this->assertEqualsWithDelta(1.0, $result['state']['earnedpoints'], 1e-6);
     }
 
     /**

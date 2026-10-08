@@ -25,11 +25,35 @@
 /**
  * Upgrades the plugin from an older version.
  *
- * Version 0.1.0 is the first release, so there are no steps yet.
- *
  * @param int $oldversion The version being upgraded from.
  * @return bool
  */
 function xmldb_vrroom_upgrade(int $oldversion): bool {
+    global $DB;
+    $dbman = $DB->get_manager();
+
+    if ($oldversion < 2026100801) {
+        // Question mode: one try per question, or retries until fully correct with a penalty per wrong try.
+        $table = new xmldb_table('vrroom');
+        $field = new xmldb_field('questionmode', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'once', 'maxattempts');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $field = new xmldb_field(
+            'retrypenalty',
+            XMLDB_TYPE_NUMBER,
+            '10, 7',
+            null,
+            XMLDB_NOTNULL,
+            null,
+            '0.3333333',
+            'questionmode'
+        );
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_mod_savepoint(true, 2026100801, 'vrroom');
+    }
+
     return true;
 }

@@ -28,6 +28,7 @@
     * lockedmessage - plain-text notice for locked or preview questions
     * retry - the answer fell short of what the objective needs; the question has been restarted
       and Try again loads the fresh question
+    * oncenotice - the question is answered and the activity allows one try per question: say so
 
     Example context (json):
     {
@@ -36,7 +37,8 @@
         "answered": false,
         "locked": false,
         "lockedmessage": "",
-        "retry": false
+        "retry": false,
+        "oncenotice": false
     }
 }}
 {{#locked}}
@@ -47,6 +49,9 @@
     <div data-region="vrroom-question-html">{{{html}}}</div>
     {{^answered}}<button type="submit" class="btn btn-primary mt-2" data-action="vrroom-submit-question">{{#str}}submitanswer, vrroomruntime_builtin{{/str}}</button>{{/answered}}
 </form>
+{{#oncenotice}}
+<p class="alert alert-info mt-2" data-region="vrroom-answered-notice">{{#str}}answeredonce, vrroomruntime_builtin{{/str}}</p>
+{{/oncenotice}}
 {{#retry}}
 <p class="alert alert-warning mt-2" data-region="vrroom-retry-notice">{{#str}}retrynotice, vrroomruntime_builtin{{/str}}</p>
 <button type="button" class="btn btn-secondary mt-2" data-action="vrroom-retry-question">{{#str}}tryagain, vrroomruntime_builtin{{/str}}</button>

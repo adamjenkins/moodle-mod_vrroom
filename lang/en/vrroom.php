@@ -318,6 +318,13 @@ $string['privacy:metadata:vrroom_events:timestamp'] = 'When the browser says the
 $string['privacy:metadata:vrroom_events:verb'] = 'What the user did.';
 $string['questionchoice'] = '{$a->bank}: {$a->category}: {$a->name}';
 $string['questionmissing'] = 'This question is no longer available.';
+$string['questionmode'] = 'Answering questions';
+$string['questionmode_help'] = 'How students answer the questions in the room.
+
+* **One try per question**: each question is answered once in an attempt; its answer and feedback then stay on show. A student who wants to answer again starts a new attempt.
+* **Try again until correct**: an answer that is not fully correct shows its feedback and a Try again button. The question counts as done only when it is answered correctly, and every wrong try first costs the share of its points set below.';
+$string['questionmodeonce'] = 'One try per question';
+$string['questionmoderetry'] = 'Try again until correct';
 $string['rebuild'] = 'Rebuild from the template';
 $string['rebuild_help'] = 'Discards every change made in the room editor and builds the room again from the template\'s settings. Attempts already made keep the tasks they were played with.';
 $string['reportactions'] = 'Actions';
@@ -350,6 +357,8 @@ $string['reportuser'] = 'Student';
 $string['reportverb'] = 'Action';
 $string['reportviewattempt'] = 'View details';
 $string['resetattempts'] = 'Delete all VR room attempts';
+$string['retrypenalty'] = 'Points lost per wrong try';
+$string['retrypenalty_help'] = 'With "Try again until correct": the share of a question\'s points taken off for each wrong try before the right answer. The question never scores below zero.';
 $string['runtime'] = 'Run mode';
 $string['runtime_help'] = 'How the room is delivered to students. The built-in viewer runs inside Moodle and needs nothing else.';
 $string['runtimenotready'] = 'This activity cannot be opened at the moment: {$a}';

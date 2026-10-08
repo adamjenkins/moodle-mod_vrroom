@@ -19,6 +19,8 @@
         <FIELD NAME="grade" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="100" SEQUENCE="false" COMMENT="Maximum grade (points only; 0 = no grade)."/>
         <FIELD NAME="grademethod" TYPE="int" LENGTH="2" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="How attempt scores combine: 1 highest, 2 average, 3 last."/>
         <FIELD NAME="maxattempts" TYPE="int" LENGTH="6" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Attempts allowed per user; 0 = unlimited."/>
+        <FIELD NAME="questionmode" TYPE="char" LENGTH="10" NOTNULL="true" DEFAULT="once" SEQUENCE="false" COMMENT="How students answer questions: once = one try per question in an attempt; retry = try again until fully correct."/>
+        <FIELD NAME="retrypenalty" TYPE="number" LENGTH="10" NOTNULL="true" DEFAULT="0.3333333" SEQUENCE="false" DECIMALS="7" COMMENT="With questionmode retry: share of a question's points lost for each wrong try before the right answer."/>
         <FIELD NAME="completionobjectives" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion rule: all required objectives completed in a finished attempt."/>
         <FIELD NAME="customised" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Time of the first room editor save; 0 while the room is built by its template."/>
         <FIELD NAME="livemode" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when people can meet in a live room (avatars, voice); every person keeps their own attempt."/>

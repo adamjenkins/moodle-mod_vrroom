@@ -240,8 +240,12 @@ class Run {
      * Initialise the run state (§4.4.1 Initialisation).
      *
      * @param {Object} compiled result of compile()
+     * @param {Object} options {retry, retrypenalty}: the activity's question mode (none = one try per question)
      */
-    constructor(compiled) {
+    constructor(compiled, options = {}) {
+        this.retry = !!(options && options.retry);
+        const penalty = options && isNum(options.retrypenalty) ? options.retrypenalty : 0;
+        this.retryPenalty = this.retry ? Math.max(0, Math.min(1, penalty)) : 0;
         this.objectives = compiled.objectives;
         this.index = compiled.index;
         this.rules = compiled.rules;
@@ -303,8 +307,14 @@ class Run {
                         break;
                     case 'answer_question': {
                         const fraction = Math.max(0, Math.min(1, event.fraction === null ? 0 : event.fraction));
-                        if (objective.passFraction !== null && fraction < objective.passFraction - 1e-9) {
-                            // Not good enough: the objective stays available for another try.
+                        // Retry mode needs a fully correct answer; otherwise the objective's own pass_fraction.
+                        const threshold = this.retry ? 1 : objective.passFraction;
+                        if (threshold !== null && fraction < threshold - 1e-9) {
+                            // Not good enough: the objective stays available for another try, which in
+                            // retry mode costs a share of its points.
+                            if (this.retryPenalty > 0) {
+                                this.penalty[pos] = round7(this.penalty[pos] + objective.points * this.retryPenalty);
+                            }
                             break;
                         }
                         this.complete(pos, round7(objective.points * fraction));
@@ -644,10 +654,11 @@ const triggerMatches = (trigger, on) => {
  *
  * @param {Object} graph decoded vrroom-graph/1
  * @param {Object[]} events §4.4.1 events in order
+ * @param {Object} options {retry, retrypenalty} (see Run)
  * @returns {Run}
  */
-const runEvents = (graph, events) => {
-    const run = new Run(compile(graph));
+const runEvents = (graph, events, options = {}) => {
+    const run = new Run(compile(graph), options);
     asList(events).forEach((event, i) => run.process(i, normaliseEvent(event)));
     return run;
 };
@@ -657,9 +668,10 @@ const runEvents = (graph, events) => {
  *
  * @param {Object} graph decoded, validated vrroom-graph/1
  * @param {Object[]} events §4.4.1 events {verb, type, id, scene, fraction} in order
+ * @param {Object} options {retry, retrypenalty}: the activity's question mode (none = one try per question)
  * @returns {Object} same shape as \mod_vrroom\local\graph\evaluation_result::to_array()
  */
-export const evaluate = (graph, events) => runEvents(graph, events).result();
+export const evaluate = (graph, events, options = {}) => runEvents(graph, events, options).result();
 
 /**
  * Status a candidate event would get after the given events (§4.4.1 Classify).
@@ -667,10 +679,11 @@ export const evaluate = (graph, events) => runEvents(graph, events).result();
  * @param {Object} graph decoded, validated vrroom-graph/1
  * @param {Object[]} events events already accepted, in order
  * @param {Object} event the candidate event
+ * @param {Object} options {retry, retrypenalty}: the activity's question mode (none = one try per question)
  * @returns {string} a STATUS value
  */
-export const classify = (graph, events, event) => {
-    const run = runEvents(graph, events);
+export const classify = (graph, events, event, options = {}) => {
+    const run = runEvents(graph, events, options);
     return run.classifyMatches(run.matching(normaliseEvent(event)));
 };
 
