@@ -14,10 +14,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * xAPI statements for the built-in viewer: building (mavr-vocab/1), UUIDs, queueing, batching
+ * xAPI statements for the built-in viewer: building (vrroom-vocab/1), UUIDs, queueing, batching
  * and retrying, sent through core_xapi_statement_post.
  *
- * @module     mavrruntime_builtin/statements
+ * @module     vrroomruntime_builtin/statements
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -27,7 +27,7 @@ import Config from 'core/config';
 import Log from 'core/log';
 
 /** Vocabulary version carried in every statement. */
-const VOCAB = 'mavr-vocab/1';
+const VOCAB = 'vrroom-vocab/1';
 
 /** Retry delays in seconds after network failures. */
 const BACKOFF = [2, 4, 8, 16, 32];
@@ -200,7 +200,7 @@ export const createQueue = (config, onBatchDone, options = {}) => {
         const batch = queue.slice(0, maxbatch);
         const request = Ajax.call([{
             methodname: 'core_xapi_statement_post',
-            args: {component: 'mod_mavr', requestjson: JSON.stringify(batch)},
+            args: {component: 'mod_vrroom', requestjson: JSON.stringify(batch)},
         }])[0];
         const promise = Promise.resolve(request)
             .then((accepted) => {
@@ -245,7 +245,7 @@ export const createQueue = (config, onBatchDone, options = {}) => {
             const body = JSON.stringify([{
                 index: 0,
                 methodname: 'core_xapi_statement_post',
-                args: {component: 'mod_mavr', requestjson: JSON.stringify(batch)},
+                args: {component: 'mod_vrroom', requestjson: JSON.stringify(batch)},
             }]);
             if (!navigator.sendBeacon(url, body)) {
                 return;

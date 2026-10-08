@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\scene;
+namespace mod_vrroom\local\scene;
 
 /**
- * Validates mavr-scene/1 documents.
+ * Validates vrroom-scene/1 documents.
  *
  * Errors are developer-facing English (they describe a template bug, not a teacher mistake).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class scene_validator {
     /** @var string Schema identifier. */
-    public const SCHEMA = 'mavr-scene/1';
+    public const SCHEMA = 'vrroom-scene/1';
     /** @var string Pattern every id in a scene must match. */
     public const ID_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/';
     /** @var int Most interactables in one scene. */
@@ -48,7 +48,7 @@ final class scene_validator {
     public const FILE_AREAS = ['models', 'media', 'environment', 'assets'];
     /** @var int Most rooms (scenes) in one activity. */
     public const MAX_SCENES = 20;
-    /** @var int Longest scene id (mavr_scenes.idnumber and mavr_events.sceneid are char(36)). */
+    /** @var int Longest scene id (vrroom_scenes.idnumber and vrroom_events.sceneid are char(36)). */
     public const MAX_SCENE_ID_LENGTH = 36;
 
     /**

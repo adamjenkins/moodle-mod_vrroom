@@ -15,15 +15,15 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/editor_inspector
+    @template mod_vrroom/editor_inspector
 
     The room editor's inspector: one labelled field per property of the selected object. A change
     is committed when the field fires its change event.
 
     Data attributes required for JS:
     * data-path and data-type on every field
-    * data-action="mavr-insp-delete", "mavr-insp-duplicate"
-    * data-action="mavr-insp-upload" with data-kind and data-path
+    * data-action="vrroom-insp-delete", "vrroom-insp-duplicate"
+    * data-action="vrroom-insp-upload" with data-kind and data-path
 
     Context variables required for this template:
     * hasselection - whether something is selected
@@ -49,38 +49,38 @@
     }
 }}
 {{^hasselection}}
-<p class="text-muted small">{{#str}}editornoselection, mod_mavr{{/str}}</p>
+<p class="text-muted small">{{#str}}editornoselection, mod_vrroom{{/str}}</p>
 {{/hasselection}}
 {{#hasselection}}
 <h3 class="h6">{{heading}}</h3>
-<div class="mavr-editor-fields">
+<div class="vrroom-editor-fields">
     {{#fields}}
     <div class="mb-2">
         {{#ischeckbox}}
         <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"{{#checked}} checked{{/checked}}>
-            <label class="form-check-label" for="mavr-insp-{{id}}">{{label}}</label>
+            <input type="checkbox" class="form-check-input" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"{{#checked}} checked{{/checked}}>
+            <label class="form-check-label" for="vrroom-insp-{{id}}">{{label}}</label>
         </div>
         {{/ischeckbox}}
         {{^ischeckbox}}
-        <label class="form-label small mb-0" for="mavr-insp-{{id}}">{{label}}</label>
+        <label class="form-label small mb-0" for="vrroom-insp-{{id}}">{{label}}</label>
         {{#isnumber}}
-        <input type="number" class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
+        <input type="number" class="form-control form-control-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
                value="{{value}}" step="{{step}}"{{#min}} min="{{min}}"{{/min}}{{#max}} max="{{max}}"{{/max}}{{#hintid}} aria-describedby="{{hintid}}"{{/hintid}}>
         {{/isnumber}}
         {{#istext}}
-        <input type="text" class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
+        <input type="text" class="form-control form-control-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}"
                value="{{value}}"{{#hintid}} aria-describedby="{{hintid}}"{{/hintid}}>
         {{/istext}}
         {{#iscolour}}
-        <input type="color" class="form-control form-control-sm form-control-color" id="mavr-insp-{{id}}" data-path="{{path}}"
+        <input type="color" class="form-control form-control-sm form-control-color" id="vrroom-insp-{{id}}" data-path="{{path}}"
                data-type="{{type}}" value="{{value}}">
         {{/iscolour}}
         {{#istextarea}}
-        <textarea class="form-control form-control-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}" rows="4">{{value}}</textarea>
+        <textarea class="form-control form-control-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}" rows="4">{{value}}</textarea>
         {{/istextarea}}
         {{#isselect}}
-        <select class="form-select form-select-sm" id="mavr-insp-{{id}}" data-path="{{path}}" data-type="{{type}}">
+        <select class="form-select form-select-sm" id="vrroom-insp-{{id}}" data-path="{{path}}" data-type="{{type}}">
             {{#options}}
             <option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>
             {{/options}}
@@ -98,18 +98,18 @@
         <p class="form-text small mb-0" id="{{hintid}}">{{hint}}</p>
         {{/hint}}
         {{#uploadkind}}
-        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-action="mavr-insp-upload" data-kind="{{uploadkind}}"
-                data-path="{{path}}">{{#str}}editorupload, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-action="vrroom-insp-upload" data-kind="{{uploadkind}}"
+                data-path="{{path}}">{{#str}}editorupload, mod_vrroom{{/str}}</button>
         {{/uploadkind}}
     </div>
     {{/fields}}
 </div>
 <div class="d-flex flex-wrap gap-2 mt-3">
     {{#canduplicate}}
-    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-insp-duplicate">{{#str}}editorduplicate, mod_mavr{{/str}}</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-insp-duplicate">{{#str}}editorduplicate, mod_vrroom{{/str}}</button>
     {{/canduplicate}}
     {{#candelete}}
-    <button type="button" class="btn btn-outline-danger btn-sm" data-action="mavr-insp-delete">{{#str}}editordelete, mod_mavr{{/str}}</button>
+    <button type="button" class="btn btn-outline-danger btn-sm" data-action="vrroom-insp-delete">{{#str}}editordelete, mod_vrroom{{/str}}</button>
     {{/candelete}}
 </div>
 {{/hasselection}}

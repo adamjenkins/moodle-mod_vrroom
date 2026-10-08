@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Post-install steps for mod_mavr.
+ * Post-install steps for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,15 +30,15 @@
  *
  * @return bool
  */
-function xmldb_mavr_install(): bool {
+function xmldb_vrroom_install(): bool {
     global $CFG;
     require_once($CFG->libdir . '/filelib.php');
 
-    \mod_mavr\local\token::ensure_secret();
+    \mod_vrroom\local\token::ensure_secret();
 
     if (!array_key_exists('glb', get_mimetypes_array())) {
         \core_filetypes::add_type('glb', 'model/gltf-binary', 'unknown', [], '', 'GL Transmission Format binary');
-        set_config('addedglbtype', 1, 'mod_mavr');
+        set_config('addedglbtype', 1, 'mod_vrroom');
     }
 
     return true;

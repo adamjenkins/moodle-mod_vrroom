@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 
 /**
- * Tests of mod_mavr_finish_attempt.
+ * Tests of mod_vrroom_finish_attempt.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -40,7 +40,7 @@ final class finish_attempt_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
         $student = $generator->create_and_enrol($course, 'student');
         $other = $generator->create_and_enrol($course, 'student');
 
@@ -54,7 +54,7 @@ final class finish_attempt_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('errornotyourattempt', $e->errorcode);
         }
-        $this->assertSame('inprogress', $DB->get_field('mavr_attempts', 'state', ['id' => $attemptid]));
+        $this->assertSame('inprogress', $DB->get_field('vrroom_attempts', 'state', ['id' => $attemptid]));
 
         $this->setUser($student);
         $result = external_api::clean_returnvalue(finish_attempt::execute_returns(), finish_attempt::execute($attemptid));
@@ -62,11 +62,11 @@ final class finish_attempt_test extends \advanced_testcase {
         $this->assertSame('finished', $result['state']);
         $this->assertEqualsWithDelta(0.0, $result['score'], 1e-6);
         $this->assertSame(
-            (new \moodle_url('/mod/mavr/view.php', ['id' => $module->cmid]))->out(false),
+            (new \moodle_url('/mod/vrroom/view.php', ['id' => $module->cmid]))->out(false),
             $result['redirecturl']
         );
 
-        $grades = grade_get_grades($course->id, 'mod', 'mavr', $module->id, (int)$student->id);
+        $grades = grade_get_grades($course->id, 'mod', 'vrroom', $module->id, (int)$student->id);
         $this->assertEqualsWithDelta(0.0, (float)$grades->items[0]->grades[$student->id]->grade, 1e-6);
 
         try {

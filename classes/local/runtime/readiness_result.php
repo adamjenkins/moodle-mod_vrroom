@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\runtime;
+namespace mod_vrroom\local\runtime;
 
 /**
  * Whether a run mode can launch right now.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 /**
- * A MAVR activity was viewed.
+ * A VR room activity was viewed.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -32,7 +32,7 @@ class course_module_viewed extends \core\event\course_module_viewed {
     protected function init() {
         $this->data['crud'] = 'r';
         $this->data['edulevel'] = self::LEVEL_PARTICIPATING;
-        $this->data['objecttable'] = 'mavr';
+        $this->data['objecttable'] = 'vrroom';
     }
 
     /**
@@ -41,6 +41,6 @@ class course_module_viewed extends \core\event\course_module_viewed {
      * @return array
      */
     public static function get_objectid_mapping() {
-        return ['db' => 'mavr', 'restore' => 'mavr'];
+        return ['db' => 'vrroom', 'restore' => 'vrroom'];
     }
 }

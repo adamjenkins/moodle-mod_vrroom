@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\questions\usage;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\questions\usage;
 
 /**
  * Render one question of the current user's open attempt, once the server has unlocked it.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -64,7 +64,7 @@ class get_question extends external_api {
 
         [$status] = helper::question_status($attempt, $slot);
         if ($status !== evaluator::OBJECTIVE_AVAILABLE && $status !== evaluator::OBJECTIVE_COMPLETED) {
-            throw new \moodle_exception('errorquestionlocked', 'mod_mavr');
+            throw new \moodle_exception('errorquestionlocked', 'mod_vrroom');
         }
         $answered = $status === evaluator::OBJECTIVE_COMPLETED;
         [$html, $javascript] = usage::render($attempt, $slot, $answered);

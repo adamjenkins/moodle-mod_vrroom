@@ -18,9 +18,9 @@
  * that everything the 3D gizmo does can also be done with numbers and the keyboard.
  *
  * The hotspot authoring fields (title, text, position, linked question) follow mod_gear's hotspot
- * form; here they edit the mavr-scene/1 document through the shared model.
+ * form; here they edit the vrroom-scene/1 document through the shared model.
  *
- * @module     mod_mavr/editor_inspector
+ * @module     mod_vrroom/editor_inspector
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -30,10 +30,10 @@ import Templates from 'core/templates';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {getStrings, getString} from 'core/str';
-import {findRef, findScene} from 'mod_mavr/editor_model';
-import {assetsOfKind, findAsset, parseKey, refKey, toRef} from 'mod_mavr/editor_assets';
+import {findRef, findScene} from 'mod_vrroom/editor_model';
+import {assetsOfKind, findAsset, parseKey, refKey, toRef} from 'mod_vrroom/editor_assets';
 
-/** Lang strings the inspector uses, by key (component mod_mavr unless given). */
+/** Lang strings the inspector uses, by key (component mod_vrroom unless given). */
 const STRINGKEYS = [
     'editorname', 'editorpositionx', 'editorpositiony', 'editorpositionz', 'editorrotationx', 'editorrotationy',
     'editorrotationz', 'editorscalex', 'editorscaley', 'editorscalez', 'editorcentrex', 'editorcentrey', 'editorcentrez',
@@ -136,7 +136,7 @@ export const displayName = (object) => {
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
 export const init = (container, model, context) => {
-    const keys = STRINGKEYS.map((key) => ({key: key, component: 'mod_mavr'}))
+    const keys = STRINGKEYS.map((key) => ({key: key, component: 'mod_vrroom'}))
         .concat(FORMATKEYS.map(([key]) => ({key: key, component: 'core'})));
     return getStrings(keys).then((values) => {
         const str = {};
@@ -258,7 +258,7 @@ const start = (container, model, context, str) => {
                 {value: /^#[0-9a-fA-F]{6}$/.test(env.sky || '') ? env.sky.toLowerCase() : '#20242a'}));
             const arscale = scene.xr && scene.xr.arscale !== null && scene.xr.arscale !== undefined ? num(scene.xr.arscale) : '';
             fields.push(field('xr-arscale', str.editorarscale, 'xr.arscale', 'numbernull', {value: arscale, step: '0.01',
-                min: '0.01', max: '1', hint: str.editorarscalehint, hintid: 'mavr-insp-xr-arscale-hint'}));
+                min: '0.01', max: '1', hint: str.editorarscalehint, hintid: 'vrroom-insp-xr-arscale-hint'}));
             return {heading: kindlabels.environment, fields: fields, candelete: false, canduplicate: false};
         }
 
@@ -537,7 +537,7 @@ const start = (container, model, context, str) => {
         const object = findRef(model.getDocument(), ref);
         const name = ref.kind === 'environment'
             ? displayName(findScene(model.getDocument(), ref.scene)) : displayName(object);
-        getString('editorchange_edit', 'mod_mavr', name).then((label) => {
+        getString('editorchange_edit', 'mod_vrroom', name).then((label) => {
             const changed = model.transact(label, (draft) => apply(draft, ref, path, type, raw));
             if (!changed) {
                 // Show the stored value again.
@@ -565,7 +565,7 @@ const start = (container, model, context, str) => {
                 return null;
             }
             key = refKey(toRef(asset));
-            return getString('editorchange_edit', 'mod_mavr', asset.filename);
+            return getString('editorchange_edit', 'mod_vrroom', asset.filename);
         }).then((label) => {
             if (label === null || destroyed) {
                 return null;
@@ -594,8 +594,8 @@ const start = (container, model, context, str) => {
         const templatecontext = description ? Object.assign({hasselection: true}, description) : {hasselection: false};
         const active = document.activeElement && container.contains(document.activeElement) ? document.activeElement.id : null;
         const id = ++renderid;
-        const pending = new Pending('mod_mavr/editor_inspector:render');
-        Templates.renderForPromise('mod_mavr/editor_inspector', templatecontext).then(({html, js}) => {
+        const pending = new Pending('mod_vrroom/editor_inspector:render');
+        Templates.renderForPromise('mod_vrroom/editor_inspector', templatecontext).then(({html, js}) => {
             if (id !== renderid || destroyed) {
                 return null;
             }
@@ -629,11 +629,11 @@ const start = (container, model, context, str) => {
         if (!button || !container.contains(button)) {
             return;
         }
-        if (button.dataset.action === 'mavr-insp-delete') {
+        if (button.dataset.action === 'vrroom-insp-delete') {
             context.actions.deleteSelection();
-        } else if (button.dataset.action === 'mavr-insp-duplicate') {
+        } else if (button.dataset.action === 'vrroom-insp-duplicate') {
             context.actions.duplicateSelection();
-        } else if (button.dataset.action === 'mavr-insp-upload') {
+        } else if (button.dataset.action === 'vrroom-insp-upload') {
             uploadFor(button);
         }
     };

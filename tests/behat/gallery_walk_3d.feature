@@ -1,4 +1,4 @@
-@mod @mod_mavr @mod_mavr_webgl @javascript
+@mod @mod_vrroom @mod_vrroom_webgl @javascript
 Feature: A student completes a gallery walk in the 3D room
   In order to explore a room like a visitor
   As a student
@@ -27,29 +27,29 @@ Feature: A student completes a gallery walk in the 3D room
       | Test questions   | truefalse | Q1   | The vase was made in 1720. |
     And the following "activities" exist:
       | activity | name        | course | idnumber | stationtitles   | stationquestions | completion | completionobjectives |
-      | mavr     | Museum walk | C1     | mavr1    | Vase\|Portrait | Q1\|             | 2          | 1                    |
+      | vrroom     | Museum walk | C1     | vrroom1    | Vase\|Portrait | Q1\|             | 2          | 1                    |
 
   Scenario: Walk to both stations, answer in the room and finish
-    Given I am on the "Museum walk" "mavr activity" page logged in as "student1"
+    Given I am on the "Museum walk" "vrroom activity" page logged in as "student1"
     When I press "Enter the 3D room"
-    And the MAVR room is ready
-    And I enter the MAVR zone "Vase"
+    And the VR room room is ready
+    And I enter the VR room zone "Vase"
     And I should see "The vase was made in 1720."
     And I set the field "True" to "1"
     And I press "Submit answer"
-    Then I should see "Correct" in the "[data-region='mavr-overlay']" "css_element"
-    And I enter the MAVR zone "Portrait"
+    Then I should see "Correct" in the "[data-region='vrroom-overlay']" "css_element"
+    And I enter the VR room zone "Portrait"
     And I should see "You have completed everything that is required."
-    And I click on "[data-action='mavr-toggle-progress']" "css_element"
-    And I click on "Finish attempt" "button" in the "[data-region='mavr-progress']" "css_element"
+    And I click on "[data-action='vrroom-toggle-progress']" "css_element"
+    And I click on "Finish attempt" "button" in the "[data-region='vrroom-progress']" "css_element"
     And I click on "[data-action='save']" "css_element" in the ".modal-dialog" "css_element"
     And I should see "Your attempts"
     And I should see "100.00"
     And the "Complete all required objectives" completion condition of "Museum walk" is displayed as "done"
 
   Scenario: Clicking a station object opens its panel
-    Given I am on the "Museum walk" "mavr activity" page logged in as "student1"
+    Given I am on the "Museum walk" "vrroom activity" page logged in as "student1"
     When I press "Enter the 3D room"
-    And the MAVR room is ready
-    And I click the MAVR object "Vase"
-    Then I should see "Vase" in the "[data-region='mavr-panel']" "css_element"
+    And the VR room room is ready
+    And I click the VR room object "Vase"
+    Then I should see "Vase" in the "[data-region='vrroom-panel']" "css_element"

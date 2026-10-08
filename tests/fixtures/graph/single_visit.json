@@ -2,7 +2,7 @@
   "name": "single_visit",
   "intent": "One required visit_zone; entered completes it; allrequiredcompleted true.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

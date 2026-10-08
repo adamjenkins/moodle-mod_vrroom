@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\grading;
+namespace mod_vrroom\local\grading;
 
 /**
  * Tests of the grader.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(grader::class)]
 final class grader_test extends \advanced_testcase {
-    /** @var int Next fake question usage id (mavr_attempts.uniqueid is unique). */
+    /** @var int Next fake question usage id (vrroom_attempts.uniqueid is unique). */
     private int $nextusage = 900000;
 
     /**
      * Create a course, an activity and a student.
      *
      * @param array $record extra module fields
-     * @return array [course, mavr row, student]
+     * @return array [course, vrroom row, student]
      */
     private function setup_activity(array $record = []): array {
         global $CFG, $DB;
@@ -41,32 +41,32 @@ final class grader_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
-        $module = $this->getDataGenerator()->create_module('mavr', $record + ['course' => $course->id]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $module = $this->getDataGenerator()->create_module('vrroom', $record + ['course' => $course->id]);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        return [$course, $mavr, $student];
+        return [$course, $vrroom, $student];
     }
 
     /**
      * Insert an attempt row directly.
      *
-     * @param \stdClass $mavr
+     * @param \stdClass $vrroom
      * @param int $userid
      * @param int $number attempt number
      * @param float|null $score
      * @param string $state
      * @return void
      */
-    private function add_attempt(\stdClass $mavr, int $userid, int $number, ?float $score, string $state = 'finished'): void {
+    private function add_attempt(\stdClass $vrroom, int $userid, int $number, ?float $score, string $state = 'finished'): void {
         global $DB;
-        $DB->insert_record('mavr_attempts', (object) [
-            'mavrid' => $mavr->id,
+        $DB->insert_record('vrroom_attempts', (object) [
+            'vrroomid' => $vrroom->id,
             'userid' => $userid,
             'attempt' => $number,
             'state' => $state,
             'uniqueid' => $this->nextusage++,
             'slotmap' => '{}',
-            'graphversion' => (int)$mavr->graphversion,
+            'graphversion' => (int)$vrroom->graphversion,
             'score' => $score,
             'requireddone' => 0,
             'timestart' => time(),
@@ -79,12 +79,12 @@ final class grader_test extends \advanced_testcase {
      * Gradebook grade of a user.
      *
      * @param \stdClass $course
-     * @param \stdClass $mavr
+     * @param \stdClass $vrroom
      * @param int $userid
      * @return float|null
      */
-    private function gradebook(\stdClass $course, \stdClass $mavr, int $userid): ?float {
-        $grades = grade_get_grades($course->id, 'mod', 'mavr', $mavr->id, $userid);
+    private function gradebook(\stdClass $course, \stdClass $vrroom, int $userid): ?float {
+        $grades = grade_get_grades($course->id, 'mod', 'vrroom', $vrroom->id, $userid);
         $grade = $grades->items[0]->grades[$userid]->grade;
         return $grade === null ? null : (float)$grade;
     }
@@ -96,28 +96,28 @@ final class grader_test extends \advanced_testcase {
      */
     public function test_grading_methods(): void {
         global $DB;
-        [, $mavr, $student] = $this->setup_activity();
+        [, $vrroom, $student] = $this->setup_activity();
         $userid = (int)$student->id;
-        $this->add_attempt($mavr, $userid, 1, 0.5);
-        $this->add_attempt($mavr, $userid, 2, 0.9);
-        $this->add_attempt($mavr, $userid, 3, 0.4);
-        $this->add_attempt($mavr, $userid, 4, 1.0, 'inprogress');
+        $this->add_attempt($vrroom, $userid, 1, 0.5);
+        $this->add_attempt($vrroom, $userid, 2, 0.9);
+        $this->add_attempt($vrroom, $userid, 3, 0.4);
+        $this->add_attempt($vrroom, $userid, 4, 1.0, 'inprogress');
 
-        $mavr->grademethod = grader::GRADE_HIGHEST;
-        $this->assertEqualsWithDelta(0.9, grader::calculate_user_score($mavr, $userid), 1e-6);
-        $mavr->grademethod = grader::GRADE_AVERAGE;
-        $this->assertEqualsWithDelta(0.6, grader::calculate_user_score($mavr, $userid), 1e-6);
-        $mavr->grademethod = grader::GRADE_LAST;
-        $this->assertEqualsWithDelta(0.4, grader::calculate_user_score($mavr, $userid), 1e-6);
+        $vrroom->grademethod = grader::GRADE_HIGHEST;
+        $this->assertEqualsWithDelta(0.9, grader::calculate_user_score($vrroom, $userid), 1e-6);
+        $vrroom->grademethod = grader::GRADE_AVERAGE;
+        $this->assertEqualsWithDelta(0.6, grader::calculate_user_score($vrroom, $userid), 1e-6);
+        $vrroom->grademethod = grader::GRADE_LAST;
+        $this->assertEqualsWithDelta(0.4, grader::calculate_user_score($vrroom, $userid), 1e-6);
 
         $other = $this->getDataGenerator()->create_user();
-        $this->assertNull(grader::calculate_user_score($mavr, (int)$other->id));
+        $this->assertNull(grader::calculate_user_score($vrroom, (int)$other->id));
 
-        $mavr->grade = 80;
-        $grades = grader::get_user_grades($mavr, $userid);
+        $vrroom->grade = 80;
+        $grades = grader::get_user_grades($vrroom, $userid);
         $this->assertSame([$userid], array_keys($grades));
         $this->assertEqualsWithDelta(32.0, $grades[$userid]->rawgrade, 1e-6);
-        $this->assertCount(3, $DB->get_records('mavr_attempts', ['mavrid' => $mavr->id, 'state' => 'finished']));
+        $this->assertCount(3, $DB->get_records('vrroom_attempts', ['vrroomid' => $vrroom->id, 'state' => 'finished']));
     }
 
     /**
@@ -127,17 +127,17 @@ final class grader_test extends \advanced_testcase {
      */
     public function test_update_grades_and_nullifnone(): void {
         global $DB;
-        [$course, $mavr, $student] = $this->setup_activity();
+        [$course, $vrroom, $student] = $this->setup_activity();
         $userid = (int)$student->id;
-        $this->add_attempt($mavr, $userid, 1, 0.75);
-        grader::update_grades($mavr, $userid);
-        $this->assertEqualsWithDelta(75.0, $this->gradebook($course, $mavr, $userid), 1e-6);
+        $this->add_attempt($vrroom, $userid, 1, 0.75);
+        grader::update_grades($vrroom, $userid);
+        $this->assertEqualsWithDelta(75.0, $this->gradebook($course, $vrroom, $userid), 1e-6);
 
-        $DB->delete_records('mavr_attempts', ['mavrid' => $mavr->id]);
-        grader::update_grades($mavr, $userid, false);
-        $this->assertEqualsWithDelta(75.0, $this->gradebook($course, $mavr, $userid), 1e-6);
-        grader::update_grades($mavr, $userid, true);
-        $this->assertNull($this->gradebook($course, $mavr, $userid));
+        $DB->delete_records('vrroom_attempts', ['vrroomid' => $vrroom->id]);
+        grader::update_grades($vrroom, $userid, false);
+        $this->assertEqualsWithDelta(75.0, $this->gradebook($course, $vrroom, $userid), 1e-6);
+        grader::update_grades($vrroom, $userid, true);
+        $this->assertNull($this->gradebook($course, $vrroom, $userid));
     }
 
     /**
@@ -146,14 +146,14 @@ final class grader_test extends \advanced_testcase {
      * @return void
      */
     public function test_update_grades_for_all_users(): void {
-        [$course, $mavr, $student] = $this->setup_activity(['grademethod' => grader::GRADE_AVERAGE]);
+        [$course, $vrroom, $student] = $this->setup_activity(['grademethod' => grader::GRADE_AVERAGE]);
         $other = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        $this->add_attempt($mavr, (int)$student->id, 1, 0.2);
-        $this->add_attempt($mavr, (int)$student->id, 2, 0.4);
-        $this->add_attempt($mavr, (int)$other->id, 1, 1.0);
-        grader::update_grades($mavr);
-        $this->assertEqualsWithDelta(30.0, $this->gradebook($course, $mavr, (int)$student->id), 1e-6);
-        $this->assertEqualsWithDelta(100.0, $this->gradebook($course, $mavr, (int)$other->id), 1e-6);
+        $this->add_attempt($vrroom, (int)$student->id, 1, 0.2);
+        $this->add_attempt($vrroom, (int)$student->id, 2, 0.4);
+        $this->add_attempt($vrroom, (int)$other->id, 1, 1.0);
+        grader::update_grades($vrroom);
+        $this->assertEqualsWithDelta(30.0, $this->gradebook($course, $vrroom, (int)$student->id), 1e-6);
+        $this->assertEqualsWithDelta(100.0, $this->gradebook($course, $vrroom, (int)$other->id), 1e-6);
     }
 
     /**
@@ -162,21 +162,21 @@ final class grader_test extends \advanced_testcase {
      * @return void
      */
     public function test_grade_item_update_and_delete(): void {
-        [$course, $mavr] = $this->setup_activity(['grade' => 40]);
-        $item = \grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'mavr',
-            'iteminstance' => $mavr->id, 'itemnumber' => 0]);
+        [$course, $vrroom] = $this->setup_activity(['grade' => 40]);
+        $item = \grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'vrroom',
+            'iteminstance' => $vrroom->id, 'itemnumber' => 0]);
         $this->assertEquals(GRADE_TYPE_VALUE, $item->gradetype);
         $this->assertEqualsWithDelta(40.0, (float)$item->grademax, 1e-6);
 
-        $mavr->grade = 0;
-        $this->assertSame(GRADE_UPDATE_OK, grader::grade_item_update($mavr));
-        $item = \grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'mavr',
-            'iteminstance' => $mavr->id, 'itemnumber' => 0]);
+        $vrroom->grade = 0;
+        $this->assertSame(GRADE_UPDATE_OK, grader::grade_item_update($vrroom));
+        $item = \grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'vrroom',
+            'iteminstance' => $vrroom->id, 'itemnumber' => 0]);
         $this->assertEquals(GRADE_TYPE_NONE, $item->gradetype);
 
-        $this->assertSame(GRADE_UPDATE_OK, grader::grade_item_delete($mavr));
-        $this->assertFalse(\grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'mavr',
-            'iteminstance' => $mavr->id, 'itemnumber' => 0]));
+        $this->assertSame(GRADE_UPDATE_OK, grader::grade_item_delete($vrroom));
+        $this->assertFalse(\grade_item::fetch(['courseid' => $course->id, 'itemtype' => 'mod', 'itemmodule' => 'vrroom',
+            'iteminstance' => $vrroom->id, 'itemnumber' => 0]));
     }
 
     /**
@@ -185,12 +185,12 @@ final class grader_test extends \advanced_testcase {
      * @return void
      */
     public function test_options_and_format(): void {
-        [, $mavr] = $this->setup_activity();
+        [, $vrroom] = $this->setup_activity();
         $this->assertSame(
             [grader::GRADE_HIGHEST, grader::GRADE_AVERAGE, grader::GRADE_LAST],
             array_keys(grader::grade_options())
         );
-        $this->assertSame('75.00', grader::format_grade($mavr, 0.75));
-        $this->assertSame('-', grader::format_grade($mavr, null));
+        $this->assertSame('75.00', grader::format_grade($vrroom, 0.75));
+        $this->assertSame('-', grader::format_grade($vrroom, null));
     }
 }

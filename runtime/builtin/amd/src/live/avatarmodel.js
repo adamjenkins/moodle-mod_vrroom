@@ -19,7 +19,7 @@
  *
  * The avatar as a group with a sphere head follows mod_gear's collaborative viewer.
  *
- * @module     mavrruntime_builtin/live/avatarmodel
+ * @module     vrroomruntime_builtin/live/avatarmodel
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -119,8 +119,8 @@ export const createAvatar = (THREE, options) => {
     };
 
     const group = new THREE.Group();
-    group.name = 'mavr-avatar';
-    group.userData.mavrPeer = peerid;
+    group.name = 'vrroom-avatar';
+    group.userData.vrroomPeer = peerid;
 
     const skin = keep(materials, new THREE.MeshStandardMaterial({color: colour, roughness: 0.6, metalness: 0}));
     const visormaterial = keep(materials, new THREE.MeshStandardMaterial({color: 0x1b1f24, roughness: 0.3, metalness: 0.2}));

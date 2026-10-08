@@ -21,21 +21,21 @@
  * 'dragging-changed' switching the orbit camera off while dragging and the change committed when
  * the drag ends.
  *
- * @module     mod_mavr/editor_view
+ * @module     mod_vrroom/editor_view
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import * as THREE from 'mavrruntime_builtin/three';
-import {GLTFLoader, OrbitControls, TransformControls} from 'mavrruntime_builtin/three';
-import {buildScene, readTransform} from 'mavrruntime_builtin/scenebuilder';
+import * as THREE from 'vrroomruntime_builtin/three';
+import {GLTFLoader, OrbitControls, TransformControls} from 'vrroomruntime_builtin/three';
+import {buildScene, readTransform} from 'vrroomruntime_builtin/scenebuilder';
 import Log from 'core/log';
 import Notification from 'core/notification';
 import {getString} from 'core/str';
-import {COLLECTIONS, clone, findRef, findScene} from 'mod_mavr/editor_model';
-import {findAsset} from 'mod_mavr/editor_assets';
-import {displayName} from 'mod_mavr/editor_inspector';
+import {COLLECTIONS, clone, findRef, findScene} from 'mod_vrroom/editor_model';
+import {findAsset} from 'mod_vrroom/editor_assets';
+import {displayName} from 'mod_vrroom/editor_inspector';
 
 /** Gizmo modes each kind of thing allows. */
 const MODES = Object.freeze({
@@ -177,7 +177,7 @@ const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complex
  * @returns {Object} {setMode(mode), getMode(), getPlacement(), frame(), destroy()}
  */
 export const init = (stage, model, context) => {
-    const canvas = stage.querySelector('[data-region="mavr-editor-canvas"]');
+    const canvas = stage.querySelector('[data-region="vrroom-editor-canvas"]');
     const renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene3 = new THREE.Scene();
@@ -392,7 +392,7 @@ export const init = (stage, model, context) => {
             },
             onLoadError: (error) => {
                 Log.debug(error);
-                context.actions.showMessage({key: 'modelloadfailed', component: 'mavrruntime_builtin'});
+                context.actions.showMessage({key: 'modelloadfailed', component: 'vrroomruntime_builtin'});
             },
         }).then((newhandle) => {
             if (mytoken !== token || destroyed) {
@@ -487,7 +487,7 @@ export const init = (stage, model, context) => {
         const t = readTransform(object);
         const gizmomode = mode;
         const target = findRef(model.getDocument(), ref);
-        getString('editorchange_move', 'mod_mavr', displayName(target)).then((label) => {
+        getString('editorchange_move', 'mod_vrroom', displayName(target)).then((label) => {
             const changed = model.transact(label, (draft) => writeTransform(draft, ref, t, gizmomode));
             if (!changed) {
                 // Nothing moved after all: redraw the object where the document has it.

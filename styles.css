@@ -1,36 +1,36 @@
-/* Activity page (mod_mavr/view_page). The room's own styles live in runtime/builtin/styles.css. */
+/* Activity page (mod_vrroom/view_page). The room's own styles live in runtime/builtin/styles.css. */
 
-.path-mod-mavr .mavr-root {
+.path-mod-vrroom .vrroom-root {
     margin-top: 1rem;
 }
 
-.path-mod-mavr .mavr-attempts {
+.path-mod-vrroom .vrroom-attempts {
     max-width: 48rem;
 }
 
-.path-mod-mavr .mavr-finalgrade {
+.path-mod-vrroom .vrroom-finalgrade {
     margin-top: 0.5rem;
 }
 
-/* Room editor (mod_mavr/editor_page). */
+/* Room editor (mod_vrroom/editor_page). */
 
-.path-mod-mavr .mavr-editor-room {
+.path-mod-vrroom .vrroom-editor-room {
     align-items: flex-start;
 }
 
-.path-mod-mavr .mavr-editor-outline {
+.path-mod-vrroom .vrroom-editor-outline {
     flex: 0 0 15rem;
     max-width: 100%;
     max-height: 70vh;
     overflow-y: auto;
 }
 
-.path-mod-mavr .mavr-editor-stage {
+.path-mod-vrroom .vrroom-editor-stage {
     position: relative;
     min-width: 18rem;
 }
 
-.path-mod-mavr .mavr-editor-stage canvas {
+.path-mod-vrroom .vrroom-editor-stage canvas {
     display: block;
     width: 100%;
     height: 60vh;
@@ -40,32 +40,32 @@
     touch-action: none;
 }
 
-.path-mod-mavr .mavr-editor-stage canvas:focus-visible {
+.path-mod-vrroom .vrroom-editor-stage canvas:focus-visible {
     outline: 3px solid var(--bs-primary);
     outline-offset: 2px;
 }
 
-.path-mod-mavr .mavr-editor-stage .alert {
+.path-mod-vrroom .vrroom-editor-stage .alert {
     margin-top: 0.5rem;
 }
 
-.path-mod-mavr .mavr-editor-inspector {
+.path-mod-vrroom .vrroom-editor-inspector {
     flex: 0 0 18rem;
     max-width: 100%;
     max-height: 70vh;
     overflow-y: auto;
 }
 
-.path-mod-mavr .mavr-editor-outline .btn-link,
-.path-mod-mavr .mavr-editor-outline .btn-link:hover {
+.path-mod-vrroom .vrroom-editor-outline .btn-link,
+.path-mod-vrroom .vrroom-editor-outline .btn-link:hover {
     padding-left: 0;
     padding-right: 0;
     text-align: start;
 }
 
 @media (max-width: 991.98px) {
-    .path-mod-mavr .mavr-editor-outline,
-    .path-mod-mavr .mavr-editor-inspector {
+    .path-mod-vrroom .vrroom-editor-outline,
+    .path-mod-vrroom .vrroom-editor-inspector {
         flex: 1 1 100%;
         max-height: none;
     }

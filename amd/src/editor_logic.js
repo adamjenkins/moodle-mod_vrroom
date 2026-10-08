@@ -15,14 +15,14 @@
 
 /**
  * The logic editor on the Tasks tab of the room editor: settings, objectives (with hints and
- * question-bank questions) and rules of the activity's mavr-graph/1 task graph.
+ * question-bank questions) and rules of the activity's vrroom-graph/1 task graph.
  *
  * It edits the shared editor document only through model.transact(), so the room editor's undo
  * history covers it, and it keeps the question bindings in step with the answer_question
  * objectives. Every select lists names from the document; only titles and hint texts are free
  * text. The server validates everything again on save.
  *
- * @module     mod_mavr/editor_logic
+ * @module     mod_vrroom/editor_logic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -31,7 +31,7 @@ import Notification from 'core/notification';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getStrings} from 'core/str';
-import {validate} from 'mavrruntime_builtin/graph';
+import {validate} from 'vrroomruntime_builtin/graph';
 
 /** Objective types, in menu order. */
 const TYPES = ['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'];
@@ -134,10 +134,10 @@ const maxmarkFor = (points) => {
  */
 const ensureGraph = (draft) => {
     if (!isObject(draft.graph)) {
-        draft.graph = {schema: 'mavr-graph/1'};
+        draft.graph = {schema: 'vrroom-graph/1'};
     }
     const graph = draft.graph;
-    graph.schema = graph.schema || 'mavr-graph/1';
+    graph.schema = graph.schema || 'vrroom-graph/1';
     ['hidden', 'objectives', 'rules'].forEach((key) => {
         if (!Array.isArray(graph[key])) {
             graph[key] = [];
@@ -273,8 +273,8 @@ const dependentsOf = (objectives, id) => {
 /**
  * Render the panel and wire its events, once the strings are loaded.
  *
- * @param {HTMLElement} container The data-region="mavr-editor-logic" element.
- * @param {Object} model The editor model (mod_mavr/editor_model).
+ * @param {HTMLElement} container The data-region="vrroom-editor-logic" element.
+ * @param {Object} model The editor model (mod_vrroom/editor_model).
  * @param {Object} str Strings by key.
  * @param {Object} options {questions, maxhints, uid, pending}
  * @param {Object[]} options.questions [{id, label, available}]
@@ -615,10 +615,10 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
     const render = () => {
         sequence++;
         const mine = sequence;
-        const renderpending = new Pending('mod_mavr/editor_logic:render');
+        const renderpending = new Pending('mod_vrroom/editor_logic:render');
         const active = document.activeElement;
         const focusid = active && container.contains(active) ? active.id : '';
-        return Templates.renderForPromise('mod_mavr/editor_logic', buildContext(model.getDocument()))
+        return Templates.renderForPromise('mod_vrroom/editor_logic', buildContext(model.getDocument()))
             .then(({html, js}) => {
                 if (destroyed || mine !== sequence) {
                     return undefined;
@@ -955,14 +955,14 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
     const onObjectiveClick = (action, index, button) => {
         const name = objectiveName(index);
         switch (action) {
-            case 'mavr-logic-objective-up':
-            case 'mavr-logic-objective-down':
+            case 'vrroom-logic-objective-up':
+            case 'vrroom-logic-objective-down':
                 edit('editorchange_edit', name, (draft, graph) => {
                     graph.objectives = graph.objectives.filter(isObject);
-                    move(graph.objectives, index, action === 'mavr-logic-objective-up' ? -1 : 1);
+                    move(graph.objectives, index, action === 'vrroom-logic-objective-up' ? -1 : 1);
                 });
                 break;
-            case 'mavr-logic-remove-objective':
+            case 'vrroom-logic-remove-objective':
                 edit('editorchange_delete', name, (draft, graph) => {
                     graph.objectives = graph.objectives.filter(isObject);
                     const o = graph.objectives[index];
@@ -978,7 +978,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                     }
                 });
                 break;
-            case 'mavr-logic-add-hint':
+            case 'vrroom-logic-add-hint':
                 edit('editorchange_edit', name, (draft, graph) => {
                     const o = graph.objectives.filter(isObject)[index];
                     if (!o || o.type === 'sequence') {
@@ -990,7 +990,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                     }
                 });
                 break;
-            case 'mavr-logic-remove-hint': {
+            case 'vrroom-logic-remove-hint': {
                 const hint = Number(button.closest('[data-hint-index]').dataset.hintIndex);
                 edit('editorchange_edit', name, (draft, graph) => {
                     const o = graph.objectives.filter(isObject)[index];
@@ -1012,7 +1012,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                 });
                 break;
             }
-            case 'mavr-logic-add-step':
+            case 'vrroom-logic-add-step':
                 edit('editorchange_edit', name, (draft, graph) => {
                     const o = graph.objectives.filter(isObject)[index];
                     if (!o || o.type !== 'sequence') {
@@ -1026,7 +1026,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                     }
                 });
                 break;
-            case 'mavr-logic-remove-step': {
+            case 'vrroom-logic-remove-step': {
                 const step = Number(button.closest('[data-step-index]').dataset.stepIndex);
                 edit('editorchange_edit', name, (draft, graph) => {
                     const o = graph.objectives.filter(isObject)[index];
@@ -1042,20 +1042,20 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
     const onRuleClick = (action, index, button) => {
         const name = fill(str.logicrule, index + 1);
         switch (action) {
-            case 'mavr-logic-rule-up':
-            case 'mavr-logic-rule-down':
+            case 'vrroom-logic-rule-up':
+            case 'vrroom-logic-rule-down':
                 edit('editorchange_edit', name, (draft, graph) => {
                     graph.rules = graph.rules.filter(isObject);
-                    move(graph.rules, index, action === 'mavr-logic-rule-up' ? -1 : 1);
+                    move(graph.rules, index, action === 'vrroom-logic-rule-up' ? -1 : 1);
                 });
                 break;
-            case 'mavr-logic-remove-rule':
+            case 'vrroom-logic-remove-rule':
                 edit('editorchange_delete', name, (draft, graph) => {
                     graph.rules = graph.rules.filter(isObject);
                     graph.rules.splice(index, 1);
                 });
                 break;
-            case 'mavr-logic-add-action':
+            case 'vrroom-logic-add-action':
                 edit('editorchange_edit', name, (draft, graph) => {
                     const rule = graph.rules.filter(isObject)[index];
                     if (rule) {
@@ -1064,7 +1064,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                     }
                 });
                 break;
-            case 'mavr-logic-remove-action': {
+            case 'vrroom-logic-remove-action': {
                 const a = Number(button.closest('[data-action-index]').dataset.actionIndex);
                 edit('editorchange_edit', name, (draft, graph) => {
                     const rule = graph.rules.filter(isObject)[index];
@@ -1083,7 +1083,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
             return;
         }
         const action = button.dataset.action;
-        if (!action.startsWith('mavr-logic-')) {
+        if (!action.startsWith('vrroom-logic-')) {
             return;
         }
         e.preventDefault();
@@ -1093,7 +1093,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
             onObjectiveClick(action, Number(objectivecard.dataset.objectiveIndex), button);
         } else if (rulecard) {
             onRuleClick(action, Number(rulecard.dataset.ruleIndex), button);
-        } else if (action === 'mavr-logic-add-objective') {
+        } else if (action === 'vrroom-logic-add-objective') {
             const number = objectivesOf(model.getDocument()).length + 1;
             const title = fill(str.logicobjective, number);
             edit('editorchange_add', title, (draft, graph) => {
@@ -1106,7 +1106,7 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
                     required: true,
                 });
             });
-        } else if (action === 'mavr-logic-add-rule') {
+        } else if (action === 'vrroom-logic-add-rule') {
             const number = list(model.getDocument().graph && model.getDocument().graph.rules).length + 1;
             edit('editorchange_add', fill(str.logicrule, number), (draft, graph) => {
                 graph.rules.push({id: model.newId('r'), on: {on: 'start'}, once: true, actions: [newAction(draft, 'show')]});
@@ -1140,8 +1140,8 @@ const build = (container, model, str, {questions, maxhints, uid, pending}) => {
 /**
  * Load the strings, render the panel and wire its events.
  *
- * @param {HTMLElement} container The data-region="mavr-editor-logic" element.
- * @param {Object} model The editor model (mod_mavr/editor_model).
+ * @param {HTMLElement} container The data-region="vrroom-editor-logic" element.
+ * @param {Object} model The editor model (mod_vrroom/editor_model).
  * @param {Object} context {questions: [{id, label, available}], presets, info}
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
@@ -1161,9 +1161,9 @@ const setup = (container, model, context) => {
         'logicinvalid', 'logicnoquestion', 'editorchange_add', 'editorchange_delete', 'editorchange_edit',
         'logicroom', 'logicslotoption',
     ];
-    const pending = new Pending('mod_mavr/editor_logic:init');
+    const pending = new Pending('mod_vrroom/editor_logic:init');
 
-    return getStrings(keys.map((key) => ({key: key, component: 'mod_mavr'}))).then((values) => {
+    return getStrings(keys.map((key) => ({key: key, component: 'mod_vrroom'}))).then((values) => {
         const str = {};
         keys.forEach((key, i) => {
             str[key] = values[i];
@@ -1181,8 +1181,8 @@ const setup = (container, model, context) => {
  *
  * The panel appears once its strings are loaded; refresh() before that waits for it.
  *
- * @param {HTMLElement} container The data-region="mavr-editor-logic" element.
- * @param {Object} model The editor model (mod_mavr/editor_model).
+ * @param {HTMLElement} container The data-region="vrroom-editor-logic" element.
+ * @param {Object} model The editor model (mod_vrroom/editor_model).
  * @param {Object} context {questions: [{id, label, available}], presets, info}
  * @returns {Object} {refresh() → Promise, destroy(), ready: Promise}
  */

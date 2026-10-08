@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\tests;
+namespace mod_vrroom\tests;
 
 use core_xapi\local\statement;
-use mod_mavr\external\finish_attempt;
-use mod_mavr\external\submit_question;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\grading\grader;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\runtime\launch_descriptor;
-use mod_mavr\local\runtime\registry;
-use mod_mavr\local\xapi\iri;
+use mod_vrroom\external\finish_attempt;
+use mod_vrroom\external\submit_question;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\grading\grader;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\runtime\launch_descriptor;
+use mod_vrroom\local\runtime\registry;
+use mod_vrroom\local\xapi\iri;
 
 /**
- * Run-mode conformance test (DESIGN §7): every mavrruntime_* plugin extends this class.
+ * Run-mode conformance test (DESIGN §7): every vrroomruntime_* plugin extends this class.
  *
  * A reference activity (two stations, one question) and a scripted session must yield the
  * reference statements and the reference grade, whatever run mode delivers the room.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -72,7 +72,7 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
         $qgen = $generator->get_plugin_generator('core_question');
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id]);
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'runtime' => $this->get_runtime_name(),
             'grade' => 100,
@@ -83,11 +83,11 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
                     'points' => 1, 'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
         $student = $generator->create_and_enrol($course, 'student');
 
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $vasezone = null;
         $vasehotspot = null;
         foreach ($scene['zones'] as $zone) {
@@ -101,7 +101,7 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
             }
         }
         $slot = 0;
-        foreach (instance_manager::get_graph((int)$mavr->id)['objectives'] as $objective) {
+        foreach (instance_manager::get_graph((int)$vrroom->id)['objectives'] as $objective) {
             if ($objective['type'] === 'answer_question') {
                 $slot = (int)$objective['slot'];
             }
@@ -112,11 +112,11 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
 
         // Launch.
         $this->setUser($student);
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
         $descriptor = $runtime->launch($cm, $attempt, $student)->to_array();
         $this->assertContains($descriptor['type'], [launch_descriptor::TYPE_INLINE, launch_descriptor::TYPE_EXTERNAL]);
         if ($descriptor['type'] === launch_descriptor::TYPE_INLINE) {
-            $this->assertSame('mavr-launch/1', $descriptor['config']['schema']);
+            $this->assertSame('vrroom-launch/1', $descriptor['config']['schema']);
             $this->assertSame((int)$attempt->id, $descriptor['config']['attemptid']);
         } else {
             $this->assertNotEmpty($descriptor['url']);
@@ -128,7 +128,7 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
 
         // Reference statements, as the client sends them.
         $cmid = (int)$cm->id;
-        $handler = \core_xapi\handler::create('mod_mavr');
+        $handler = \core_xapi\handler::create('mod_vrroom');
         $result = $handler->process_statements([
             $this->statement($student, 'initialized', iri::activity($cmid), (int)$attempt->id),
             $this->statement($student, 'entered', iri::for_object($cmid, 'scene', $scene['id'], null), (int)$attempt->id),
@@ -168,8 +168,8 @@ abstract class runtime_conformance_testcase extends \advanced_testcase {
 
         // Reference grade: the question (1 point) of 2 points.
         $attempt = attempt_manager::get_attempt((int)$attempt->id);
-        $this->assertSame('50.00', grader::format_grade($mavr, (float)$attempt->score));
-        $grades = grade_get_grades($course->id, 'mod', 'mavr', $mavr->id, (int)$student->id);
+        $this->assertSame('50.00', grader::format_grade($vrroom, (float)$attempt->score));
+        $grades = grade_get_grades($course->id, 'mod', 'vrroom', $vrroom->id, (int)$student->id);
         $this->assertEqualsWithDelta(50.0, (float)$grades->items[0]->grades[$student->id]->grade, 1e-6);
     }
 

@@ -20,7 +20,7 @@
  * The hotspot panel follows the idea of mod_gear's hotspot popup (a Mustache-rendered card over
  * the scene, opened by clicking a hotspot, closed with a close button).
  *
- * @module     mavrruntime_builtin/panels
+ * @module     vrroomruntime_builtin/panels
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -30,8 +30,8 @@ import Notification from 'core/notification';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
-import {renderQuestion} from 'mavrruntime_builtin/question';
-import {BADGES, plainText, formatPoints, startScene, announce, showMessage} from 'mavrruntime_builtin/util';
+import {renderQuestion} from 'vrroomruntime_builtin/question';
+import {BADGES, plainText, formatPoints, startScene, announce, showMessage} from 'vrroomruntime_builtin/util';
 
 /** Counter for unique heading ids. */
 let uidcounter = 0;
@@ -73,13 +73,13 @@ const timerFor = (session) => {
 /**
  * Create the overlay panels of a 3D stage.
  *
- * @param {HTMLElement} stageroot The element holding the mavr-overlay region (the stage).
+ * @param {HTMLElement} stageroot The element holding the vrroom-overlay region (the stage).
  * @param {Object} session The session.
  * @param {Object} options {onClose()} called after a panel closes (focus goes back to the canvas).
  * @returns {Object} {openInteractable(item), openQuestion(slot), close(), refresh()}
  */
 export const createPanels = (stageroot, session, options = {}) => {
-    const overlay = stageroot.querySelector('[data-region="mavr-overlay"]');
+    const overlay = stageroot.querySelector('[data-region="vrroom-overlay"]');
     let current = null;
 
     const close = () => {
@@ -93,19 +93,19 @@ export const createPanels = (stageroot, session, options = {}) => {
         }
     };
 
-    const questionHost = () => (current ? overlay.querySelector('[data-region="mavr-question"]') : null);
+    const questionHost = () => (current ? overlay.querySelector('[data-region="vrroom-question"]') : null);
 
     const show = (context, slot) => {
-        const pending = new Pending('mavrruntime_builtin/panels:open');
+        const pending = new Pending('vrroomruntime_builtin/panels:open');
         uidcounter++;
         context.uid = `${session.config.cmid}-${uidcounter}`;
-        return Templates.renderForPromise('mavrruntime_builtin/panel', context)
+        return Templates.renderForPromise('vrroomruntime_builtin/panel', context)
             .then(({html, js}) => {
                 Templates.replaceNodeContents(overlay, html, js);
                 current = {id: context.id, slot: slot};
-                const panel = overlay.querySelector('[data-region="mavr-panel"]');
+                const panel = overlay.querySelector('[data-region="vrroom-panel"]');
                 panel.addEventListener('click', (e) => {
-                    if (e.target.closest('[data-action="mavr-close-panel"]')) {
+                    if (e.target.closest('[data-action="vrroom-close-panel"]')) {
                         e.preventDefault();
                         close();
                     }
@@ -116,7 +116,7 @@ export const createPanels = (stageroot, session, options = {}) => {
                         close();
                     }
                 });
-                const heading = panel.querySelector(`#mavr-panel-title-${CSS.escape(context.uid)}`);
+                const heading = panel.querySelector(`#vrroom-panel-title-${CSS.escape(context.uid)}`);
                 if (heading) {
                     heading.focus({preventScroll: true});
                 }
@@ -190,7 +190,7 @@ export const createPanels = (stageroot, session, options = {}) => {
         if (!host || current.slot === null) {
             return;
         }
-        if (host.dataset.mavrQuestionState === 'locked' && session.isSlotAvailable(current.slot)) {
+        if (host.dataset.vrroomQuestionState === 'locked' && session.isSlotAvailable(current.slot)) {
             renderQuestion(host, session, current.slot);
         }
     };
@@ -239,9 +239,9 @@ const objectiveContext = (o, session, labels) => {
     context.hashints = true;
     context.canhint = !session.preview && !session.closed && o.status === 'available' && used < total;
     context.hints = hints.used.map((h) => ({text: h.text}));
-    const requests = [getString('hintsused', 'mavrruntime_builtin', {used: used, total: total})];
+    const requests = [getString('hintsused', 'vrroomruntime_builtin', {used: used, total: total})];
     if (context.canhint && o.nexthintpenalty > 0) {
-        requests.push(getString('hintcost', 'mavrruntime_builtin', formatPoints(o.nexthintpenalty)));
+        requests.push(getString('hintcost', 'vrroomruntime_builtin', formatPoints(o.nexthintpenalty)));
     }
     return Promise.all(requests).then(([usedtext, costtext]) => {
         context.hintsusedtext = usedtext;
@@ -254,7 +254,7 @@ const objectiveContext = (o, session, labels) => {
  * Create the progress panel (objectives, hints, points, time left, finish button) inside a host
  * element.
  *
- * Options: root (the element holding the mavr-live and mavr-message regions; default the shell
+ * Options: root (the element holding the vrroom-live and vrroom-message regions; default the shell
  * around the host); onFinish() → Promise that finishes the attempt and leaves the page.
  *
  * When the attempt's time runs out the panel says so and finishes the attempt (once per session,
@@ -266,14 +266,14 @@ const objectiveContext = (o, session, labels) => {
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
 export const createProgress = (host, session, options = {}) => getStrings([
-    {key: 'objectivestatus_locked', component: 'mavrruntime_builtin'},
-    {key: 'objectivestatus_available', component: 'mavrruntime_builtin'},
-    {key: 'objectivestatus_completed', component: 'mavrruntime_builtin'},
-    {key: 'finishconfirmtitle', component: 'mavrruntime_builtin'},
-    {key: 'finishconfirm', component: 'mavrruntime_builtin'},
-    {key: 'finishattempt', component: 'mavrruntime_builtin'},
-    {key: 'timeup', component: 'mavrruntime_builtin'},
-    {key: 'nomorehints', component: 'mavrruntime_builtin'},
+    {key: 'objectivestatus_locked', component: 'vrroomruntime_builtin'},
+    {key: 'objectivestatus_available', component: 'vrroomruntime_builtin'},
+    {key: 'objectivestatus_completed', component: 'vrroomruntime_builtin'},
+    {key: 'finishconfirmtitle', component: 'vrroomruntime_builtin'},
+    {key: 'finishconfirm', component: 'vrroomruntime_builtin'},
+    {key: 'finishattempt', component: 'vrroomruntime_builtin'},
+    {key: 'timeup', component: 'vrroomruntime_builtin'},
+    {key: 'nomorehints', component: 'vrroomruntime_builtin'},
 ]).then((strings) => buildProgress(host, session, options, strings));
 
 /**
@@ -288,7 +288,7 @@ export const createProgress = (host, session, options = {}) => getStrings([
 const buildProgress = (host, session, options, strings) => {
     const [locked, available, completed, confirmtitle, confirmtext, finishlabel, timeuptext, nomorehints] = strings;
     const labels = {locked: locked, available: available, completed: completed};
-    const root = options.root || host.closest('[data-region="mavr-shell"]') || host;
+    const root = options.root || host.closest('[data-region="vrroom-shell"]') || host;
     const shared = timerFor(session);
     let destroyed = false;
     let sequence = 0;
@@ -298,7 +298,7 @@ const buildProgress = (host, session, options, strings) => {
      * Show the time left in the timer region and announce the warnings.
      */
     const tick = () => {
-        const timer = host.querySelector('[data-region="mavr-timer"]');
+        const timer = host.querySelector('[data-region="vrroom-timer"]');
         const left = session.getTimeLeft();
         if (!timer) {
             return;
@@ -308,7 +308,7 @@ const buildProgress = (host, session, options, strings) => {
             return;
         }
         const formatted = formatTimeLeft(left);
-        getString('timeleft', 'mavrruntime_builtin', formatted).then((text) => {
+        getString('timeleft', 'vrroomruntime_builtin', formatted).then((text) => {
             if (!destroyed) {
                 timer.textContent = text;
                 timer.hidden = false;
@@ -318,7 +318,7 @@ const buildProgress = (host, session, options, strings) => {
         const crossed = TIME_WARNINGS.filter((t) => shared.lastleft > t && left <= t && left > 0);
         shared.lastleft = left;
         if (crossed.length > 0) {
-            getString('timewarning', 'mavrruntime_builtin', formatted)
+            getString('timewarning', 'vrroomruntime_builtin', formatted)
                 .then((text) => announce(root, text))
                 .catch(() => null);
         }
@@ -329,7 +329,7 @@ const buildProgress = (host, session, options, strings) => {
         const mine = sequence;
         const state = session.getState();
         let scoretext = '';
-        return getString('scoreprogress', 'mavrruntime_builtin', {
+        return getString('scoreprogress', 'vrroomruntime_builtin', {
             earned: formatPoints(state.earnedpoints),
             max: formatPoints(state.maxpoints),
         }).then((text) => {
@@ -337,7 +337,7 @@ const buildProgress = (host, session, options, strings) => {
             return Promise.all(state.objectives
                 .filter((o) => !state.hidden.has(o.id))
                 .map((o) => objectiveContext(o, session, labels)));
-        }).then((objectives) => Templates.renderForPromise('mavrruntime_builtin/progress', {
+        }).then((objectives) => Templates.renderForPromise('vrroomruntime_builtin/progress', {
             scoretext: scoretext,
             objectives: objectives,
             canfinish: !session.preview && !session.closed,
@@ -362,7 +362,7 @@ const buildProgress = (host, session, options, strings) => {
         showMessage(root, timeuptext, 'warning');
         announce(root, timeuptext);
         const finishurl = session.getConfig().finishurl;
-        const pending = new Pending('mavrruntime_builtin/panels:timeup');
+        const pending = new Pending('vrroomruntime_builtin/panels:timeup');
         const finishing = options.onFinish
             ? Promise.resolve(options.onFinish()).then(() => null)
             : session.finish().then((result) => (result && result.redirecturl) || finishurl);
@@ -382,7 +382,7 @@ const buildProgress = (host, session, options, strings) => {
      */
     const getHint = (button) => {
         button.disabled = true;
-        const pending = new Pending('mavrruntime_builtin/panels:hint');
+        const pending = new Pending('vrroomruntime_builtin/panels:hint');
         session.requestHint(button.dataset.objective)
             .then((hint) => {
                 announce(root, hint.text);
@@ -408,7 +408,7 @@ const buildProgress = (host, session, options, strings) => {
      */
     const runFinish = (button) => {
         button.disabled = true;
-        const pending = new Pending('mavrruntime_builtin/panels:finish');
+        const pending = new Pending('vrroomruntime_builtin/panels:finish');
         return Promise.resolve(options.onFinish ? options.onFinish() : null)
             .catch((error) => {
                 button.disabled = false;
@@ -418,7 +418,7 @@ const buildProgress = (host, session, options, strings) => {
     };
 
     const onClick = (e) => {
-        const hintbutton = e.target.closest('[data-action="mavr-get-hint"]');
+        const hintbutton = e.target.closest('[data-action="vrroom-get-hint"]');
         if (hintbutton) {
             e.preventDefault();
             if (!hintbutton.disabled) {
@@ -426,7 +426,7 @@ const buildProgress = (host, session, options, strings) => {
             }
             return;
         }
-        const button = e.target.closest('[data-action="mavr-finish-attempt"]');
+        const button = e.target.closest('[data-action="vrroom-finish-attempt"]');
         if (!button || button.disabled) {
             return;
         }
@@ -475,4 +475,4 @@ const buildProgress = (host, session, options, strings) => {
  * @param {string} status locked, available or completed.
  * @returns {Promise<string>}
  */
-export const statusLabel = (status) => getString(`objectivestatus_${status}`, 'mavrruntime_builtin');
+export const statusLabel = (status) => getString(`objectivestatus_${status}`, 'vrroomruntime_builtin');

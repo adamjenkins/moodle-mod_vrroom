@@ -2,7 +2,7 @@
   "name": "hint_locked_completed",
   "intent": "A hint requested while its objective is locked is 'locked' and costs nothing; a hint requested after completion is 'applied' and changes neither the earned points nor hintsused.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v-1",

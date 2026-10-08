@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\attempt_manager;
 
 /**
  * Finish the current user's open attempt: final replay, grade and completion.
@@ -28,7 +28,7 @@ use mod_mavr\local\attempt\attempt_manager;
  * An attempt whose time ran out is finished as of its deadline, and its data is returned as for
  * any other finish.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -58,10 +58,10 @@ class finish_attempt extends external_api {
         self::validate_context($context);
         $attempt = attempt_manager::get_attempt($attemptid);
         if ((int)$attempt->userid !== (int)$USER->id) {
-            throw new \moodle_exception('errornotyourattempt', 'mod_mavr');
+            throw new \moodle_exception('errornotyourattempt', 'mod_vrroom');
         }
         [, $cm] = attempt_manager::load_activity($attempt);
-        require_capability('mod/mavr:attempt', $context);
+        require_capability('mod/vrroom:attempt', $context);
         if (attempt_manager::close_if_overdue($attempt)) {
             $attempt = attempt_manager::get_attempt($attemptid);
         } else {
@@ -73,7 +73,7 @@ class finish_attempt extends external_api {
             'attemptid' => (int)$attempt->id,
             'state' => (string)$attempt->state,
             'score' => $attempt->score === null ? 0.0 : (float)$attempt->score,
-            'redirecturl' => (new \moodle_url('/mod/mavr/view.php', ['id' => $cm->id]))->out(false),
+            'redirecturl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
         ];
     }
 

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
 /**
  * Checks a connection message and rebuilds it from known keys only (PHASE3-CONTRACT §3.4).
@@ -22,7 +22,7 @@ namespace mavrruntime_builtin\local\live;
  * Nothing a client sends is stored as it came: the payload is decoded, every value is checked
  * and a canonical JSON text is built from the allowed keys in a fixed order.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\privacy;
+namespace mod_vrroom\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Tests for the mod_mavr privacy provider.
+ * Tests for the mod_vrroom privacy provider.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -36,8 +36,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     /** @var \stdClass the course */
     private \stdClass $course;
 
-    /** @var \stdClass the mavr row (with cmid) */
-    private \stdClass $mavr;
+    /** @var \stdClass the vrroom row (with cmid) */
+    private \stdClass $vrroom;
 
     /** @var \context_module the activity context */
     private \context_module $context;
@@ -64,21 +64,21 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $this->mavr = $generator->create_module('mavr', [
+        $this->vrroom = $generator->create_module('vrroom', [
             'course' => $this->course->id,
             'stationtitles' => 'Vase|Portrait',
             'stationquestions' => 'Q1|',
         ]);
-        $this->context = \context_module::instance($this->mavr->cmid);
+        $this->context = \context_module::instance($this->vrroom->cmid);
 
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
-        $scene = instance_manager::get_scenes((int)$this->mavr->id)[0];
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $scene = instance_manager::get_scenes((int)$this->vrroom->id)[0];
         foreach ([1, 2] as $key) {
             $this->students[$key] = $generator->create_and_enrol($this->course, 'student');
-            $attempt = $mavrgen->create_attempt((int)$this->mavr->id, (int)$this->students[$key]->id);
-            $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
-            $mavrgen->record_event(
+            $attempt = $vrroomgen->create_attempt((int)$this->vrroom->id, (int)$this->students[$key]->id);
+            $vrroomgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
+            $vrroomgen->record_event(
                 $attempt,
                 'answered',
                 'question',
@@ -89,10 +89,10 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
             );
             $this->attempts[$key] = $attempt;
             $DB->insert_record('xapi_states', (object)[
-                'component' => 'mod_mavr',
+                'component' => 'mod_vrroom',
                 'userid' => $this->students[$key]->id,
                 'itemid' => $this->context->id,
-                'stateid' => 'mavr-resume',
+                'stateid' => 'vrroom-resume',
                 'statedata' => json_encode(['scene' => $scene['id'], 'position' => [0, 0, 1], 'yaw' => 0]),
                 'registration' => null,
                 'timecreated' => time(),
@@ -112,10 +112,10 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $userid = $this->students[$key]->id;
         $attempt = $this->attempts[$key];
         return [
-            $DB->count_records('mavr_attempts', ['mavrid' => $this->mavr->id, 'userid' => $userid]),
-            $DB->count_records('mavr_events', ['attemptid' => $attempt->id]),
+            $DB->count_records('vrroom_attempts', ['vrroomid' => $this->vrroom->id, 'userid' => $userid]),
+            $DB->count_records('vrroom_events', ['attemptid' => $attempt->id]),
             $DB->count_records('question_usages', ['id' => $attempt->uniqueid]),
-            $DB->count_records('xapi_states', ['component' => 'mod_mavr', 'userid' => $userid]),
+            $DB->count_records('xapi_states', ['component' => 'mod_vrroom', 'userid' => $userid]),
         ];
     }
 
@@ -123,9 +123,9 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
      * Metadata lists both tables and both subsystem links.
      */
     public function test_get_metadata(): void {
-        $collection = provider::get_metadata(new collection('mod_mavr'));
+        $collection = provider::get_metadata(new collection('mod_vrroom'));
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
-        $this->assertEqualsCanonicalizing(['mavr_attempts', 'mavr_events', 'core_question', 'core_xapi'], $names);
+        $this->assertEqualsCanonicalizing(['vrroom_attempts', 'vrroom_events', 'core_question', 'core_xapi'], $names);
     }
 
     /**
@@ -138,8 +138,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
 
         $stateonly = $this->getDataGenerator()->create_user();
         $DB->insert_record('xapi_states', (object)[
-            'component' => 'mod_mavr', 'userid' => $stateonly->id, 'itemid' => $this->context->id,
-            'stateid' => 'mavr-resume', 'statedata' => '{}', 'registration' => null,
+            'component' => 'mod_vrroom', 'userid' => $stateonly->id, 'itemid' => $this->context->id,
+            'stateid' => 'vrroom-resume', 'statedata' => '{}', 'registration' => null,
             'timecreated' => time(), 'timemodified' => time(),
         ]);
         $contextlist = provider::get_contexts_for_userid((int)$stateonly->id);
@@ -153,14 +153,14 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
      * Both students are found in the module context; nobody in the course context.
      */
     public function test_get_users_in_context(): void {
-        $userlist = new userlist($this->context, 'mod_mavr');
+        $userlist = new userlist($this->context, 'mod_vrroom');
         provider::get_users_in_context($userlist);
         $this->assertEqualsCanonicalizing(
             [(int)$this->students[1]->id, (int)$this->students[2]->id],
             array_map('intval', $userlist->get_userids())
         );
 
-        $courselist = new userlist(\context_course::instance($this->course->id), 'mod_mavr');
+        $courselist = new userlist(\context_course::instance($this->course->id), 'mod_vrroom');
         provider::get_users_in_context($courselist);
         $this->assertEmpty($courselist->get_userids());
     }
@@ -170,12 +170,12 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
      */
     public function test_export_user_data(): void {
         $user = $this->students[1];
-        $this->export_context_data_for_user((int)$user->id, $this->context, 'mod_mavr');
+        $this->export_context_data_for_user((int)$user->id, $this->context, 'mod_vrroom');
 
         $writer = writer::with_context($this->context);
         $this->assertTrue($writer->has_any_data());
 
-        $subcontext = [get_string('privacy:attemptpath', 'mod_mavr', 1)];
+        $subcontext = [get_string('privacy:attemptpath', 'mod_vrroom', 1)];
         $data = $writer->get_data($subcontext);
         $this->assertEquals(1, $data->attempt);
         $this->assertSame('inprogress', $data->state);
@@ -199,25 +199,25 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
      */
     public function test_export_timedue(): void {
         global $DB;
-        $collection = provider::get_metadata(new collection('mod_mavr'));
+        $collection = provider::get_metadata(new collection('mod_vrroom'));
         $fields = [];
         foreach ($collection->get_collection() as $item) {
-            if ($item->get_name() === 'mavr_attempts') {
+            if ($item->get_name() === 'vrroom_attempts') {
                 $fields = $item->get_privacy_fields();
             }
         }
-        $this->assertSame('privacy:metadata:mavr_attempts:timedue', $fields['timedue'] ?? null);
+        $this->assertSame('privacy:metadata:vrroom_attempts:timedue', $fields['timedue'] ?? null);
 
-        $subcontext = [get_string('privacy:attemptpath', 'mod_mavr', 1)];
-        $this->export_context_data_for_user((int)$this->students[1]->id, $this->context, 'mod_mavr');
+        $subcontext = [get_string('privacy:attemptpath', 'mod_vrroom', 1)];
+        $this->export_context_data_for_user((int)$this->students[1]->id, $this->context, 'mod_vrroom');
         $data = writer::with_context($this->context)->get_data($subcontext);
         $this->assertTrue(property_exists($data, 'timedue'));
         $this->assertNull($data->timedue);
 
         $timedue = (int)$this->attempts[2]->timestart + 900;
-        $DB->set_field('mavr_attempts', 'timedue', $timedue, ['id' => $this->attempts[2]->id]);
+        $DB->set_field('vrroom_attempts', 'timedue', $timedue, ['id' => $this->attempts[2]->id]);
         writer::reset();
-        $this->export_context_data_for_user((int)$this->students[2]->id, $this->context, 'mod_mavr');
+        $this->export_context_data_for_user((int)$this->students[2]->id, $this->context, 'mod_vrroom');
         $data = writer::with_context($this->context)->get_data($subcontext);
         $this->assertSame(\core_privacy\local\request\transform::datetime($timedue), $data->timedue);
     }
@@ -232,7 +232,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertSame([0, 0, 0, 0], $this->counts(1));
         $this->assertSame([0, 0, 0, 0], $this->counts(2));
         // The activity itself stays.
-        $this->assertEquals(1, $DB->count_records('mavr_slots', ['mavrid' => $this->mavr->id]));
+        $this->assertEquals(1, $DB->count_records('vrroom_slots', ['vrroomid' => $this->vrroom->id]));
     }
 
     /**
@@ -241,7 +241,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     public function test_delete_data_for_user(): void {
         $other = $this->counts(2);
         $this->assertNotContains(0, $other);
-        $contextlist = new approved_contextlist($this->students[1], 'mod_mavr', [$this->context->id]);
+        $contextlist = new approved_contextlist($this->students[1], 'mod_vrroom', [$this->context->id]);
         provider::delete_data_for_user($contextlist);
         $this->assertSame([0, 0, 0, 0], $this->counts(1));
         $this->assertSame($other, $this->counts(2));
@@ -253,7 +253,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     public function test_delete_data_for_users(): void {
         $other = $this->counts(1);
         $this->assertNotContains(0, $other);
-        $userlist = new approved_userlist($this->context, 'mod_mavr', [(int)$this->students[2]->id]);
+        $userlist = new approved_userlist($this->context, 'mod_vrroom', [(int)$this->students[2]->id]);
         provider::delete_data_for_users($userlist);
         $this->assertSame($other, $this->counts(1));
         $this->assertSame([0, 0, 0, 0], $this->counts(2));

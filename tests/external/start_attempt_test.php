@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\token;
+use mod_vrroom\local\token;
 
 /**
- * Tests of mod_mavr_start_attempt and mod_mavr_get_preview.
+ * Tests of mod_vrroom_start_attempt and mod_vrroom_get_preview.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -41,7 +41,7 @@ final class start_attempt_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', $record + ['course' => $course->id]);
+        $module = $generator->create_module('vrroom', $record + ['course' => $course->id]);
         return (object) [
             'course' => $course,
             'module' => $module,
@@ -70,18 +70,18 @@ final class start_attempt_test extends \advanced_testcase {
         $descriptor = json_decode($result['launchjson'], true);
         $this->assertSame('inline', $descriptor['type']);
         $config = $descriptor['config'];
-        $this->assertSame('mavr-launch/1', $config['schema']);
+        $this->assertSame('vrroom-launch/1', $config['schema']);
         $this->assertFalse($config['preview']);
         $this->assertSame((int)$fx->module->cmid, $config['cmid']);
         $this->assertSame($result['attemptid'], $config['attemptid']);
         $this->assertSame((int)$fx->student->id, $config['userid']);
         $this->assertSame($CFG->wwwroot, $config['actor']['account']['homePage']);
         $this->assertSame((string)$fx->student->id, $config['actor']['account']['name']);
-        $this->assertSame($CFG->wwwroot . '/mod/mavr/xapi/' . $fx->module->cmid, $config['activityiri']);
-        $this->assertSame('mavr-resume', $config['resume']['stateid']);
+        $this->assertSame($CFG->wwwroot . '/mod/vrroom/xapi/' . $fx->module->cmid, $config['activityiri']);
+        $this->assertSame('vrroom-resume', $config['resume']['stateid']);
         $this->assertNotEmpty($config['scenes']);
         $this->assertSame($config['scenes'][0]['id'], $config['startscene']);
-        $this->assertSame('mavr-graph/1', $config['graph']['schema']);
+        $this->assertSame('vrroom-graph/1', $config['graph']['schema']);
         $this->assertSame($result['attemptid'], $config['state']['attemptid']);
         foreach ($config['scenes'][0]['interactables'] as $item) {
             if ($item['kind'] === 'hotspot') {
@@ -104,7 +104,7 @@ final class start_attempt_test extends \advanced_testcase {
     }
 
     /**
-     * Only users with mod/mavr:attempt can start; users outside the course cannot reach it.
+     * Only users with mod/vrroom:attempt can start; users outside the course cannot reach it.
      *
      * @return void
      */
@@ -165,7 +165,7 @@ final class start_attempt_test extends \advanced_testcase {
         foreach ($config['questions'] as $question) {
             $this->assertFalse($question['available']);
         }
-        $this->assertSame(0, $DB->count_records('mavr_attempts'));
+        $this->assertSame(0, $DB->count_records('vrroom_attempts'));
 
         $this->setUser($fx->student);
         $this->expectException(\required_capability_exception::class);

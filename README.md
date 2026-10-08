@@ -1,6 +1,6 @@
-# MAVR — Mixed, Augmented and Virtual Reality for Moodle
+# VR room — virtual-reality rooms for Moodle
 
-MAVR is a Moodle activity that puts students in a 3D room they explore in the browser, on a
+VR room is a Moodle activity that puts students in a 3D room they explore in the browser, on a
 computer or a phone. Students walk between stations, look at models, images and texts, and answer
 questions from the course question bank. Everything they do is recorded as xAPI statements, and
 the grade and activity completion are calculated from those statements on the server, so the
@@ -21,10 +21,10 @@ when a browser cannot show 3D.
 
 ## Installation
 
-1. Copy this repository to `public/mod/mavr` in your Moodle code (Moodle 5.x keeps plugins under
+1. Copy this repository to `public/mod/vrroom` in your Moodle code (Moodle 5.x keeps plugins under
    `public/`).
 2. Visit *Site administration > Notifications* to install it.
-3. Optionally review *Site administration > Plugins > Activity modules > MAVR*. *General settings*:
+3. Optionally review *Site administration > Plugins > Activity modules > VR room*. *General settings*:
    maximum model file size, statements per request, statements per attempt and the launch token
    lifetime. *Built-in viewer*: live mode on or off for the site (on by default), and optional
    STUN and TURN servers (none by default).
@@ -33,15 +33,15 @@ The plugin includes two sub-plugins that install with it:
 
 | Sub-plugin | Path | Purpose |
 |---|---|---|
-| `mavrruntime_builtin` | `runtime/builtin` | The built-in viewer: 3D room and list view, inside Moodle. |
-| `mavrtemplate_gallery` | `template/gallery` | The *Gallery walk* template. |
+| `vrroomruntime_builtin` | `runtime/builtin` | The built-in viewer: 3D room and list view, inside Moodle. |
+| `vrroomtemplate_gallery` | `template/gallery` | The *Gallery walk* template. |
 
 On installation the plugin registers the `.glb` file type (`model/gltf-binary`) if the site does
 not have it yet, so teachers can upload 3D models. Uninstalling the plugin removes it again.
 
 ## Using it
 
-1. In a course, add a **MAVR** activity.
+1. In a course, add a **VR room** activity.
 2. Choose the **Gallery walk** template and an environment (*Gallery hall*, *Courtyard*, or your own
    GLB model).
 3. Add stations: a title, a text, optionally a 3D model or an image, and optionally a question from
@@ -95,7 +95,7 @@ How it works and what it discloses:
 - Without STUN or TURN servers, live mode usually works only when everyone is on the same
   network. An administrator can add STUN and TURN servers (with a TURN REST shared secret, for
   example coturn's `static-auth-secret`) under *Site administration > Plugins > Activity modules
-  > MAVR > Built-in viewer*, or turn live mode off for the whole site there.
+  > VR room > Built-in viewer*, or turn live mode off for the whole site there.
 - Nothing is recorded: presence rows go when a person leaves or stops responding for 20 seconds,
   connection messages when delivered or after 60 seconds.
 

@@ -22,7 +22,7 @@
  * Hands: the grip of a controller when it has a pose; for hand tracking (where three.js updates
  * the hand joints and not the grip) the 'wrist' joint of the hand with that handedness.
  *
- * @module     mavrruntime_builtin/live/posesource
+ * @module     vrroomruntime_builtin/live/posesource
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

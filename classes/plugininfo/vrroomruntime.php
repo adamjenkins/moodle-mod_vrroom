@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\plugininfo;
+namespace mod_vrroom\plugininfo;
 
 use core\plugininfo\base;
 
 /**
- * Plugin info for the mavrruntime sub-plugin type (run modes).
+ * Plugin info for the vrroomruntime sub-plugin type (run modes).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class mavrruntime extends base {
+class vrroomruntime extends base {
     /**
      * A run mode can be uninstalled only while no activity uses it.
      *
@@ -33,7 +33,7 @@ class mavrruntime extends base {
      */
     public function is_uninstall_allowed(): bool {
         global $DB;
-        return !$DB->record_exists('mavr', ['runtime' => $this->name]);
+        return !$DB->record_exists('vrroom', ['runtime' => $this->name]);
     }
 
     /**
@@ -51,11 +51,11 @@ class mavrruntime extends base {
      * @return string
      */
     public function get_settings_section_name() {
-        return 'mavrruntimesetting' . $this->name;
+        return 'vrroomruntimesetting' . $this->name;
     }
 
     /**
-     * Add the run mode's settings page (its settings.php) below the MAVR settings category.
+     * Add the run mode's settings page (its settings.php) below the VR room settings category.
      *
      * @param \part_of_admin_tree $adminroot The admin tree.
      * @param string $parentnodename The category to add the page to.

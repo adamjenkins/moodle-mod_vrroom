@@ -1,10 +1,10 @@
 {
     "subplugintypes": {
-        "mavrruntime": "runtime",
-        "mavrtemplate": "template"
+        "vrroomruntime": "runtime",
+        "vrroomtemplate": "template"
     },
     "plugintypes": {
-        "mavrruntime": "mod/mavr/runtime",
-        "mavrtemplate": "mod/mavr/template"
+        "vrroomruntime": "mod/vrroom/runtime",
+        "vrroomtemplate": "mod/vrroom/template"
     }
 }

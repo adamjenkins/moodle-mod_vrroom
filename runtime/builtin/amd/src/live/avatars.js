@@ -23,16 +23,16 @@
  * Avatars kept per peer, created, updated and removed as people come and go, follow mod_gear's
  * collaborative viewer.
  *
- * @module     mavrruntime_builtin/live/avatars
+ * @module     vrroomruntime_builtin/live/avatars
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 import Log from 'core/log';
-import {createInterpolator} from 'mavrruntime_builtin/live/interpolation';
-import {createPoseSource} from 'mavrruntime_builtin/live/posesource';
-import {createAvatar} from 'mavrruntime_builtin/live/avatarmodel';
+import {createInterpolator} from 'vrroomruntime_builtin/live/interpolation';
+import {createPoseSource} from 'vrroomruntime_builtin/live/posesource';
+import {createAvatar} from 'vrroomruntime_builtin/live/avatarmodel';
 
 /** Seconds between two own pose messages (12 Hz). */
 const SEND_INTERVAL = 1 / 12;

@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr;
+namespace mod_vrroom;
 
-use mod_mavr\local\instance_manager;
-use mod_mavr\output\report_attempt;
-use mod_mavr\output\report_overview;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\output\report_attempt;
+use mod_vrroom\output\report_overview;
 
 /**
- * Tests for the MAVR report renderables and templates.
+ * Tests for the VR room report renderables and templates.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -38,7 +38,7 @@ final class report_test extends \advanced_testcase {
      * An activity whose first station has a hostile title, and a student with a hostile name who
      * visited it.
      *
-     * @return array [mavr row, cm_info, context, student, attempt]
+     * @return array [vrroom row, cm_info, context, student, attempt]
      */
     private function create_setup(): array {
         global $DB;
@@ -49,24 +49,24 @@ final class report_test extends \advanced_testcase {
         // name can still reach the table unclean (an import, an auth plugin, an old site).
         $DB->set_field('user', 'firstname', self::HOSTILE, ['id' => $student->id]);
         $student->firstname = self::HOSTILE;
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'stations' => [
                 ['title' => 'Vase <script>alert(1)</script> & jug'],
                 ['title' => 'Portrait'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
-        [, $cm] = get_course_and_cm_from_cmid($module->cmid, 'mavr');
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        [, $cm] = get_course_and_cm_from_cmid($module->cmid, 'vrroom');
         $context = \context_module::instance($cm->id);
 
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
-        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
-        $mavrgen->record_event($attempt, 'interacted', 'zone', $scene['id'], $scene['zones'][0]['id']);
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $attempt = $vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id);
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
+        $vrroomgen->record_event($attempt, 'interacted', 'zone', $scene['id'], $scene['zones'][0]['id']);
 
-        return [$mavr, $cm, $context, $student, $attempt];
+        return [$vrroom, $cm, $context, $student, $attempt];
     }
 
     /**
@@ -76,19 +76,19 @@ final class report_test extends \advanced_testcase {
         global $PAGE;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$mavr, $cm, $context, $student, $attempt] = $this->create_setup();
+        [$vrroom, $cm, $context, $student, $attempt] = $this->create_setup();
 
         $output = $PAGE->get_renderer('core');
-        $data = (new report_overview($mavr, $cm, $context))->export_for_template($output);
+        $data = (new report_overview($vrroom, $cm, $context))->export_for_template($output);
         $this->assertTrue($data['hasattempts']);
         $this->assertCount(1, $data['attempts']);
         $row = $data['attempts'][0];
         $this->assertSame((int)$attempt->id, $row['attemptid']);
-        $this->assertSame(get_string('state_inprogress', 'mod_mavr'), $row['state']);
+        $this->assertSame(get_string('state_inprogress', 'mod_vrroom'), $row['state']);
         $this->assertTrue($row['candelete']);
         $this->assertStringContainsString('delete=' . $attempt->id, $row['deleteurl']);
 
-        $html = $output->render_from_template('mod_mavr/report_overview', $data);
+        $html = $output->render_from_template('mod_vrroom/report_overview', $data);
         $this->assertStringContainsString('&lt;b&gt;Evil&lt;/b&gt; &amp; Co', $html);
         $this->assertStringNotContainsString('<b>Evil</b>', $html);
         $this->assertStringNotContainsString('&amp;lt;', $html);
@@ -100,11 +100,11 @@ final class report_test extends \advanced_testcase {
     public function test_overview_hides_delete_without_capability(): void {
         global $PAGE;
         $this->resetAfterTest();
-        [$mavr, $cm, $context] = $this->create_setup();
+        [$vrroom, $cm, $context] = $this->create_setup();
         $teacher = $this->getDataGenerator()->create_and_enrol($cm->get_course(), 'teacher');
         $this->setUser($teacher);
 
-        $data = (new report_overview($mavr, $cm, $context))->export_for_template($PAGE->get_renderer('core'));
+        $data = (new report_overview($vrroom, $cm, $context))->export_for_template($PAGE->get_renderer('core'));
         $this->assertFalse($data['attempts'][0]['candelete']);
         $this->assertSame('', $data['attempts'][0]['deleteurl']);
     }
@@ -116,10 +116,10 @@ final class report_test extends \advanced_testcase {
         global $PAGE;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$mavr, $cm, $context, $student, $attempt] = $this->create_setup();
+        [$vrroom, $cm, $context, $student, $attempt] = $this->create_setup();
 
         $output = $PAGE->get_renderer('core');
-        $data = (new report_attempt($mavr, $cm, $context, $attempt))->export_for_template($output);
+        $data = (new report_attempt($vrroom, $cm, $context, $attempt))->export_for_template($output);
 
         $statuses = array_column($data['objectives'], 'status', 'id');
         $this->assertCount(2, $statuses);
@@ -131,23 +131,23 @@ final class report_test extends \advanced_testcase {
         $this->assertContains(false, $sources);
         $interacted = array_values(array_filter(
             $data['statements'],
-            fn($s) => $s['verb'] === get_string('verb_interacted', 'mod_mavr')
+            fn($s) => $s['verb'] === get_string('verb_interacted', 'mod_vrroom')
         ));
         $this->assertCount(1, $interacted);
         $this->assertTrue($interacted[0]['clientasserted']);
-        $this->assertSame(get_string('reportclientasserted', 'mod_mavr'), $interacted[0]['source']);
-        $this->assertSame(get_string('objecttype_zone', 'mod_mavr'), $interacted[0]['objecttype']);
+        $this->assertSame(get_string('reportclientasserted', 'mod_vrroom'), $interacted[0]['source']);
+        $this->assertSame(get_string('objecttype_zone', 'mod_vrroom'), $interacted[0]['objecttype']);
         $this->assertStringNotContainsString('<script>', $interacted[0]['objectname']);
         $this->assertStringContainsString('Vase', $interacted[0]['objectname']);
         // The format_string() call made the name HTML-safe: the ampersand is escaped exactly once.
         $this->assertStringContainsString('&amp; jug', $interacted[0]['objectname']);
         $this->assertStringNotContainsString('&amp;amp;', $interacted[0]['objectname']);
 
-        $html = $output->render_from_template('mod_mavr/report_attempt', $data);
+        $html = $output->render_from_template('mod_vrroom/report_attempt', $data);
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringNotContainsString('<b>Evil</b>', $html);
         $this->assertStringContainsString('&lt;b&gt;Evil&lt;/b&gt;', $html);
-        $this->assertStringContainsString('data-region="mavr-report-statements"', $html);
+        $this->assertStringContainsString('data-region="vrroom-report-statements"', $html);
     }
 
     /**
@@ -155,7 +155,7 @@ final class report_test extends \advanced_testcase {
      * non-editing teacher (no "access all groups") in group A.
      *
      * @param int $groupmode SEPARATEGROUPS, VISIBLEGROUPS or NOGROUPS
-     * @return array [course, mavr row, cm_info, context, teacher, group A, group B, attempt A, attempt B]
+     * @return array [course, vrroom row, cm_info, context, teacher, group A, group B, attempt A, attempt B]
      */
     private function create_group_setup(int $groupmode): array {
         global $DB;
@@ -170,17 +170,17 @@ final class report_test extends \advanced_testcase {
         $generator->create_group_member(['groupid' => $groupb->id, 'userid' => $studentb->id]);
         $generator->create_group_member(['groupid' => $groupa->id, 'userid' => $teacher->id]);
 
-        $module = $generator->create_module('mavr', ['course' => $course->id, 'groupmode' => $groupmode]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
-        [$course, $cm] = get_course_and_cm_from_cmid($module->cmid, 'mavr');
+        $module = $generator->create_module('vrroom', ['course' => $course->id, 'groupmode' => $groupmode]);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        [$course, $cm] = get_course_and_cm_from_cmid($module->cmid, 'vrroom');
         $context = \context_module::instance($cm->id);
 
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
-        $attempta = $mavrgen->create_attempt((int)$mavr->id, (int)$studenta->id);
-        $attemptb = $mavrgen->create_attempt((int)$mavr->id, (int)$studentb->id);
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $attempta = $vrroomgen->create_attempt((int)$vrroom->id, (int)$studenta->id);
+        $attemptb = $vrroomgen->create_attempt((int)$vrroom->id, (int)$studentb->id);
 
-        return [$course, $mavr, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb];
+        return [$course, $vrroom, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb];
     }
 
     /**
@@ -204,19 +204,19 @@ final class report_test extends \advanced_testcase {
      */
     public function test_separate_groups_limit_the_report(): void {
         $this->resetAfterTest();
-        [$course, $mavr, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb] =
+        [$course, $vrroom, $cm, $context, $teacher, $groupa, $groupb, $attempta, $attemptb] =
             $this->create_group_setup(SEPARATEGROUPS);
         $this->setUser($teacher);
 
         $this->assertSame(
             [(int)$attempta->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id))
+            $this->overview_attemptids(new report_overview($vrroom, $cm, $context, (int)$groupa->id))
         );
         $this->assertSame(
             [(int)$attemptb->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupb->id))
+            $this->overview_attemptids(new report_overview($vrroom, $cm, $context, (int)$groupb->id))
         );
-        $this->assertSame([], $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
+        $this->assertSame([], $this->overview_attemptids(new report_overview($vrroom, $cm, $context, 0)));
 
         // The detail page and the deletion both go through this check.
         report_overview::require_attempt_in_groups($course, $cm, $attempta);
@@ -225,7 +225,7 @@ final class report_test extends \advanced_testcase {
             $this->fail('An attempt of another group must be refused.');
         } catch (\moodle_exception $e) {
             $this->assertSame('errorattemptnotingroup', $e->errorcode);
-            $this->assertSame(get_string('errorattemptnotingroup', 'mod_mavr'), $e->getMessage());
+            $this->assertSame(get_string('errorattemptnotingroup', 'mod_vrroom'), $e->getMessage());
         }
     }
 
@@ -235,16 +235,16 @@ final class report_test extends \advanced_testcase {
      */
     public function test_separate_groups_with_access_all_groups(): void {
         $this->resetAfterTest();
-        [$course, $mavr, $cm, $context, , $groupa, , $attempta, $attemptb] =
+        [$course, $vrroom, $cm, $context, , $groupa, , $attempta, $attemptb] =
             $this->create_group_setup(SEPARATEGROUPS);
         $this->setAdminUser();
 
         $expected = [(int)$attempta->id, (int)$attemptb->id];
         sort($expected);
-        $this->assertSame($expected, $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)));
+        $this->assertSame($expected, $this->overview_attemptids(new report_overview($vrroom, $cm, $context, 0)));
         $this->assertSame(
             [(int)$attempta->id],
-            $this->overview_attemptids(new report_overview($mavr, $cm, $context, (int)$groupa->id))
+            $this->overview_attemptids(new report_overview($vrroom, $cm, $context, (int)$groupa->id))
         );
         report_overview::require_attempt_in_groups($course, $cm, $attemptb);
     }
@@ -255,7 +255,7 @@ final class report_test extends \advanced_testcase {
     public function test_visible_groups_and_no_groups_unchanged(): void {
         $this->resetAfterTest();
         foreach ([VISIBLEGROUPS, NOGROUPS] as $groupmode) {
-            [$course, $mavr, $cm, $context, $teacher, , , $attempta, $attemptb] =
+            [$course, $vrroom, $cm, $context, $teacher, , , $attempta, $attemptb] =
                 $this->create_group_setup($groupmode);
             $this->setUser($teacher);
 
@@ -263,7 +263,7 @@ final class report_test extends \advanced_testcase {
             sort($expected);
             $this->assertSame(
                 $expected,
-                $this->overview_attemptids(new report_overview($mavr, $cm, $context, 0)),
+                $this->overview_attemptids(new report_overview($vrroom, $cm, $context, 0)),
                 'group mode ' . $groupmode
             );
             report_overview::require_attempt_in_groups($course, $cm, $attemptb);

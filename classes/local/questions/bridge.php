@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
  * A plain-text view of a question for the in-world panels of immersive VR.
@@ -31,7 +31,7 @@ namespace mod_mavr\local\questions;
  * Questions whose text or choices hold images, media, embedded content or TeX are reported as
  * unsupported, because the plain-text view would lose part of the question.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -57,7 +57,7 @@ final class bridge {
      * The caller has checked that the attempt is the user's own open attempt and that the slot's
      * objective is not locked.
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @param \context_module $context The activity's module context.
      * @param bool $answered Whether the slot's objective is completed.

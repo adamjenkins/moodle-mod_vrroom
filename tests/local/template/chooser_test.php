@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\template;
+namespace mod_vrroom\local\template;
 
 use core_course\local\entity\content_item;
 use core_course\local\entity\string_title;
@@ -22,7 +22,7 @@ use core_course\local\entity\string_title;
 /**
  * Tests for the activity chooser items and the template selection in the activity form.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -55,13 +55,13 @@ final class chooser_test extends \advanced_testcase {
     private function default_item(int $courseid): content_item {
         return new content_item(
             id: 42,
-            name: 'mavr',
-            title: new string_title('MAVR'),
-            link: new \moodle_url('/course/mod.php', ['id' => $courseid, 'add' => 'mavr']),
+            name: 'vrroom',
+            title: new string_title('VR room'),
+            link: new \moodle_url('/course/mod.php', ['id' => $courseid, 'add' => 'vrroom']),
             icon: '<img class="icon" alt="">',
             help: 'Default help',
             archetype: MOD_ARCHETYPE_OTHER,
-            componentname: 'mod_mavr',
+            componentname: 'mod_vrroom',
             purpose: MOD_PURPOSE_INTERACTIVECONTENT,
             branded: false,
             gradable: true,
@@ -86,30 +86,30 @@ final class chooser_test extends \advanced_testcase {
         foreach ($templates as $name => $template) {
             $item = $items[$position];
             $this->assertSame($position + 1, $item->get_id());
-            $this->assertSame('mavr_' . $name, $item->get_name());
+            $this->assertSame('vrroom_' . $name, $item->get_name());
             $this->assertSame(
-                get_string('choosertitle', 'mod_mavr', $template->get_display_name()),
+                get_string('choosertitle', 'mod_vrroom', $template->get_display_name()),
                 $item->get_title()->get_value()
             );
-            $this->assertSame(get_string('chooserhelp', 'mavrtemplate_' . $name), $item->get_help());
+            $this->assertSame(get_string('chooserhelp', 'vrroomtemplate_' . $name), $item->get_help());
 
             $link = $item->get_link();
             $this->assertStringEndsWith('/course/modedit.php', $link->out_omit_querystring());
             $this->assertSame($name, $link->param('template'));
-            $this->assertSame('mavr', $link->param('add'));
+            $this->assertSame('vrroom', $link->param('add'));
             $this->assertSame('7', (string)$link->param('course'));
 
             // Everything else is the default item's.
             $this->assertSame('<img class="icon" alt="">', $item->get_icon());
             $this->assertSame(MOD_ARCHETYPE_OTHER, $item->get_archetype());
-            $this->assertSame('mod_mavr', $item->get_component_name());
+            $this->assertSame('mod_vrroom', $item->get_component_name());
             $this->assertSame(MOD_PURPOSE_INTERACTIVECONTENT, $item->get_purpose());
             $this->assertTrue($item->is_gradable());
             $this->assertSame('Default summary', $item->get_summary());
             $position++;
         }
         $this->assertSame(
-            ['mavr_blank', 'mavr_escape', 'mavr_gallery'],
+            ['vrroom_blank', 'vrroom_escape', 'vrroom_gallery'],
             array_slice(array_map(fn (content_item $item) => $item->get_name(), $items), 0, 3)
         );
     }
@@ -120,13 +120,13 @@ final class chooser_test extends \advanced_testcase {
     public function test_content_items_without_course(): void {
         $default = new content_item(
             1,
-            'mavr',
-            new string_title('MAVR'),
+            'vrroom',
+            new string_title('VR room'),
             new \moodle_url(''),
             '',
             'Help',
             MOD_ARCHETYPE_OTHER,
-            'mod_mavr',
+            'mod_vrroom',
             MOD_PURPOSE_INTERACTIVECONTENT
         );
         foreach (chooser::content_items($default) as $item) {
@@ -140,15 +140,15 @@ final class chooser_test extends \advanced_testcase {
      */
     public function test_callbacks(): void {
         global $CFG;
-        require_once($CFG->dirroot . '/mod/mavr/lib.php');
+        require_once($CFG->dirroot . '/mod/vrroom/lib.php');
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $default = $this->default_item((int)$course->id);
 
         $expected = array_map(fn (content_item $item) => $item->get_name(), chooser::content_items($default));
-        $courseitems = mod_mavr_get_course_content_items($default, get_admin(), $course);
+        $courseitems = mod_vrroom_get_course_content_items($default, get_admin(), $course);
         $this->assertSame($expected, array_map(fn (content_item $item) => $item->get_name(), $courseitems));
-        $allitems = mod_mavr_get_all_content_items($default);
+        $allitems = mod_vrroom_get_all_content_items($default);
         $this->assertSame($expected, array_map(fn (content_item $item) => $item->get_name(), $allitems));
     }
 
@@ -157,8 +157,8 @@ final class chooser_test extends \advanced_testcase {
      */
     public function test_chooser_help_fallback(): void {
         foreach (registry::get_all() as $name => $template) {
-            $expected = get_string_manager()->string_exists('chooserhelp', 'mavrtemplate_' . $name)
-                ? get_string('chooserhelp', 'mavrtemplate_' . $name) : '';
+            $expected = get_string_manager()->string_exists('chooserhelp', 'vrroomtemplate_' . $name)
+                ? get_string('chooserhelp', 'vrroomtemplate_' . $name) : '';
             $this->assertSame($expected, $template->get_chooser_help());
         }
     }
@@ -171,12 +171,12 @@ final class chooser_test extends \advanced_testcase {
     private function render_new_form(): string {
         global $CFG, $PAGE;
         require_once($CFG->dirroot . '/course/modlib.php');
-        require_once($CFG->dirroot . '/mod/mavr/mod_form.php');
+        require_once($CFG->dirroot . '/mod/vrroom/mod_form.php');
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
-        $PAGE->set_url('/course/modedit.php', ['add' => 'mavr', 'course' => $course->id, 'section' => 0]);
-        [, , $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'mavr', 0);
-        $form = new \mod_mavr_mod_form($data, $cw->section, $cm, $course);
+        $PAGE->set_url('/course/modedit.php', ['add' => 'vrroom', 'course' => $course->id, 'section' => 0]);
+        [, , $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'vrroom', 0);
+        $form = new \mod_vrroom_mod_form($data, $cw->section, $cm, $course);
         $form->set_data($data);
         return $form->render();
     }
@@ -193,8 +193,8 @@ final class chooser_test extends \advanced_testcase {
         $this->assertMatchesRegularExpression('/<input[^>]*name="template"[^>]*value="escape"/', $html);
         $this->assertStringContainsString('name="escape_title[0]"', $html);
         $this->assertStringNotContainsString('gallery_title', $html);
-        $this->assertStringNotContainsString('name="mavr_choosetemplate"', $html);
-        $this->assertStringContainsString(get_string('templatechosen', 'mavr'), $html);
+        $this->assertStringNotContainsString('name="vrroom_choosetemplate"', $html);
+        $this->assertStringContainsString(get_string('templatechosen', 'vrroom'), $html);
     }
 
     /**
@@ -207,8 +207,8 @@ final class chooser_test extends \advanced_testcase {
 
         $html = $this->render_new_form();
         $this->assertMatchesRegularExpression('/<select[^>]*name="template"/', $html);
-        $this->assertStringContainsString('name="mavr_choosetemplate"', $html);
-        $this->assertStringContainsString(get_string('choosetemplatebutton', 'mavr'), $html);
+        $this->assertStringContainsString('name="vrroom_choosetemplate"', $html);
+        $this->assertStringContainsString(get_string('choosetemplatebutton', 'vrroom'), $html);
         $this->assertStringNotContainsString('escape_title', $html);
         $this->assertStringNotContainsString('gallery_title', $html);
     }

@@ -2,7 +2,7 @@
   "name": "escape_chain",
   "intent": "The escape template's compile for two puzzles (Desk: key lock with one 0.5-point hint; Safe: question lock with pass_fraction 1) and the exit door, walked through: hint, key, wrong then right answer, exit, finish. Earned 1.5 + 3 of 5.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "timelimit": 900,
     "hidden": [
       "k-p1",

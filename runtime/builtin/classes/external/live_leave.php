@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\external;
+namespace vrroomruntime_builtin\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mavrruntime_builtin\local\live\room_manager;
+use vrroomruntime_builtin\local\live\room_manager;
 
 /**
  * Leave a live room.
@@ -28,7 +28,7 @@ use mavrruntime_builtin\local\live\room_manager;
  * Only ever removes the caller's own presence, so it needs no activity context: an unknown or
  * foreign peer id changes nothing and still answers 'ok'.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -17,10 +17,10 @@
  * Environment builder: the procedural presets (hall, courtyard) and uploaded GLB environments.
  *
  * Every floor, wall and ceiling mesh (and an uploaded environment model) is tagged with
- * userData.mavrShell, so augmented and mixed reality can hide the room's shell while keeping its
+ * userData.vrroomShell, so augmented and mixed reality can hide the room's shell while keeping its
  * lights and contents.
  *
- * @module     mavrruntime_builtin/environment
+ * @module     vrroomruntime_builtin/environment
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -62,7 +62,7 @@ const colour = (THREE, value, fallback) => {
  * @returns {Object} the mesh
  */
 const addShell = (mesh, group, shell) => {
-    mesh.userData.mavrShell = true;
+    mesh.userData.vrroomShell = true;
     group.add(mesh);
     shell.push(mesh);
     return mesh;
@@ -86,7 +86,7 @@ const buildHall = (THREE, shape, group, shell) => {
 
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, length), floormaterial);
     floor.rotation.x = -Math.PI / 2;
-    floor.name = 'mavr-floor';
+    floor.name = 'vrroom-floor';
     floor.receiveShadow = true;
     addShell(floor, group, shell);
 
@@ -99,7 +99,7 @@ const buildHall = (THREE, shape, group, shell) => {
     walls.forEach((w) => {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(w.size[0], w.size[1], w.size[2]), wallmaterial);
         mesh.position.set(w.position[0], w.position[1], w.position[2]);
-        mesh.name = 'mavr-wall';
+        mesh.name = 'vrroom-wall';
         addShell(mesh, group, shell);
     });
 
@@ -107,7 +107,7 @@ const buildHall = (THREE, shape, group, shell) => {
         const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, length), wallmaterial);
         ceiling.rotation.x = Math.PI / 2;
         ceiling.position.y = height;
-        ceiling.name = 'mavr-ceiling';
+        ceiling.name = 'vrroom-ceiling';
         return addShell(ceiling, group, shell);
     }
     return null;
@@ -133,7 +133,7 @@ const buildCourtyard = (THREE, shape, group, shell) => {
         new THREE.MeshStandardMaterial({color: colour(THREE, shape.groundcolor, '#7d9a5b'), roughness: 1})
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.name = 'mavr-floor';
+    ground.name = 'vrroom-floor';
     addShell(ground, group, shell);
 
     const path = new THREE.Mesh(
@@ -142,7 +142,7 @@ const buildCourtyard = (THREE, shape, group, shell) => {
     );
     path.rotation.x = -Math.PI / 2;
     path.position.y = 0.01;
-    path.name = 'mavr-path';
+    path.name = 'vrroom-path';
     addShell(path, group, shell);
 
     const wall = new THREE.Mesh(
@@ -150,7 +150,7 @@ const buildCourtyard = (THREE, shape, group, shell) => {
         new THREE.MeshStandardMaterial({color: new THREE.Color('#b9b0a2'), roughness: 0.9, side: THREE.DoubleSide})
     );
     wall.position.y = wallheight / 2;
-    wall.name = 'mavr-wall';
+    wall.name = 'vrroom-wall';
     addShell(wall, group, shell);
 };
 
@@ -207,7 +207,7 @@ const readBounds = (bounds) => {
 };
 
 /**
- * Build the environment of a mavr-scene/1 document.
+ * Build the environment of a vrroom-scene/1 document.
  *
  * The result is {group, bounds, background, ceiling, shell}: the group holds the lights and the
  * shell; ceiling is the ceiling mesh or null; shell lists the floor, wall and ceiling meshes (or
@@ -222,7 +222,7 @@ const readBounds = (bounds) => {
 export const buildEnvironment = (THREE, environment, loader, resolveUrl = null) => {
     const env = environment || {};
     const group = new THREE.Group();
-    group.name = 'mavr-environment';
+    group.name = 'vrroom-environment';
     addLights(THREE, env.lights, group);
     const background = colour(THREE, env.sky, '#20242a');
     const shell = [];
@@ -235,7 +235,7 @@ export const buildEnvironment = (THREE, environment, loader, resolveUrl = null) 
         return loader.loadAsync(url).then((gltf) => {
             const model = gltf.scene || (gltf.scenes && gltf.scenes[0]);
             if (model) {
-                model.name = 'mavr-environment-model';
+                model.name = 'vrroom-environment-model';
                 addShell(model, group, shell);
             }
             let bounds = readBounds(env.bounds);

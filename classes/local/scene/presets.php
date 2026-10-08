@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\scene;
+namespace mod_vrroom\local\scene;
 
 /**
  * The bundled procedural environments (environments/presets.json).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class presets {
     /** @var string Schema of the presets file. */
-    public const SCHEMA = 'mavr-presets/1';
+    public const SCHEMA = 'vrroom-presets/1';
 
     /** @var array|null Decoded presets map, once read. */
     private static ?array $presets = null;
@@ -79,7 +79,7 @@ final class presets {
     public static function get_choices(): array {
         $choices = [];
         foreach (self::get_all() as $id => $preset) {
-            $choices[$id] = get_string($preset['string'], 'mod_mavr');
+            $choices[$id] = get_string($preset['string'], 'mod_vrroom');
         }
         return $choices;
     }

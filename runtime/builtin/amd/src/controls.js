@@ -21,12 +21,12 @@
  * camera inside it, so an immersive WebXR session can take over the camera's pose while teleport
  * and snap turn keep moving the rig.
  *
- * @module     mavrruntime_builtin/controls
+ * @module     vrroomruntime_builtin/controls
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import * as THREE from 'mavrruntime_builtin/three';
+import * as THREE from 'vrroomruntime_builtin/three';
 
 /** Walking speed in metres per second. */
 const WALK = 2.5;
@@ -235,7 +235,7 @@ export const attach = (camera, canvas, options = {}) => {
 
     // Virtual stick (touch).
     const stick = options.stick || null;
-    const knob = stick ? stick.querySelector('[data-region="mavr-stick-knob"]') : null;
+    const knob = stick ? stick.querySelector('[data-region="vrroom-stick-knob"]') : null;
     const setKnob = (x, y) => {
         if (knob) {
             knob.style.transform = `translate(${x * STICK}px, ${y * STICK}px)`;

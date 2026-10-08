@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\xapi;
+namespace mod_vrroom\xapi;
 
 use core_xapi\local\state;
 use core_xapi\local\statement;
 use core_xapi\local\statement\item_activity;
 use core_xapi\local\statement\item_agent;
 use core_xapi\xapi_exception;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\xapi\iri;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\xapi\iri;
 
 /**
- * Trust tests of the MAVR xAPI handler (DESIGN §7).
+ * Trust tests of the VR room xAPI handler (DESIGN §7).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -39,7 +39,7 @@ final class handler_test extends \advanced_testcase {
      * Create a course, a two-station gallery and an enrolled student.
      *
      * @param array $record extra module fields
-     * @return \stdClass course, mavr, cm, context, student, sceneid, zones (name => id), objects (name => hotspot id)
+     * @return \stdClass course, vrroom, cm, context, student, sceneid, zones (name => id), objects (name => hotspot id)
      */
     private function setup_activity(array $record = []): \stdClass {
         global $DB;
@@ -47,7 +47,7 @@ final class handler_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', $record + [
+        $module = $generator->create_module('vrroom', $record + [
             'course' => $course->id,
             'stations' => [
                 ['title' => 'Vase', 'text' => '<p>Vase</p>', 'questionbankentryid' => 0, 'required' => 1, 'points' => 1,
@@ -56,11 +56,11 @@ final class handler_test extends \advanced_testcase {
                     'points' => 1, 'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
         $student = $generator->create_and_enrol($course, 'student');
 
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $zones = [];
         foreach ($scene['zones'] as $zone) {
             $zones[$zone['name']] = $zone['id'];
@@ -73,7 +73,7 @@ final class handler_test extends \advanced_testcase {
         }
         return (object) [
             'course' => $course,
-            'mavr' => $mavr,
+            'vrroom' => $vrroom,
             'cm' => $cm,
             'context' => \context_module::instance($cm->id),
             'student' => $student,
@@ -140,7 +140,7 @@ final class handler_test extends \advanced_testcase {
      */
     private function client_rows(int $attemptid): int {
         global $DB;
-        return $DB->count_records('mavr_events', ['attemptid' => $attemptid, 'clientasserted' => 1]);
+        return $DB->count_records('vrroom_events', ['attemptid' => $attemptid, 'clientasserted' => 1]);
     }
 
     /**
@@ -151,19 +151,19 @@ final class handler_test extends \advanced_testcase {
     public function test_valid_statement_is_stored_and_replayed(): void {
         global $DB;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
 
         $sid = \core\uuid::generate();
         $sink = $this->redirectEvents();
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id, $sid),
         ]);
         $events = $sink->get_events();
         $sink->close();
 
         $this->assertSame([0 => true], $result);
-        $row = $DB->get_record('mavr_events', ['statementid' => strtolower($sid)], '*', MUST_EXIST);
+        $row = $DB->get_record('vrroom_events', ['statementid' => strtolower($sid)], '*', MUST_EXIST);
         $this->assertEquals(1, $row->clientasserted);
         $this->assertSame('entered', $row->verb);
         $this->assertSame('zone', $row->objecttype);
@@ -171,11 +171,11 @@ final class handler_test extends \advanced_testcase {
         $this->assertSame($fx->sceneid, $row->sceneid);
         $this->assertNull($row->resultjson);
 
-        $recorded = array_filter($events, fn($e) => $e instanceof \mod_mavr\event\statement_recorded);
+        $recorded = array_filter($events, fn($e) => $e instanceof \mod_vrroom\event\statement_recorded);
         $this->assertCount(1, $recorded);
 
         // The replay recorded the completed visit objective once, as a server statement.
-        $completed = $DB->get_records('mavr_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
+        $completed = $DB->get_records('vrroom_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
             'objecttype' => 'objective']);
         $this->assertCount(1, $completed);
         $this->assertEquals(0, reset($completed)->clientasserted);
@@ -190,13 +190,13 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_forged_actor_is_refused_by_core(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
         $this->setUser($other);
 
         $statement = $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id);
         $this->expectException(xapi_exception::class);
-        \core_xapi\external\post_statement::execute('mod_mavr', json_encode([$statement]));
+        \core_xapi\external\post_statement::execute('mod_vrroom', json_encode([$statement]));
     }
 
     /**
@@ -207,14 +207,14 @@ final class handler_test extends \advanced_testcase {
     public function test_wrong_activity_is_rejected(): void {
         global $DB;
         $fx = $this->setup_activity();
-        $other = $this->getDataGenerator()->create_module('mavr', ['course' => $fx->course->id]);
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        $other = $this->getDataGenerator()->create_module('vrroom', ['course' => $fx->course->id]);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
 
         $iri = iri::for_object((int)$other->cmid, 'zone', $fx->sceneid, $fx->zones['Vase']);
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $iri, (int)$attempt->id),
-            $this->statement($fx->student, 'entered', 'http://example.com/mod/mavr/xapi/' . $fx->cm->id, (int)$attempt->id),
+            $this->statement($fx->student, 'entered', 'http://example.com/mod/vrroom/xapi/' . $fx->cm->id, (int)$attempt->id),
         ]);
         $this->assertSame([0 => false, 1 => false], $result);
         $this->assertSame(0, $this->client_rows((int)$attempt->id));
@@ -227,11 +227,11 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_closed_attempt_is_rejected(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         attempt_manager::finish($attempt);
         $this->setUser($fx->student);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
         ]);
         $this->assertSame([0 => false], $result);
@@ -245,12 +245,12 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_other_users_attempt_is_rejected(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $intruder = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
-        attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$intruder->id);
+        attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$intruder->id);
         $this->setUser($intruder);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($intruder, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
         ]);
         $this->assertSame([0 => false], $result);
@@ -264,9 +264,9 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_locked_objective_is_rejected(): void {
         $fx = $this->setup_activity(['gallery_ordered' => 1]);
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
-        $handler = handler::create('mod_mavr');
+        $handler = handler::create('mod_vrroom');
 
         // Station 2 opens only after station 1 has been visited.
         $result = $handler->process_statements([
@@ -291,9 +291,9 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_resent_statement_is_counted_once(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
-        $handler = handler::create('mod_mavr');
+        $handler = handler::create('mod_vrroom');
         $sid = \core\uuid::generate();
 
         $result = $handler->process_statements([
@@ -315,7 +315,7 @@ final class handler_test extends \advanced_testcase {
 
         // Through core's web service the resend is not an error either.
         $statement = $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id, $sid);
-        $this->assertSame([true], \core_xapi\external\post_statement::execute('mod_mavr', json_encode([$statement])));
+        $this->assertSame([true], \core_xapi\external\post_statement::execute('mod_vrroom', json_encode([$statement])));
         $this->assertSame(1, $this->client_rows((int)$attempt->id));
     }
 
@@ -326,10 +326,10 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_resent_statement_of_another_user_is_not_accepted(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
-        [$otherattempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$other->id);
-        $handler = handler::create('mod_mavr');
+        [$otherattempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$other->id);
+        $handler = handler::create('mod_vrroom');
         $sid = \core\uuid::generate();
 
         $this->setUser($fx->student);
@@ -351,8 +351,8 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_over_limit_batch_is_refused(): void {
         $fx = $this->setup_activity();
-        set_config('maxbatch', 2, 'mod_mavr');
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        set_config('maxbatch', 2, 'mod_vrroom');
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
 
         $statements = [];
@@ -360,7 +360,7 @@ final class handler_test extends \advanced_testcase {
             $statements[] = $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id);
         }
         try {
-            handler::create('mod_mavr')->process_statements($statements);
+            handler::create('mod_vrroom')->process_statements($statements);
             $this->fail('An over-limit batch must throw');
         } catch (xapi_exception $e) {
             $this->assertSame(0, $this->client_rows((int)$attempt->id));
@@ -375,12 +375,12 @@ final class handler_test extends \advanced_testcase {
     public function test_max_attempt_events(): void {
         global $DB;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
-        $stored = $DB->count_records('mavr_events', ['attemptid' => $attempt->id]);
-        set_config('maxattemptevents', $stored + 1, 'mod_mavr');
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $stored = $DB->count_records('vrroom_events', ['attemptid' => $attempt->id]);
+        set_config('maxattemptevents', $stored + 1, 'mod_vrroom');
         $this->setUser($fx->student);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'exited', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
             $this->statement($fx->student, 'exited', $this->zone_iri($fx, 'Portrait'), (int)$attempt->id),
         ]);
@@ -395,11 +395,11 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_unknown_ids_are_rejected(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
         $cmid = (int)$fx->cm->id;
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement(
                 $fx->student,
                 'entered',
@@ -435,12 +435,12 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_server_verbs_and_malformed_statements_are_rejected(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
         $cmid = (int)$fx->cm->id;
         $activity = iri::activity($cmid);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'answered', iri::for_object($cmid, 'question', null, '1'), (int)$attempt->id),
             $this->statement($fx->student, 'completed', $activity, (int)$attempt->id),
             $this->statement($fx->student, 'passed', $activity, (int)$attempt->id),
@@ -462,33 +462,33 @@ final class handler_test extends \advanced_testcase {
      */
     public function test_missing_capability_is_rejected(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $roleid = $this->getDataGenerator()->create_role();
         $this->getDataGenerator()->role_assign($roleid, (int)$fx->student->id, $fx->context->id);
-        assign_capability('mod/mavr:attempt', CAP_PROHIBIT, $roleid, $fx->context->id, true);
+        assign_capability('mod/vrroom:attempt', CAP_PROHIBIT, $roleid, $fx->context->id, true);
         accesslib_clear_all_caches_for_unit_testing();
-        $this->assertFalse(has_capability('mod/mavr:attempt', $fx->context, $fx->student));
+        $this->assertFalse(has_capability('mod/vrroom:attempt', $fx->context, $fx->student));
         $this->setUser($fx->student);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
         ]);
         $this->assertSame([0 => false], $result);
     }
 
     /**
-     * The resume state is accepted only with its state id, on a MAVR module, for a user who can attempt.
+     * The resume state is accepted only with its state id, on a VR room module, for a user who can attempt.
      *
      * @return void
      */
     public function test_validate_state(): void {
         $fx = $this->setup_activity();
-        $handler = handler::create('mod_mavr');
+        $handler = handler::create('mod_vrroom');
         $data = (object) ['scene' => $fx->sceneid, 'position' => [0, 0, 1], 'yaw' => 12.5];
 
         $this->setUser($fx->student);
         $agent = item_agent::create_from_user($fx->student);
-        $ok = new state($agent, item_activity::create_from_id((string)$fx->context->id), 'mavr-resume', $data, null);
+        $ok = new state($agent, item_activity::create_from_id((string)$fx->context->id), 'vrroom-resume', $data, null);
         $this->assertTrue($handler->save_state($ok));
         $loaded = $handler->load_state($ok);
         $this->assertEquals(12.5, $loaded->get_state_data()->yaw);
@@ -498,11 +498,11 @@ final class handler_test extends \advanced_testcase {
             new state(
                 $agent,
                 item_activity::create_from_id((string)\context_course::instance($fx->course->id)->id),
-                'mavr-resume',
+                'vrroom-resume',
                 $data,
                 null
             ),
-            new state($agent, item_activity::create_from_id('999999999'), 'mavr-resume', $data, null),
+            new state($agent, item_activity::create_from_id('999999999'), 'vrroom-resume', $data, null),
         ];
         foreach ($rejected as $state) {
             try {
@@ -519,7 +519,7 @@ final class handler_test extends \advanced_testcase {
         $state = new state(
             item_agent::create_from_user($teacher),
             item_activity::create_from_id((string)$fx->context->id),
-            'mavr-resume',
+            'vrroom-resume',
             $data,
             null
         );
@@ -536,22 +536,22 @@ final class handler_test extends \advanced_testcase {
     public function test_late_statement_is_refused_and_attempt_finished(): void {
         global $DB;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $deadline = time() - attempt_manager::DEADLINE_GRACE - 60;
-        $DB->set_field('mavr_attempts', 'timedue', $deadline, ['id' => $attempt->id]);
+        $DB->set_field('vrroom_attempts', 'timedue', $deadline, ['id' => $attempt->id]);
         $this->setUser($fx->student);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Portrait'), (int)$attempt->id),
         ]);
 
         $this->assertSame([0 => false, 1 => false], $result);
         $this->assertSame(0, $this->client_rows((int)$attempt->id));
-        $row = $DB->get_record('mavr_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
+        $row = $DB->get_record('vrroom_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
         $this->assertSame(attempt_manager::STATE_FINISHED, $row->state);
         $this->assertEquals($deadline, $row->timefinish);
-        $completed = $DB->get_records('mavr_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
+        $completed = $DB->get_records('vrroom_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
             'objecttype' => 'activity']);
         $this->assertCount(1, $completed);
         $this->assertTrue(json_decode(reset($completed)->resultjson)->timeup);
@@ -565,18 +565,18 @@ final class handler_test extends \advanced_testcase {
     public function test_statement_within_grace_is_accepted(): void {
         global $DB;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         // Two seconds past the deadline is inside the grace period.
-        $DB->set_field('mavr_attempts', 'timedue', time() - 2, ['id' => $attempt->id]);
+        $DB->set_field('vrroom_attempts', 'timedue', time() - 2, ['id' => $attempt->id]);
         $this->setUser($fx->student);
 
-        $result = handler::create('mod_mavr')->process_statements([
+        $result = handler::create('mod_vrroom')->process_statements([
             $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
         ]);
         $this->assertSame([0 => true], $result);
         $this->assertSame(
             attempt_manager::STATE_INPROGRESS,
-            $DB->get_field('mavr_attempts', 'state', ['id' => $attempt->id])
+            $DB->get_field('vrroom_attempts', 'state', ['id' => $attempt->id])
         );
     }
 }

@@ -20,7 +20,7 @@
  * Uses only the transport interface (live/transport), so it works with any transport. All Web
  * Audio and WebRTC behaviour here is unverified in this repository's tests (manual check).
  *
- * @module     mavrruntime_builtin/live/voice
+ * @module     vrroomruntime_builtin/live/voice
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

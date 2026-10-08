@@ -2,7 +2,7 @@
   "name": "valid_extensions",
   "intent": "Every Phase 2 extension used correctly: time limit, hints with and without a penalty, pass_fraction 1 and null, empty hints on a sequence, a requested/hint event trigger.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "timelimit": 900,
     "hidden": [
       "g-key"

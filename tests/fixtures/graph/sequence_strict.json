@@ -2,7 +2,7 @@
   "name": "sequence_strict",
   "intent": "Strict sequences: s1 (a, b, c) is spoiled because b completed before a, so its pointer stays at b; s2 (a, c) completes in order and a rule on it finishes the attempt.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "a",

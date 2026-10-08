@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\privacy;
+namespace vrroomruntime_builtin\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
@@ -26,7 +26,7 @@ use core_privacy\local\request\writer;
 /**
  * Tests for the privacy provider of the built-in run mode (live rooms).
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -34,21 +34,21 @@ use core_privacy\local\request\writer;
 #[\PHPUnit\Framework\Attributes\CoversClass(provider::class)]
 final class provider_test extends \core_privacy\tests\provider_testcase {
     /** @var string This component. */
-    private const COMPONENT = 'mavrruntime_builtin';
+    private const COMPONENT = 'vrroomruntime_builtin';
 
     /** @var \stdClass the activity with two people in its live room */
-    private \stdClass $mavr;
+    private \stdClass $vrroom;
 
     /** @var \stdClass another activity with one person in its live room */
-    private \stdClass $othermavr;
+    private \stdClass $othervrroom;
 
-    /** @var \context_module context of $mavr */
+    /** @var \context_module context of $vrroom */
     private \context_module $context;
 
-    /** @var \context_module context of $othermavr */
+    /** @var \context_module context of $othervrroom */
     private \context_module $othercontext;
 
-    /** @var \stdClass[] users keyed 1, 2 (in $mavr) and 3 (in $othermavr) */
+    /** @var \stdClass[] users keyed 1, 2 (in $vrroom) and 3 (in $othervrroom) */
     private array $users = [];
 
     /** @var \stdClass[] peer rows keyed like $users */
@@ -64,39 +64,39 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
 
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $this->mavr = $generator->create_module('mavr', ['course' => $course->id, 'livemode' => 1]);
-        $this->othermavr = $generator->create_module('mavr', ['course' => $course->id, 'livemode' => 1]);
-        $this->context = \context_module::instance($this->mavr->cmid);
-        $this->othercontext = \context_module::instance($this->othermavr->cmid);
+        $this->vrroom = $generator->create_module('vrroom', ['course' => $course->id, 'livemode' => 1]);
+        $this->othervrroom = $generator->create_module('vrroom', ['course' => $course->id, 'livemode' => 1]);
+        $this->context = \context_module::instance($this->vrroom->cmid);
+        $this->othercontext = \context_module::instance($this->othervrroom->cmid);
 
-        /** @var \mavrruntime_builtin_generator $livegen */
+        /** @var \vrroomruntime_builtin_generator $livegen */
         $livegen = $generator->get_plugin_generator(self::COMPONENT);
         foreach ([1, 2, 3] as $key) {
             $this->users[$key] = $generator->create_and_enrol($course, 'student');
-            $mavrid = $key === 3 ? $this->othermavr->id : $this->mavr->id;
-            $this->peers[$key] = $livegen->create_peer(['mavrid' => $mavrid, 'userid' => $this->users[$key]->id]);
+            $vrroomid = $key === 3 ? $this->othervrroom->id : $this->vrroom->id;
+            $this->peers[$key] = $livegen->create_peer(['vrroomid' => $vrroomid, 'userid' => $this->users[$key]->id]);
         }
 
         $livegen->create_signal([
-            'mavrid' => $this->mavr->id,
+            'vrroomid' => $this->vrroom->id,
             'frompeer' => $this->peers[1]->peerid,
             'topeer' => $this->peers[2]->peerid,
             'type' => 'description',
             'payload' => '{"gen":1,"type":"offer","sdp":"v=0\r\n"}',
         ]);
         $livegen->create_signal([
-            'mavrid' => $this->mavr->id,
+            'vrroomid' => $this->vrroom->id,
             'frompeer' => $this->peers[2]->peerid,
             'topeer' => $this->peers[1]->peerid,
         ]);
         // A message of a presence that has already gone.
         $livegen->create_signal([
-            'mavrid' => $this->mavr->id,
+            'vrroomid' => $this->vrroom->id,
             'frompeer' => str_repeat('a', 32),
             'topeer' => str_repeat('b', 32),
         ]);
         $livegen->create_signal([
-            'mavrid' => $this->othermavr->id,
+            'vrroomid' => $this->othervrroom->id,
             'frompeer' => $this->peers[3]->peerid,
             'topeer' => str_repeat('c', 32),
         ]);
@@ -112,9 +112,9 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         global $DB;
         $peerid = $this->peers[$key]->peerid;
         return [
-            $DB->count_records('mavrruntime_builtin_peers', ['userid' => $this->users[$key]->id]),
-            $DB->count_records('mavrruntime_builtin_signals', ['frompeer' => $peerid]),
-            $DB->count_records('mavrruntime_builtin_signals', ['topeer' => $peerid]),
+            $DB->count_records('vrroomruntime_builtin_peers', ['userid' => $this->users[$key]->id]),
+            $DB->count_records('vrroomruntime_builtin_signals', ['frompeer' => $peerid]),
+            $DB->count_records('vrroomruntime_builtin_signals', ['topeer' => $peerid]),
         ];
     }
 
@@ -128,21 +128,21 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
             $items[$item->get_name()] = $item;
         }
         $this->assertEqualsCanonicalizing(
-            ['mavrruntime_builtin_peers', 'mavrruntime_builtin_signals', 'livepeers', 'iceservers'],
+            ['vrroomruntime_builtin_peers', 'vrroomruntime_builtin_signals', 'livepeers', 'iceservers'],
             array_keys($items)
         );
         $this->assertInstanceOf(
             \core_privacy\local\metadata\types\database_table::class,
-            $items['mavrruntime_builtin_peers']
+            $items['vrroomruntime_builtin_peers']
         );
         $this->assertInstanceOf(\core_privacy\local\metadata\types\external_location::class, $items['livepeers']);
         $this->assertEqualsCanonicalizing(
             ['userid', 'groupid', 'timejoined', 'timeseen'],
-            array_keys($items['mavrruntime_builtin_peers']->get_privacy_fields())
+            array_keys($items['vrroomruntime_builtin_peers']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
             ['frompeer', 'topeer', 'payload', 'timecreated'],
-            array_keys($items['mavrruntime_builtin_signals']->get_privacy_fields())
+            array_keys($items['vrroomruntime_builtin_signals']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
             ['fullname', 'ipaddress', 'pose', 'voice'],
@@ -188,7 +188,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
             array_map('intval', $userlist->get_userids())
         );
 
-        $courselist = new userlist(\context_course::instance($this->mavr->course), self::COMPONENT);
+        $courselist = new userlist(\context_course::instance($this->vrroom->course), self::COMPONENT);
         provider::get_users_in_context($courselist);
         $this->assertEmpty($courselist->get_userids());
     }
@@ -227,12 +227,12 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         global $DB;
         provider::delete_data_for_all_users_in_context($this->context);
 
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $this->mavr->id]));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $this->mavr->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $this->vrroom->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals', ['vrroomid' => $this->vrroom->id]));
         $this->assertSame([1, 1, 0], $this->counts(3));
 
         // A course context is ignored.
-        provider::delete_data_for_all_users_in_context(\context_course::instance($this->mavr->course));
+        provider::delete_data_for_all_users_in_context(\context_course::instance($this->vrroom->course));
         $this->assertSame([1, 1, 0], $this->counts(3));
     }
 
@@ -249,7 +249,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertSame([1, 0, 0], $this->counts(2));
         $this->assertSame([1, 1, 0], $this->counts(3));
         // The leftover message of a gone presence is nobody's in particular and stays.
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_signals', ['frompeer' => str_repeat('a', 32)]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_signals', ['frompeer' => str_repeat('a', 32)]));
     }
 
     /**

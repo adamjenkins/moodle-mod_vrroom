@@ -2,7 +2,7 @@
   "name": "hints_on_sequence",
   "intent": "Hints are not allowed on a sequence (an empty list is); more than five hints are refused.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v-1",

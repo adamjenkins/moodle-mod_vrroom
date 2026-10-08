@@ -19,7 +19,7 @@
  * needs a better answer (pass fraction) the feedback comes with Try again, which loads the
  * fresh question the server has started.
  *
- * @module     mavrruntime_builtin/question
+ * @module     vrroomruntime_builtin/question
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -38,7 +38,7 @@ import {getString} from 'core/str';
  * @param {string} javascript Collected question JavaScript from the server.
  * @returns {Promise}
  */
-const place = (host, context, javascript) => Templates.renderForPromise('mavrruntime_builtin/question', context)
+const place = (host, context, javascript) => Templates.renderForPromise('vrroomruntime_builtin/question', context)
     .then(({html, js}) => {
         Templates.replaceNodeContents(host, html, js);
         if (javascript) {
@@ -52,10 +52,10 @@ const place = (host, context, javascript) => Templates.renderForPromise('mavrrun
  *
  * @param {HTMLElement} host The question region.
  * @param {number} slot Slot.
- * @param {string} key String key in mavrruntime_builtin.
+ * @param {string} key String key in vrroomruntime_builtin.
  * @returns {Promise}
  */
-const notice = (host, slot, key) => getString(key, 'mavrruntime_builtin')
+const notice = (host, slot, key) => getString(key, 'vrroomruntime_builtin')
     .then((text) => place(host, {slot: slot, html: '', answered: true, locked: true, lockedmessage: text, retry: false}, ''));
 
 /**
@@ -66,7 +66,7 @@ const notice = (host, slot, key) => getString(key, 'mavrruntime_builtin')
  * @param {number} slot Slot.
  */
 const wireRetry = (host, session, slot) => {
-    const button = host.querySelector('[data-action="mavr-retry-question"]');
+    const button = host.querySelector('[data-action="vrroom-retry-question"]');
     if (!button) {
         return;
     }
@@ -74,7 +74,7 @@ const wireRetry = (host, session, slot) => {
         e.preventDefault();
         button.disabled = true;
         renderQuestion(host, session, slot).then(() => {
-            const html = host.querySelector('[data-region="mavr-question-html"]');
+            const html = host.querySelector('[data-region="vrroom-question-html"]');
             if (html) {
                 html.setAttribute('tabindex', '-1');
                 html.focus({preventScroll: false});
@@ -92,20 +92,20 @@ const wireRetry = (host, session, slot) => {
  * @param {number} slot Slot.
  */
 const wire = (host, session, slot) => {
-    const form = host.querySelector('[data-region="mavr-question-form"]');
+    const form = host.querySelector('[data-region="vrroom-question-form"]');
     if (!form) {
         return;
     }
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const button = form.querySelector('[data-action="mavr-submit-question"]');
+        const button = form.querySelector('[data-action="vrroom-submit-question"]');
         if (button) {
             if (button.disabled) {
                 return;
             }
             button.disabled = true;
         }
-        const pending = new Pending('mavrruntime_builtin/question:submit');
+        const pending = new Pending('vrroomruntime_builtin/question:submit');
         session.submitQuestion(slot, form)
             .then((result) => showSubmitted(host, session, slot, result))
             .catch((error) => {
@@ -141,13 +141,13 @@ const showSubmitted = (host, session, slot, result) => place(host, {
     } else if (result.answered) {
         state = 'answered';
     }
-    host.dataset.mavrQuestionState = state;
+    host.dataset.vrroomQuestionState = state;
     if (!result.answered) {
         wire(host, session, slot);
     } else if (result.retry) {
         wireRetry(host, session, slot);
     }
-    const heading = host.querySelector('[data-region="mavr-question-html"]');
+    const heading = host.querySelector('[data-region="vrroom-question-html"]');
     if (heading) {
         heading.setAttribute('tabindex', '-1');
         heading.focus({preventScroll: false});
@@ -172,7 +172,7 @@ const showFetched = (host, session, slot, result) => place(host, {
     lockedmessage: '',
     retry: false,
 }, result.javascript).then(() => {
-    host.dataset.mavrQuestionState = result.answered ? 'answered' : 'open';
+    host.dataset.vrroomQuestionState = result.answered ? 'answered' : 'open';
     if (!result.answered) {
         wire(host, session, slot);
     }
@@ -193,24 +193,24 @@ const showFetched = (host, session, slot, result) => place(host, {
 export const renderQuestion = (host, session, slot) => {
     const n = Number(slot);
     host.dataset.slot = String(n);
-    const pending = new Pending('mavrruntime_builtin/question:render');
+    const pending = new Pending('vrroomruntime_builtin/question:render');
     let promise;
     if (session.preview) {
-        host.dataset.mavrQuestionState = 'preview';
+        host.dataset.vrroomQuestionState = 'preview';
         promise = notice(host, n, 'questionpreview');
     } else if (!session.isSlotAvailable(n)) {
-        host.dataset.mavrQuestionState = 'locked';
+        host.dataset.vrroomQuestionState = 'locked';
         promise = notice(host, n, 'questionlocked');
     } else {
-        host.dataset.mavrQuestionState = 'loading';
+        host.dataset.vrroomQuestionState = 'loading';
         promise = session.getQuestion(n)
             .then((result) => showFetched(host, session, n, result))
             .catch((error) => {
                 if (error && error.errorcode === 'errorquestionlocked') {
-                    host.dataset.mavrQuestionState = 'locked';
+                    host.dataset.vrroomQuestionState = 'locked';
                     return notice(host, n, 'questionlocked');
                 }
-                host.dataset.mavrQuestionState = 'error';
+                host.dataset.vrroomQuestionState = 'error';
                 return Notification.exception(error);
             });
     }

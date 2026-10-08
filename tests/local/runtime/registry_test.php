@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\runtime;
+namespace mod_vrroom\local\runtime;
 
 /**
  * Tests for run mode discovery and the run mode value classes.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -49,13 +49,13 @@ final class registry_test extends \advanced_testcase {
         foreach ($all as $name => $runtime) {
             $this->assertInstanceOf(base::class, $runtime);
             $this->assertSame($name, $runtime->get_name());
-            $this->assertSame('mavrruntime_' . $name, $runtime->get_component());
+            $this->assertSame('vrroomruntime_' . $name, $runtime->get_component());
         }
 
         $builtin = registry::get('builtin');
         $this->assertSame($all['builtin'], $builtin);
-        $this->assertSame(get_string('pluginname', 'mavrruntime_builtin'), $builtin->get_display_name());
-        $this->assertSame(get_string('pluginname', 'mavrruntime_builtin'), registry::get_choices()['builtin']);
+        $this->assertSame(get_string('pluginname', 'vrroomruntime_builtin'), $builtin->get_display_name());
+        $this->assertSame(get_string('pluginname', 'vrroomruntime_builtin'), registry::get_choices()['builtin']);
         $this->assertContains($builtin->statement_channel(), ['browser', 'server']);
         $entry = $builtin->client_entry();
         $this->assertArrayHasKey('module', $entry);
@@ -71,7 +71,7 @@ final class registry_test extends \advanced_testcase {
             $this->fail('An unknown run mode was returned.');
         } catch (\moodle_exception $e) {
             $this->assertSame('errorunknownruntime', $e->errorcode);
-            $this->assertSame('mod_mavr', $e->module);
+            $this->assertSame('mod_vrroom', $e->module);
         }
     }
 
@@ -79,19 +79,19 @@ final class registry_test extends \advanced_testcase {
      * Launch descriptors and cleanup scopes check their type.
      */
     public function test_value_classes(): void {
-        $inline = new launch_descriptor(launch_descriptor::TYPE_INLINE, ['schema' => 'mavr-launch/1']);
+        $inline = new launch_descriptor(launch_descriptor::TYPE_INLINE, ['schema' => 'vrroom-launch/1']);
         $this->assertSame(
-            ['type' => 'inline', 'config' => ['schema' => 'mavr-launch/1'], 'url' => null],
+            ['type' => 'inline', 'config' => ['schema' => 'vrroom-launch/1'], 'url' => null],
             $inline->to_array()
         );
 
-        $url = new \moodle_url('/mod/mavr/view.php', ['id' => 3]);
+        $url = new \moodle_url('/mod/vrroom/view.php', ['id' => 3]);
         $external = new launch_descriptor(launch_descriptor::TYPE_EXTERNAL, [], $url);
         $this->assertSame($url->out(false), $external->to_array()['url']);
 
         $scope = new cleanup_scope(cleanup_scope::COURSE_RESET, 2);
         $this->assertSame(2, $scope->courseid);
-        $this->assertSame(0, $scope->mavrid);
+        $this->assertSame(0, $scope->vrroomid);
 
         $this->expectException(\coding_exception::class);
         new cleanup_scope('everything');

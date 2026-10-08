@@ -15,9 +15,9 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/report_attempt
+    @template mod_vrroom/report_attempt
 
-    One attempt in the MAVR report: summary, objectives and statement timeline.
+    One attempt in the VR room report: summary, objectives and statement timeline.
 
     Classes required for JS:
     * none
@@ -57,35 +57,35 @@
              "source": "Server"}
         ],
         "clienthelp": "",
-        "backurl": "https://example.com/mod/mavr/report.php?id=12",
+        "backurl": "https://example.com/mod/vrroom/report.php?id=12",
         "candelete": true,
-        "deleteurl": "https://example.com/mod/mavr/report.php?id=12&delete=7"
+        "deleteurl": "https://example.com/mod/vrroom/report.php?id=12&delete=7"
     }
 }}
-<div class="mod-mavr-report" data-region="mavr-report-attempt" data-attemptid="{{attemptid}}">
+<div class="mod-vrroom-report" data-region="vrroom-report-attempt" data-attemptid="{{attemptid}}">
     <h3>{{heading}}</h3>
     <dl class="row">
-        <dt class="col-sm-3">{{#str}}reportstate, mod_mavr{{/str}}</dt>
+        <dt class="col-sm-3">{{#str}}reportstate, mod_vrroom{{/str}}</dt>
         <dd class="col-sm-9">{{state}}</dd>
-        <dt class="col-sm-3">{{#str}}reportscore, mod_mavr{{/str}}</dt>
+        <dt class="col-sm-3">{{#str}}reportscore, mod_vrroom{{/str}}</dt>
         <dd class="col-sm-9">{{score}}</dd>
-        <dt class="col-sm-3">{{#str}}reportgrade, mod_mavr{{/str}}</dt>
+        <dt class="col-sm-3">{{#str}}reportgrade, mod_vrroom{{/str}}</dt>
         <dd class="col-sm-9">{{grade}}</dd>
-        <dt class="col-sm-3">{{#str}}reporttimestart, mod_mavr{{/str}}</dt>
+        <dt class="col-sm-3">{{#str}}reporttimestart, mod_vrroom{{/str}}</dt>
         <dd class="col-sm-9">{{timestart}}</dd>
-        <dt class="col-sm-3">{{#str}}reporttimefinish, mod_mavr{{/str}}</dt>
+        <dt class="col-sm-3">{{#str}}reporttimefinish, mod_vrroom{{/str}}</dt>
         <dd class="col-sm-9">{{timefinish}}</dd>
     </dl>
 
-    <h4>{{#str}}reportobjectives, mod_mavr{{/str}}</h4>
+    <h4>{{#str}}reportobjectives, mod_vrroom{{/str}}</h4>
     {{#hasobjectives}}
     <div class="table-responsive">
-        <table class="table table-sm generaltable" data-region="mavr-report-objectives">
+        <table class="table table-sm generaltable" data-region="vrroom-report-objectives">
             <thead>
                 <tr>
-                    <th scope="col">{{#str}}reportobjective, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportobjectivestatus, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportpoints, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportobjective, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportobjectivestatus, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportpoints, mod_vrroom{{/str}}</th>
                 </tr>
             </thead>
             <tbody>
@@ -101,17 +101,17 @@
     </div>
     {{/hasobjectives}}
 
-    <h4>{{#str}}reportstatements, mod_mavr{{/str}}</h4>
+    <h4>{{#str}}reportstatements, mod_vrroom{{/str}}</h4>
     {{#hasstatements}}
     <div class="table-responsive">
-        <table class="table table-sm generaltable" data-region="mavr-report-statements">
+        <table class="table table-sm generaltable" data-region="vrroom-report-statements">
             <thead>
                 <tr>
-                    <th scope="col">{{#str}}reporttime, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportverb, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportobject, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportresult, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportsource, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reporttime, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportverb, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportobject, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportresult, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportsource, mod_vrroom{{/str}}</th>
                 </tr>
             </thead>
             <tbody>
@@ -133,9 +133,9 @@
     {{/hasstatements}}
 
     <div class="d-flex flex-wrap gap-2 mt-3">
-        <a href="{{backurl}}" class="btn btn-secondary">{{#str}}reportoverview, mod_mavr{{/str}}</a>
+        <a href="{{backurl}}" class="btn btn-secondary">{{#str}}reportoverview, mod_vrroom{{/str}}</a>
         {{#candelete}}
-        <a href="{{deleteurl}}" class="btn btn-outline-danger">{{#str}}reportdeleteattempt, mod_mavr{{/str}}</a>
+        <a href="{{deleteurl}}" class="btn btn-outline-danger">{{#str}}reportdeleteattempt, mod_vrroom{{/str}}</a>
         {{/candelete}}
     </div>
 </div>

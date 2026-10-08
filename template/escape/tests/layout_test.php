@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_escape;
+namespace vrroomtemplate_escape;
 
-use mavrtemplate_escape\local\layout;
-use mod_mavr\local\scene\presets;
+use vrroomtemplate_escape\local\layout;
+use mod_vrroom\local\scene\presets;
 
 /**
  * Tests for the Escape chain layout: anchors, front vectors and the exit anchor.
  *
- * @package    mavrtemplate_escape
+ * @package    vrroomtemplate_escape
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

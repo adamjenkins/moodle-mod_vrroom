@@ -2,7 +2,7 @@
   "name": "pass_fraction_invalid",
   "intent": "pass_fraction only on answer_question, and only a number in (0, 1]; null is allowed anywhere.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v-1",

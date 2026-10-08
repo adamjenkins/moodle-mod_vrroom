@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 use core_xapi\local\statement;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\xapi\iri;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\xapi\iri;
 
 /**
- * Tests of the MAVR events.
+ * Tests of the VR room events.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -41,7 +41,7 @@ final class events_test extends \advanced_testcase {
     /**
      * Course, activity, student.
      *
-     * @return \stdClass course, mavr, cm, context, student
+     * @return \stdClass course, vrroom, cm, context, student
      */
     private function setup_activity(): \stdClass {
         global $DB;
@@ -49,11 +49,11 @@ final class events_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
         return (object) [
             'course' => $course,
-            'mavr' => $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST),
+            'vrroom' => $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST),
             'cm' => $cm,
             'context' => \context_module::instance($cm->id),
             'student' => $generator->create_and_enrol($course, 'student'),
@@ -81,7 +81,7 @@ final class events_test extends \advanced_testcase {
         $userid = (int)$fx->student->id;
 
         $sink = $this->redirectEvents();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, $userid);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, $userid);
         $attempt = attempt_manager::finish($attempt);
         $this->setAdminUser();
         attempt_manager::delete_attempt($attempt);
@@ -98,7 +98,7 @@ final class events_test extends \advanced_testcase {
             $this->assertEquals($fx->context, $event->get_context());
             $this->assertEquals($userid, $event->relateduserid);
             $this->assertEquals($attempt->id, $event->objectid);
-            $this->assertEquals($fx->mavr->id, $event->other['mavrid']);
+            $this->assertEquals($fx->vrroom->id, $event->other['vrroomid']);
             $this->assertInstanceOf(\moodle_url::class, $event->get_url());
             $this->assertNotEmpty($event->get_description());
             $this->assertNotEmpty($event::get_name());
@@ -116,8 +116,8 @@ final class events_test extends \advanced_testcase {
     public function test_statement_recorded(): void {
         global $CFG;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
-        $scene = instance_manager::get_scenes((int)$fx->mavr->id)[0];
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $scene = instance_manager::get_scenes((int)$fx->vrroom->id)[0];
         $zone = $scene['zones'][0]['id'];
         $this->setUser($fx->student);
 
@@ -133,7 +133,7 @@ final class events_test extends \advanced_testcase {
             ]],
         ]);
         $sink = $this->redirectEvents();
-        \mod_mavr\xapi\handler::create('mod_mavr')->process_statements([$statement]);
+        \mod_vrroom\xapi\handler::create('mod_vrroom')->process_statements([$statement]);
         $events = $this->only($sink->get_events(), statement_recorded::class);
         $sink->close();
 
@@ -156,7 +156,7 @@ final class events_test extends \advanced_testcase {
         $fx = $this->setup_activity();
         $sink = $this->redirectEvents();
         course_module_viewed::create([
-            'objectid' => $fx->mavr->id,
+            'objectid' => $fx->vrroom->id,
             'context' => $fx->context,
         ])->trigger();
         course_module_instance_list_viewed::create([
@@ -168,7 +168,7 @@ final class events_test extends \advanced_testcase {
         $viewed = $this->only($events, course_module_viewed::class);
         $this->assertCount(1, $viewed);
         $this->assertEquals($fx->context, $viewed[0]->get_context());
-        $this->assertSame('mavr', $viewed[0]->objecttable);
+        $this->assertSame('vrroom', $viewed[0]->objecttable);
         $this->assertCount(1, $this->only($events, course_module_instance_list_viewed::class));
     }
 
@@ -181,22 +181,22 @@ final class events_test extends \advanced_testcase {
         global $DB;
         $fx = $this->setup_activity();
         $graphrow = $DB->get_record(
-            'mavr_graphs',
-            ['mavrid' => $fx->mavr->id, 'version' => $fx->mavr->graphversion],
+            'vrroom_graphs',
+            ['vrroomid' => $fx->vrroom->id, 'version' => $fx->vrroom->graphversion],
             '*',
             MUST_EXIST
         );
 
         $sink = $this->redirectEvents();
         scene_updated::create([
-            'objectid' => (int)$fx->mavr->id,
+            'objectid' => (int)$fx->vrroom->id,
             'context' => $fx->context,
             'other' => ['scenecount' => 1],
         ])->trigger();
         graph_updated::create([
             'objectid' => (int)$graphrow->id,
             'context' => $fx->context,
-            'other' => ['mavrid' => (int)$fx->mavr->id, 'version' => (int)$graphrow->version],
+            'other' => ['vrroomid' => (int)$fx->vrroom->id, 'version' => (int)$graphrow->version],
         ])->trigger();
         $events = $sink->get_events();
         $sink->close();
@@ -204,29 +204,29 @@ final class events_test extends \advanced_testcase {
         $scene = $this->only($events, scene_updated::class);
         $this->assertCount(1, $scene);
         $this->assertEquals($fx->context, $scene[0]->get_context());
-        $this->assertSame('mavr', $scene[0]->objecttable);
-        $this->assertEquals($fx->mavr->id, $scene[0]->objectid);
+        $this->assertSame('vrroom', $scene[0]->objecttable);
+        $this->assertEquals($fx->vrroom->id, $scene[0]->objectid);
         $this->assertSame('u', $scene[0]->crud);
         $this->assertSame(\core\event\base::LEVEL_TEACHING, $scene[0]->edulevel);
         $this->assertSame(1, $scene[0]->other['scenecount']);
-        $this->assertStringEndsWith('/mod/mavr/edit.php', $scene[0]->get_url()->get_path(false));
+        $this->assertStringEndsWith('/mod/vrroom/edit.php', $scene[0]->get_url()->get_path(false));
         $this->assertEquals($fx->cm->id, $scene[0]->get_url()->get_param('id'));
         $this->assertNotEmpty($scene[0]->get_description());
-        $this->assertSame(get_string('eventsceneupdated', 'mod_mavr'), scene_updated::get_name());
-        $this->assertSame(['db' => 'mavr', 'restore' => 'mavr'], scene_updated::get_objectid_mapping());
+        $this->assertSame(get_string('eventsceneupdated', 'mod_vrroom'), scene_updated::get_name());
+        $this->assertSame(['db' => 'vrroom', 'restore' => 'vrroom'], scene_updated::get_objectid_mapping());
 
         $graph = $this->only($events, graph_updated::class);
         $this->assertCount(1, $graph);
         $this->assertEquals($fx->context, $graph[0]->get_context());
-        $this->assertSame('mavr_graphs', $graph[0]->objecttable);
+        $this->assertSame('vrroom_graphs', $graph[0]->objecttable);
         $this->assertEquals($graphrow->id, $graph[0]->objectid);
         $this->assertSame('u', $graph[0]->crud);
         $this->assertSame(\core\event\base::LEVEL_TEACHING, $graph[0]->edulevel);
         $this->assertSame((int)$graphrow->version, $graph[0]->other['version']);
-        $this->assertStringEndsWith('/mod/mavr/edit.php', $graph[0]->get_url()->get_path(false));
-        $this->assertSame(get_string('eventgraphupdated', 'mod_mavr'), graph_updated::get_name());
+        $this->assertStringEndsWith('/mod/vrroom/edit.php', $graph[0]->get_url()->get_path(false));
+        $this->assertSame(get_string('eventgraphupdated', 'mod_vrroom'), graph_updated::get_name());
         $this->assertSame(\core\event\base::NOT_MAPPED, graph_updated::get_objectid_mapping());
-        $this->assertSame(['mavrid' => ['db' => 'mavr', 'restore' => 'mavr']], graph_updated::get_other_mapping());
+        $this->assertSame(['vrroomid' => ['db' => 'vrroom', 'restore' => 'vrroom']], graph_updated::get_other_mapping());
     }
 
     /**
@@ -237,12 +237,12 @@ final class events_test extends \advanced_testcase {
     public function test_editor_events_require_other_data(): void {
         $fx = $this->setup_activity();
         try {
-            scene_updated::create(['objectid' => (int)$fx->mavr->id, 'context' => $fx->context]);
+            scene_updated::create(['objectid' => (int)$fx->vrroom->id, 'context' => $fx->context]);
             $this->fail('scene_updated without scenecount was accepted');
         } catch (\coding_exception $e) {
             $this->assertStringContainsString('scenecount', $e->getMessage());
         }
         $this->expectException(\coding_exception::class);
-        graph_updated::create(['objectid' => 1, 'context' => $fx->context, 'other' => ['mavrid' => (int)$fx->mavr->id]]);
+        graph_updated::create(['objectid' => 1, 'context' => $fx->context, 'other' => ['vrroomid' => (int)$fx->vrroom->id]]);
     }
 }

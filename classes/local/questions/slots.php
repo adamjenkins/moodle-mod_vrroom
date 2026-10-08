@@ -14,25 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
- * The question slots of a MAVR activity and their question references.
+ * The question slots of a VR room activity and their question references.
  *
  * A slot is a graph slot number (what an answer_question objective names) bound
  * to a question bank entry. Each slot row owns one core question_references row,
  * keyed exactly as mod_quiz keys its slots (usingcontextid = module context,
- * component mod_mavr, questionarea 'slot', itemid = mavr_slots.id, version null
+ * component mod_vrroom, questionarea 'slot', itemid = vrroom_slots.id, version null
  * for "always latest"). Those rows are what make core treat the questions as in
  * use, and what core backup writes under each slot element.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class slots {
     /** @var string Component recorded in question_references. */
-    public const COMPONENT = 'mod_mavr';
+    public const COMPONENT = 'mod_vrroom';
 
     /** @var string Question area recorded in question_references. */
     public const QUESTIONAREA = 'slot';
@@ -45,12 +45,12 @@ final class slots {
      * entry updated in place; new numbers are inserted; numbers no longer bound
      * are deleted together with their references.
      *
-     * @param \stdClass $mavr The mavr record (needs id).
+     * @param \stdClass $vrroom The vrroom record (needs id).
      * @param \context_module $context The activity's module context.
      * @param array $bindings compiled_activity::$slots, each
      *      ['slot' => int, 'questionbankentryid' => int, 'maxmark' => float, 'objectiveid' => string].
      */
-    public static function sync(\stdClass $mavr, \context_module $context, array $bindings): void {
+    public static function sync(\stdClass $vrroom, \context_module $context, array $bindings): void {
         global $DB;
 
         $wanted = [];
@@ -85,20 +85,20 @@ final class slots {
 
         $transaction = $DB->start_delegated_transaction();
 
-        $existing = $DB->get_records_menu('mavr_slots', ['mavrid' => $mavr->id], '', 'slot, id');
+        $existing = $DB->get_records_menu('vrroom_slots', ['vrroomid' => $vrroom->id], '', 'slot, id');
         $existing = array_map('intval', $existing);
 
         foreach ($wanted as $slot => $binding) {
             if (isset($existing[$slot])) {
                 $slotid = $existing[$slot];
-                $DB->update_record('mavr_slots', (object)[
+                $DB->update_record('vrroom_slots', (object)[
                     'id' => $slotid,
                     'objectiveid' => $binding->objectiveid,
                     'maxmark' => $binding->maxmark,
                 ]);
             } else {
-                $slotid = (int)$DB->insert_record('mavr_slots', (object)[
-                    'mavrid' => $mavr->id,
+                $slotid = (int)$DB->insert_record('vrroom_slots', (object)[
+                    'vrroomid' => $vrroom->id,
                     'slot' => $slot,
                     'objectiveid' => $binding->objectiveid,
                     'maxmark' => $binding->maxmark,
@@ -117,7 +117,7 @@ final class slots {
                 'questionarea' => self::QUESTIONAREA,
                 'itemid' => $slotid,
             ]);
-            $DB->delete_records('mavr_slots', ['id' => $slotid]);
+            $DB->delete_records('vrroom_slots', ['id' => $slotid]);
         }
 
         $transaction->allow_commit();
@@ -126,29 +126,29 @@ final class slots {
     /**
      * The activity's slots with their bound entries.
      *
-     * @param int $mavrid The mavr id.
+     * @param int $vrroomid The vrroom id.
      * @param \context_module $context The activity's module context.
      * @return \stdClass[] Keyed by slot number, ascending; each has slot, objectiveid,
      *      maxmark, slotid, questionbankentryid (0 when the reference is missing) and
      *      version (null = always latest).
      */
-    public static function get_slots(int $mavrid, \context_module $context): array {
+    public static function get_slots(int $vrroomid, \context_module $context): array {
         global $DB;
 
         $sql = "SELECT s.slot, s.objectiveid, s.maxmark, s.id AS slotid,
                        qr.questionbankentryid, qr.version
-                  FROM {mavr_slots} s
+                  FROM {vrroom_slots} s
              LEFT JOIN {question_references} qr ON qr.itemid = s.id
                                                AND qr.usingcontextid = :contextid
                                                AND qr.component = :component
                                                AND qr.questionarea = :questionarea
-                 WHERE s.mavrid = :mavrid
+                 WHERE s.vrroomid = :vrroomid
               ORDER BY s.slot";
         $records = $DB->get_records_sql($sql, [
             'contextid' => $context->id,
             'component' => self::COMPONENT,
             'questionarea' => self::QUESTIONAREA,
-            'mavrid' => $mavrid,
+            'vrroomid' => $vrroomid,
         ]);
 
         $result = [];
@@ -172,14 +172,14 @@ final class slots {
      * Core does not remove a module's question references when the module goes
      * (quiz removes its own), so the activity's delete path calls this.
      *
-     * @param \stdClass $mavr The mavr record (needs id).
+     * @param \stdClass $vrroom The vrroom record (needs id).
      * @param \context_module $context The activity's module context.
      */
-    public static function delete_all(\stdClass $mavr, \context_module $context): void {
+    public static function delete_all(\stdClass $vrroom, \context_module $context): void {
         global $DB;
 
         $transaction = $DB->start_delegated_transaction();
-        $slotids = $DB->get_fieldset_select('mavr_slots', 'id', 'mavrid = ?', [$mavr->id]);
+        $slotids = $DB->get_fieldset_select('vrroom_slots', 'id', 'vrroomid = ?', [$vrroom->id]);
         if ($slotids) {
             [$insql, $params] = $DB->get_in_or_equal($slotids, SQL_PARAMS_NAMED, 'slot');
             $params['contextid'] = $context->id;
@@ -197,7 +197,7 @@ final class slots {
             'component' => self::COMPONENT,
             'questionarea' => self::QUESTIONAREA,
         ]);
-        $DB->delete_records('mavr_slots', ['mavrid' => $mavr->id]);
+        $DB->delete_records('vrroom_slots', ['vrroomid' => $vrroom->id]);
         $transaction->allow_commit();
     }
 
@@ -205,7 +205,7 @@ final class slots {
      * Point one slot's reference at an entry, inserting or updating it in place.
      *
      * @param \context_module $context The activity's module context.
-     * @param int $slotid The mavr_slots id (reference itemid).
+     * @param int $slotid The vrroom_slots id (reference itemid).
      * @param int $qbeid The question bank entry id.
      */
     private static function set_reference(\context_module $context, int $slotid, int $qbeid): void {

@@ -14,31 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\template;
+namespace mod_vrroom\local\template;
 
 /**
- * Base class every mavrtemplate sub-plugin extends as \mavrtemplate_<name>\template.
+ * Base class every vrroomtemplate sub-plugin extends as \vrroomtemplate_<name>\template.
  *
  * A template is a set of form fields that compiles into scene documents, a task graph and
  * question bindings.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class base {
     /** @var string Frankenstyle prefix of the sub-plugin type. */
-    public const PREFIX = 'mavrtemplate_';
+    public const PREFIX = 'vrroomtemplate_';
 
     /**
      * Frankenstyle component of the template, taken from the class's namespace.
      *
-     * @return string e.g. 'mavrtemplate_gallery'
+     * @return string e.g. 'vrroomtemplate_gallery'
      */
     final public function get_component(): string {
         $component = strstr(static::class, '\\', true);
         if ($component === false || !str_starts_with($component, self::PREFIX) || $component === self::PREFIX) {
-            throw new \coding_exception('A template class must live in a mavrtemplate_<name> namespace: ' . static::class);
+            throw new \coding_exception('A template class must live in a vrroomtemplate_<name> namespace: ' . static::class);
         }
         return $component;
     }
@@ -124,7 +124,7 @@ abstract class base {
     abstract public function validation(array $data, array $files, int $courseid): array;
 
     /**
-     * Turn form data into the JSON-able config stored in mavr.templateconfig.
+     * Turn form data into the JSON-able config stored in vrroom.templateconfig.
      *
      * Must tolerate absent file fields (generators and web services do not send them).
      *

@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\questions\usage;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\questions\usage;
 
 /**
  * Submit a response to one question; the question engine grades it and the server records the
@@ -35,7 +35,7 @@ use mod_mavr\local\questions\usage;
  * again (Phase 2 contract §4.2.3); the response then carries retry = true and the feedback HTML
  * of the try that fell short.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -83,10 +83,10 @@ class submit_question extends external_api {
 
         [$status, $objective, $result] = helper::question_status($attempt, $slot);
         if ($status === evaluator::OBJECTIVE_COMPLETED) {
-            throw new \moodle_exception('errorquestionanswered', 'mod_mavr');
+            throw new \moodle_exception('errorquestionanswered', 'mod_vrroom');
         }
         if ($status !== evaluator::OBJECTIVE_AVAILABLE) {
-            throw new \moodle_exception('errorquestionlocked', 'mod_mavr');
+            throw new \moodle_exception('errorquestionlocked', 'mod_vrroom');
         }
 
         $outcome = usage::submit($attempt, $slot, $responses, time());

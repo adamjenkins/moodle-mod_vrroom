@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\template;
+namespace mod_vrroom\local\template;
 
 /**
  * Tests for template discovery.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -47,13 +47,13 @@ final class registry_test extends \advanced_testcase {
         foreach ($all as $name => $template) {
             $this->assertInstanceOf(base::class, $template);
             $this->assertSame($name, $template->get_name());
-            $this->assertSame('mavrtemplate_' . $name, $template->get_component());
+            $this->assertSame('vrroomtemplate_' . $name, $template->get_component());
         }
 
         $gallery = registry::get('gallery');
         $this->assertSame($all['gallery'], $gallery);
-        $this->assertSame(get_string('pluginname', 'mavrtemplate_gallery'), $gallery->get_display_name());
-        $this->assertSame(get_string('pluginname', 'mavrtemplate_gallery'), registry::get_choices()['gallery']);
+        $this->assertSame(get_string('pluginname', 'vrroomtemplate_gallery'), $gallery->get_display_name());
+        $this->assertSame(get_string('pluginname', 'vrroomtemplate_gallery'), registry::get_choices()['gallery']);
         $this->assertSame(['completionobjectives'], $gallery->completion_rules());
         $this->assertSame(100, $gallery->default_grade());
     }
@@ -67,7 +67,7 @@ final class registry_test extends \advanced_testcase {
             $this->fail('An unknown template was returned.');
         } catch (\moodle_exception $e) {
             $this->assertSame('errorunknowntemplate', $e->errorcode);
-            $this->assertSame('mod_mavr', $e->module);
+            $this->assertSame('mod_vrroom', $e->module);
         }
     }
 
@@ -75,9 +75,9 @@ final class registry_test extends \advanced_testcase {
      * The compiled activity keeps what it was given.
      */
     public function test_compiled_activity(): void {
-        $compiled = new compiled_activity([['id' => 's']], ['schema' => 'mavr-graph/1'], [['slot' => 1]]);
+        $compiled = new compiled_activity([['id' => 's']], ['schema' => 'vrroom-graph/1'], [['slot' => 1]]);
         $this->assertSame([['id' => 's']], $compiled->scenes);
-        $this->assertSame(['schema' => 'mavr-graph/1'], $compiled->graph);
+        $this->assertSame(['schema' => 'vrroom-graph/1'], $compiled->graph);
         $this->assertSame([['slot' => 1]], $compiled->slots);
     }
 }

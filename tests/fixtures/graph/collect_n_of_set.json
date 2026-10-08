@@ -2,7 +2,7 @@
   "name": "collect_n_of_set",
   "intent": "collect count 2 of 3; repeating the same target counts once; a zone event with a target's id does not count.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "c1",

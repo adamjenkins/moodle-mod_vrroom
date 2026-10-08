@@ -20,7 +20,7 @@
  * Only the transport interface (live/transport) is used, so another transport (Phase 4) can be
  * chosen by config.live.transport without changing the avatars, the voice or the panel.
  *
- * @module     mavrruntime_builtin/live/controller
+ * @module     vrroomruntime_builtin/live/controller
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -28,13 +28,13 @@
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {getStrings} from 'core/str';
-import {Emitter} from 'mavrruntime_builtin/live/transport';
-import {createMeshTransport} from 'mavrruntime_builtin/live/mesh';
-import {createVoice} from 'mavrruntime_builtin/live/voice';
-import {createPanel} from 'mavrruntime_builtin/live/panel';
-import {region, announce, plainText, startScene} from 'mavrruntime_builtin/util';
+import {Emitter} from 'vrroomruntime_builtin/live/transport';
+import {createMeshTransport} from 'vrroomruntime_builtin/live/mesh';
+import {createVoice} from 'vrroomruntime_builtin/live/voice';
+import {createPanel} from 'vrroomruntime_builtin/live/panel';
+import {region, announce, plainText, startScene} from 'vrroomruntime_builtin/util';
 
-/** Strings of the live room (all in mavrruntime_builtin). */
+/** Strings of the live room (all in vrroomruntime_builtin). */
 const STRINGS = [
     'errorlivebusy', 'errorlivedisabled', 'errorlivenoroom', 'errorlivenotallowed',
     'livealone', 'liveclosed', 'liveconnectfailed', 'liveconnecting', 'livefull', 'livejoined',
@@ -51,7 +51,7 @@ const TRANSPORTS = {
 };
 
 /** AMD modules a launch config may name as its transport: another run mode's module. */
-const TRANSPORT_MODULE = /^mavrruntime_[a-z][a-z0-9_]*\/[a-z][a-z0-9_]*(\/[a-z][a-z0-9_]*)*$/;
+const TRANSPORT_MODULE = /^vrroomruntime_[a-z][a-z0-9_]*\/[a-z][a-z0-9_]*(\/[a-z][a-z0-9_]*)*$/;
 
 /**
  * The transport factory for a live block: a built-in transport by name, or the createTransport
@@ -130,9 +130,9 @@ class LiveController extends Emitter {
     /**
      * Constructor.
      *
-     * @param {HTMLElement} root The MAVR root.
+     * @param {HTMLElement} root The VR room root.
      * @param {Object} config Launch config (with config.live).
-     * @param {Object} session The session (mavrruntime_builtin/session).
+     * @param {Object} session The session (vrroomruntime_builtin/session).
      */
     constructor(root, config, session) {
         super();
@@ -227,16 +227,16 @@ class LiveController extends Emitter {
     }
 
     /**
-     * Load the strings and render the panel into the mavr-liveroom region.
+     * Load the strings and render the panel into the vrroom-liveroom region.
      *
      * @returns {Promise}
      */
     render() {
-        const container = region(this.root, 'mavr-liveroom');
+        const container = region(this.root, 'vrroom-liveroom');
         if (!container || this.destroyed) {
             return Promise.resolve();
         }
-        const pending = new Pending('mavrruntime_builtin/live/controller:render');
+        const pending = new Pending('vrroomruntime_builtin/live/controller:render');
         const handlers = {
             join: () => this.join().catch(Notification.exception),
             leave: () => this.leave().catch(Notification.exception),
@@ -246,7 +246,7 @@ class LiveController extends Emitter {
             talk: (on) => this.talk(on),
             mutepeer: (peerid) => this.toggleMutePeer(peerid),
         };
-        return getStrings(STRINGS.map((key) => ({key: key, component: 'mavrruntime_builtin'}))).then((values) => {
+        return getStrings(STRINGS.map((key) => ({key: key, component: 'vrroomruntime_builtin'}))).then((values) => {
             STRINGS.forEach((key, i) => {
                 this.strings[key] = values[i];
             });
@@ -279,7 +279,7 @@ class LiveController extends Emitter {
         }
         // Inside the user gesture: browsers start audio only then.
         this.voice.ensureAudio();
-        const pending = new Pending('mavrruntime_builtin/live/controller:join');
+        const pending = new Pending('vrroomruntime_builtin/live/controller:join');
         this.joining = true;
         if (this.panel) {
             this.panel.setBusy(true);
@@ -358,7 +358,7 @@ class LiveController extends Emitter {
             return Promise.resolve();
         }
         const transport = this.transport;
-        const pending = new Pending('mavrruntime_builtin/live/controller:leave');
+        const pending = new Pending('vrroomruntime_builtin/live/controller:leave');
         if (this.panel) {
             this.panel.setBusy(true);
         }
@@ -568,7 +568,7 @@ class LiveController extends Emitter {
         const wasjoined = this.joined;
         this.joined = true;
         this.joining = false;
-        this.root.dataset.mavrLive = 'joined';
+        this.root.dataset.vrroomLive = 'joined';
         const self = this.transport.getSelf();
         if (self) {
             this.names.set(self.peerid, String(self.name || ''));
@@ -625,7 +625,7 @@ class LiveController extends Emitter {
         this.voice.setTransport(null);
         this.joined = false;
         this.joining = false;
-        delete this.root.dataset.mavrLive;
+        delete this.root.dataset.vrroomLive;
         this.stopTimers();
         if (transport) {
             try {
@@ -803,7 +803,7 @@ class LiveController extends Emitter {
             }
             return;
         }
-        const pending = new Pending('mavrruntime_builtin/live/controller:mic');
+        const pending = new Pending('vrroomruntime_builtin/live/controller:mic');
         this.voice.enableMic().then(() => {
             if (!this.joined) {
                 // Left while the browser asked for permission.
@@ -993,7 +993,7 @@ class LiveController extends Emitter {
         if (!this.panel || !this.joined || this.refreshtimer) {
             return;
         }
-        this.refreshpending = new Pending('mavrruntime_builtin/live/controller:refresh');
+        this.refreshpending = new Pending('vrroomruntime_builtin/live/controller:refresh');
         this.refreshtimer = window.setTimeout(() => {
             this.refreshtimer = null;
             const pending = this.refreshpending;
@@ -1059,7 +1059,7 @@ class LiveController extends Emitter {
 /**
  * Create the live room of a launch.
  *
- * @param {HTMLElement} root The MAVR root.
+ * @param {HTMLElement} root The VR room root.
  * @param {Object} config Launch config.
  * @param {Object} session The session.
  * @returns {LiveController|null} null when live mode is not available for this launch.

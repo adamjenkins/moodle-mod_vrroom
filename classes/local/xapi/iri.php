@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\xapi;
+namespace mod_vrroom\local\xapi;
 
 /**
- * The mavr-vocab/1 statement vocabulary: verb IRIs, object IRIs and context extensions.
+ * The vrroom-vocab/1 statement vocabulary: verb IRIs, object IRIs and context extensions.
  *
  * Object IRIs are built from the site's wwwroot and the course module id, so the same object
  * yields the same IRI in every run mode. They are identifiers, not pages.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class iri {
-    /** @var string Base of MAVR's own context extension IRIs. */
-    public const EXT_BASE = 'https://wisecat.net/xapi/mavr/ext/';
+    /** @var string Base of VR room's own context extension IRIs. */
+    public const EXT_BASE = 'https://wisecat.net/xapi/vrroom/ext/';
 
     /** @var string Context extension holding the attempt id. */
     public const EXT_ATTEMPT = self::EXT_BASE . 'attempt-id';
@@ -43,21 +43,21 @@ final class iri {
     public const EXT_CHANNEL = self::EXT_BASE . 'channel';
 
     /** @var string Vocabulary version. */
-    public const VOCAB = 'mavr-vocab/1';
+    public const VOCAB = 'vrroom-vocab/1';
 
-    /** @var string[] Short verb => verb IRI, all eleven verbs of mavr-vocab/1. */
+    /** @var string[] Short verb => verb IRI, all eleven verbs of vrroom-vocab/1. */
     public const VERBS = [
         'launched' => 'http://adlnet.gov/expapi/verbs/launched',
         'initialized' => 'http://adlnet.gov/expapi/verbs/initialized',
         'terminated' => 'http://adlnet.gov/expapi/verbs/terminated',
-        'entered' => 'https://wisecat.net/xapi/mavr/verbs/entered',
+        'entered' => 'https://wisecat.net/xapi/vrroom/verbs/entered',
         'exited' => 'http://adlnet.gov/expapi/verbs/exited',
         'interacted' => 'http://adlnet.gov/expapi/verbs/interacted',
         'answered' => 'http://adlnet.gov/expapi/verbs/answered',
         'completed' => 'http://adlnet.gov/expapi/verbs/completed',
         'passed' => 'http://adlnet.gov/expapi/verbs/passed',
         'failed' => 'http://adlnet.gov/expapi/verbs/failed',
-        'requested' => 'https://wisecat.net/xapi/mavr/verbs/requested',
+        'requested' => 'https://wisecat.net/xapi/vrroom/verbs/requested',
     ];
 
     /** @var array Verbs a client may send => object types allowed for that verb (hints are server-asserted). */
@@ -69,7 +69,7 @@ final class iri {
         'interacted' => ['object', 'zone'],
     ];
 
-    /** @var string[] All object types of mavr-vocab/1. */
+    /** @var string[] All object types of vrroom-vocab/1. */
     public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective', 'hint'];
 
     /** @var string Pattern every scene, zone, object, objective and hint id must match. */
@@ -83,7 +83,7 @@ final class iri {
      */
     public static function activity(int $cmid): string {
         global $CFG;
-        return $CFG->wwwroot . '/mod/mavr/xapi/' . $cmid;
+        return $CFG->wwwroot . '/mod/vrroom/xapi/' . $cmid;
     }
 
     /**
@@ -124,11 +124,11 @@ final class iri {
                 self::require_id($id);
                 return $act . '/hint/' . $id;
         }
-        throw new \coding_exception('Unknown MAVR object type: ' . $type);
+        throw new \coding_exception('Unknown VR room object type: ' . $type);
     }
 
     /**
-     * Parse a MAVR object IRI.
+     * Parse a VR room object IRI.
      *
      * For a scene IRI both 'sceneid' and 'id' hold the scene id; for an activity both are null.
      *
@@ -137,7 +137,7 @@ final class iri {
      */
     public static function parse(string $iri): ?array {
         global $CFG;
-        $prefix = $CFG->wwwroot . '/mod/mavr/xapi/';
+        $prefix = $CFG->wwwroot . '/mod/vrroom/xapi/';
         if (strpos($iri, $prefix) !== 0) {
             return null;
         }
@@ -184,7 +184,7 @@ final class iri {
      */
     public static function verb_iri(string $short): string {
         if (!array_key_exists($short, self::VERBS)) {
-            throw new \coding_exception('Unknown MAVR verb: ' . $short);
+            throw new \coding_exception('Unknown VR room verb: ' . $short);
         }
         return self::VERBS[$short];
     }
@@ -201,7 +201,7 @@ final class iri {
     }
 
     /**
-     * Throw unless the id is a valid MAVR id.
+     * Throw unless the id is a valid VR room id.
      *
      * @param string|null $id
      * @return void
@@ -209,7 +209,7 @@ final class iri {
      */
     private static function require_id(?string $id): void {
         if ($id === null || !preg_match(self::ID_PATTERN, $id)) {
-            throw new \coding_exception('Invalid MAVR id in IRI');
+            throw new \coding_exception('Invalid VR room id in IRI');
         }
     }
 }

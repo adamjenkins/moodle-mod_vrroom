@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\external;
+namespace vrroomruntime_builtin\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mavrruntime_builtin\local\live\access;
-use mavrruntime_builtin\local\live\room_manager;
+use vrroomruntime_builtin\local\live\access;
+use vrroomruntime_builtin\local\live\room_manager;
 
 /**
  * Pass connection messages to other people in the same live room.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -67,21 +67,21 @@ class live_send extends external_api {
             return ['status' => 'gone', 'results' => []];
         }
         try {
-            [$cm, $context, $mavr] = access::load_by_mavrid((int)$peer->mavrid);
+            [$cm, $context, $vrroom] = access::load_by_vrroomid((int)$peer->vrroomid);
         } catch (\dml_missing_record_exception $e) {
             room_manager::remove_peer($peer);
             return ['status' => 'closed', 'results' => []];
         }
         try {
             self::validate_context($context);
-            require_capability('mod/mavr:view', $context);
+            require_capability('mod/vrroom:view', $context);
         } catch (\moodle_exception $e) {
             // The caller lost access to the activity: the presence goes at once, not after it is stale.
             room_manager::remove_peer($peer);
             throw $e;
         }
 
-        return room_manager::send($peer, $cm, $context, $mavr, $params['signals']);
+        return room_manager::send($peer, $cm, $context, $vrroom, $params['signals']);
     }
 
     /**

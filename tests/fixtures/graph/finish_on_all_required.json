@@ -2,7 +2,7 @@
   "name": "finish_on_all_required",
   "intent": "start rule effect uses event -1; all_required_completed fires once and finishes; open_question, teleport and play_media effects are listed in production order.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Tests of mod_mavr_get_attempt_state.
+ * Tests of mod_vrroom_get_attempt_state.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -42,7 +42,7 @@ final class get_attempt_state_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'stations' => [
                 ['title' => 'Vase', 'text' => '<p>Vase</p>', 'questionbankentryid' => 0, 'required' => 1, 'points' => 1,
@@ -105,7 +105,7 @@ final class get_attempt_state_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('errornotyourattempt', $e->errorcode);
         }
-        $this->assertTrue($DB->record_exists('mavr_attempts', ['id' => $attemptid]));
+        $this->assertTrue($DB->record_exists('vrroom_attempts', ['id' => $attemptid]));
 
         $this->setUser($generator->create_user());
         $this->expectException(\require_login_exception::class);

@@ -15,25 +15,25 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Server-side evaluator for mavr-graph/1 task graphs.
+ * Server-side evaluator for vrroom-graph/1 task graphs.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace mod_mavr\local\graph;
+namespace mod_vrroom\local\graph;
 
 /**
- * Server-side evaluator for mavr-graph/1 task graphs (contract §4.4.1, normative).
+ * Server-side evaluator for vrroom-graph/1 task graphs (contract §4.4.1, normative).
  *
- * Pure: no database, no globals. The client evaluator (mavrruntime_builtin/graph, file
+ * Pure: no database, no globals. The client evaluator (vrroomruntime_builtin/graph, file
  * runtime/builtin/amd/src/graph.js) implements the same semantics step by step; the golden
  * fixtures in tests/fixtures/graph are run against both. Any change here must be made there too.
  *
  * Events are arrays {verb, type, id, scene, fraction}; see {@see self::event_from_record()}.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -113,7 +113,7 @@ final class evaluator {
     /**
      * Constructor.
      *
-     * @param array $graph decoded, validated mavr-graph/1 (assoc arrays). Pure: no DB, no globals.
+     * @param array $graph decoded, validated vrroom-graph/1 (assoc arrays). Pure: no DB, no globals.
      */
     public function __construct(array $graph) {
         $position = 0;
@@ -180,9 +180,9 @@ final class evaluator {
     }
 
     /**
-     * Convert a mavr_events row into a §4.4.1 event (fraction from resultjson for 'answered').
+     * Convert a vrroom_events row into a §4.4.1 event (fraction from resultjson for 'answered').
      *
-     * @param \stdClass $record mavr_events row (verb, objecttype, sceneid, objectid, resultjson)
+     * @param \stdClass $record vrroom_events row (verb, objecttype, sceneid, objectid, resultjson)
      * @return array {verb, type, id, scene, fraction}
      */
     public static function event_from_record(\stdClass $record): array {

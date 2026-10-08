@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\runtime;
+namespace mod_vrroom\local\runtime;
 
 /**
- * Finds the installed run modes (mavrruntime sub-plugins).
+ * Finds the installed run modes (vrroomruntime sub-plugins).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -37,8 +37,8 @@ final class registry {
             return self::$instances;
         }
         $instances = [];
-        foreach (\core_component::get_plugin_list('mavrruntime') as $name => $unuseddir) {
-            $classname = "\\mavrruntime_{$name}\\runtime";
+        foreach (\core_component::get_plugin_list('vrroomruntime') as $name => $unuseddir) {
+            $classname = "\\vrroomruntime_{$name}\\runtime";
             if (!class_exists($classname) || !is_subclass_of($classname, base::class)) {
                 continue;
             }
@@ -59,7 +59,7 @@ final class registry {
     public static function get(string $name): base {
         $all = self::get_all();
         if (!isset($all[$name])) {
-            throw new \moodle_exception('errorunknownruntime', 'mod_mavr', '', $name);
+            throw new \moodle_exception('errorunknownruntime', 'mod_vrroom', '', $name);
         }
         return $all[$name];
     }

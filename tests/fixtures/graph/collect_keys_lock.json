@@ -2,7 +2,7 @@
   "name": "collect_keys_lock",
   "intent": "Two hidden keys are shown when the room is searched; collecting both (2 of 2, interacted objects) unlocks the lock. Each key is hidden again when taken; using the lock early is locked.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "hidden": [
       "k-1",
       "k-2"

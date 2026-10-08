@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 use core_question\local\bank\question_version_status;
 
 /**
- * Tests for the MAVR question picker and entry checks.
+ * Tests for the VR room question picker and entry checks.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

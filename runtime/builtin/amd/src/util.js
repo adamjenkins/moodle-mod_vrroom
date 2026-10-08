@@ -16,7 +16,7 @@
 /**
  * Small DOM and text helpers shared by the built-in viewer modules.
  *
- * @module     mavrruntime_builtin/util
+ * @module     vrroomruntime_builtin/util
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -29,9 +29,9 @@ export const BADGES = {
 };
 
 /**
- * Find a region inside the MAVR root.
+ * Find a region inside the VR room root.
  *
- * @param {HTMLElement} root The MAVR root element.
+ * @param {HTMLElement} root The VR room root element.
  * @param {string} name The data-region value.
  * @returns {HTMLElement|null}
  */
@@ -61,11 +61,11 @@ export const plainText = (value) => {
 /**
  * Announce a message to screen readers through the live region.
  *
- * @param {HTMLElement} root The MAVR root element.
+ * @param {HTMLElement} root The VR room root element.
  * @param {string} text Plain text.
  */
 export const announce = (root, text) => {
-    const live = region(root, 'mavr-live');
+    const live = region(root, 'vrroom-live');
     if (!live || !text) {
         return;
     }
@@ -78,38 +78,38 @@ export const announce = (root, text) => {
 /**
  * Show a message in the message region.
  *
- * @param {HTMLElement} root The MAVR root element.
+ * @param {HTMLElement} root The VR room root element.
  * @param {string} text Plain text.
  * @param {string} level 'warning', 'info' or 'success'.
  */
 export const showMessage = (root, text, level = 'warning') => {
-    const message = region(root, 'mavr-message');
+    const message = region(root, 'vrroom-message');
     if (!message) {
         return;
     }
     message.classList.remove('alert-warning', 'alert-info', 'alert-success', 'd-none');
     message.classList.add(`alert-${level}`);
     message.textContent = text;
-    message.dataset.mavrMessage = text;
+    message.dataset.vrroomMessage = text;
 };
 
 /**
  * Hide the message region, optionally only when it still shows a given text.
  *
- * @param {HTMLElement} root The MAVR root element.
+ * @param {HTMLElement} root The VR room root element.
  * @param {string|null} onlyText Clear only when this text is shown.
  */
 export const clearMessage = (root, onlyText = null) => {
-    const message = region(root, 'mavr-message');
+    const message = region(root, 'vrroom-message');
     if (!message) {
         return;
     }
-    if (onlyText !== null && message.dataset.mavrMessage !== onlyText) {
+    if (onlyText !== null && message.dataset.vrroomMessage !== onlyText) {
         return;
     }
     message.classList.add('d-none');
     message.textContent = '';
-    delete message.dataset.mavrMessage;
+    delete message.dataset.vrroomMessage;
 };
 
 /**

@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/liveroom
+    @template vrroomruntime_builtin/liveroom
 
     The live room panel of the built-in viewer: the notice about what joining shares (IP address
     included), the group room choice, join and leave, the voice controls and the people in the room.
@@ -24,9 +24,9 @@
     * none
 
     Data attributes required for JS:
-    * data-region: mavr-live-notice, mavr-live-group, mavr-live-status, mavr-live-voice, mavr-live-ptt,
-      mavr-live-insecure, mavr-live-people, mavr-live-participants, mavr-live-count
-    * data-action: mavr-live-join, mavr-live-leave, mavr-live-mic, mavr-live-mute, mavr-live-talk
+    * data-region: vrroom-live-notice, vrroom-live-group, vrroom-live-status, vrroom-live-voice, vrroom-live-ptt,
+      vrroom-live-insecure, vrroom-live-people, vrroom-live-participants, vrroom-live-count
+    * data-action: vrroom-live-join, vrroom-live-leave, vrroom-live-mic, vrroom-live-mute, vrroom-live-talk
 
     Context variables required for this template:
     * cmid - course module id
@@ -52,45 +52,45 @@
         "notice": ""
     }
 }}
-<h3 class="h5" id="mavr-liveroom-heading-{{cmid}}">{{#str}}liveroom, mavrruntime_builtin{{/str}}</h3>
-<p class="small" data-region="mavr-live-notice">{{#notice}}{{notice}}{{/notice}}{{^notice}}{{#str}}livenotice, mavrruntime_builtin{{/str}}{{/notice}}</p>
+<h3 class="h5" id="vrroom-liveroom-heading-{{cmid}}">{{#str}}liveroom, vrroomruntime_builtin{{/str}}</h3>
+<p class="small" data-region="vrroom-live-notice">{{#notice}}{{notice}}{{/notice}}{{^notice}}{{#str}}livenotice, vrroomruntime_builtin{{/str}}{{/notice}}</p>
 {{#nogroup}}
-<p class="alert alert-info">{{#str}}livenogroup, mavrruntime_builtin{{/str}}</p>
+<p class="alert alert-info">{{#str}}livenogroup, vrroomruntime_builtin{{/str}}</p>
 {{/nogroup}}
 {{#canjoin}}
-<div class="mavr-live-controls d-flex flex-wrap align-items-end gap-2 mb-2">
+<div class="vrroom-live-controls d-flex flex-wrap align-items-end gap-2 mb-2">
     {{#hasgroups}}
-    <div class="mavr-live-groupchoice">
-        <label class="form-label mb-1" for="mavr-live-group-{{cmid}}">{{#str}}livegroupselect, mavrruntime_builtin{{/str}}</label>
-        <select id="mavr-live-group-{{cmid}}" class="form-select" data-region="mavr-live-group">
+    <div class="vrroom-live-groupchoice">
+        <label class="form-label mb-1" for="vrroom-live-group-{{cmid}}">{{#str}}livegroupselect, vrroomruntime_builtin{{/str}}</label>
+        <select id="vrroom-live-group-{{cmid}}" class="form-select" data-region="vrroom-live-group">
             {{#groups}}
             <option value="{{id}}"{{#selected}} selected{{/selected}}>{{name}}</option>
             {{/groups}}
         </select>
     </div>
     {{/hasgroups}}
-    <button type="button" class="btn btn-primary" data-action="mavr-live-join">{{#str}}livejoin, mavrruntime_builtin{{/str}}</button>
-    <button type="button" class="btn btn-secondary d-none" data-action="mavr-live-leave">{{#str}}liveleave, mavrruntime_builtin{{/str}}</button>
+    <button type="button" class="btn btn-primary" data-action="vrroom-live-join">{{#str}}livejoin, vrroomruntime_builtin{{/str}}</button>
+    <button type="button" class="btn btn-secondary d-none" data-action="vrroom-live-leave">{{#str}}liveleave, vrroomruntime_builtin{{/str}}</button>
 </div>
 {{/canjoin}}
-<p class="mavr-live-status mb-2" data-region="mavr-live-status" role="status"></p>
-<div class="mavr-live-voice d-none mb-2" data-region="mavr-live-voice">
+<p class="vrroom-live-status mb-2" data-region="vrroom-live-status" role="status"></p>
+<div class="vrroom-live-voice d-none mb-2" data-region="vrroom-live-voice">
     {{#secure}}
     <div class="d-flex flex-wrap align-items-center gap-2">
-        <button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-live-mic">{{#str}}livemicon, mavrruntime_builtin{{/str}}</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-live-mute" aria-pressed="false" disabled>{{#str}}livemute, mavrruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-action="vrroom-live-mic">{{#str}}livemicon, vrroomruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-live-mute" aria-pressed="false" disabled>{{#str}}livemute, vrroomruntime_builtin{{/str}}</button>
         <div class="form-check mb-0">
-            <input type="checkbox" class="form-check-input" id="mavr-live-ptt-{{cmid}}" data-region="mavr-live-ptt">
-            <label class="form-check-label" for="mavr-live-ptt-{{cmid}}">{{#str}}livepushtotalk, mavrruntime_builtin{{/str}}</label>
+            <input type="checkbox" class="form-check-input" id="vrroom-live-ptt-{{cmid}}" data-region="vrroom-live-ptt">
+            <label class="form-check-label" for="vrroom-live-ptt-{{cmid}}">{{#str}}livepushtotalk, vrroomruntime_builtin{{/str}}</label>
         </div>
-        <button type="button" class="btn btn-outline-secondary btn-sm d-none" data-action="mavr-live-talk" aria-pressed="false">{{#str}}liveholdtotalk, mavrruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" data-action="vrroom-live-talk" aria-pressed="false">{{#str}}liveholdtotalk, vrroomruntime_builtin{{/str}}</button>
     </div>
     {{/secure}}
     {{^secure}}
-    <p class="small text-muted mb-0" data-region="mavr-live-insecure">{{#str}}livemicinsecure, mavrruntime_builtin{{/str}}</p>
+    <p class="small text-muted mb-0" data-region="vrroom-live-insecure">{{#str}}livemicinsecure, vrroomruntime_builtin{{/str}}</p>
     {{/secure}}
 </div>
-<div class="mavr-live-people d-none" data-region="mavr-live-people">
-    <h4 class="h6" data-region="mavr-live-count">{{#str}}liveparticipants, mavrruntime_builtin, {{count}}{{/str}}</h4>
-    <div class="mavr-live-participants mb-0" data-region="mavr-live-participants"></div>
+<div class="vrroom-live-people d-none" data-region="vrroom-live-people">
+    <h4 class="h6" data-region="vrroom-live-count">{{#str}}liveparticipants, vrroomruntime_builtin, {{count}}{{/str}}</h4>
+    <div class="vrroom-live-participants mb-0" data-region="vrroom-live-participants"></div>
 </div>

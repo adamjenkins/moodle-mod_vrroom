@@ -19,16 +19,16 @@
  * authoritative state, questions (with retries), hints, the attempt's deadline, rooms, resume
  * position and finishing.
  *
- * @module     mavrruntime_builtin/session
+ * @module     vrroomruntime_builtin/session
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 import Ajax from 'core/ajax';
 import Log from 'core/log';
-import {evaluate, classify, STATUS} from 'mavrruntime_builtin/graph';
-import {createQueue, buildStatement} from 'mavrruntime_builtin/statements';
-import {plainText} from 'mavrruntime_builtin/util';
+import {evaluate, classify, STATUS} from 'vrroomruntime_builtin/graph';
+import {createQueue, buildStatement} from 'vrroomruntime_builtin/statements';
+import {plainText} from 'vrroomruntime_builtin/util';
 
 /** Order of objective states, used to merge server and local state. */
 const RANK = {locked: 0, available: 1, completed: 2};
@@ -125,7 +125,7 @@ class Session {
     constructor(config) {
         this.config = config;
         this.preview = !!config.preview;
-        this.graph = config.graph || {schema: 'mavr-graph/1', hidden: [], objectives: [], rules: []};
+        this.graph = config.graph || {schema: 'vrroom-graph/1', hidden: [], objectives: [], rules: []};
         this.objectivedefs = Array.isArray(this.graph.objectives) ? this.graph.objectives : [];
         this.scenes = Array.isArray(config.scenes) ? config.scenes : [];
         this.confirmed = (Array.isArray(config.events) ? config.events : []).map(normaliseEvent);
@@ -457,7 +457,7 @@ class Session {
             return Promise.resolve();
         }
         const pendingbefore = this.pendingevents.length;
-        this.reconciling = call('mod_mavr_get_attempt_state', {attemptid: this.config.attemptid})
+        this.reconciling = call('mod_vrroom_get_attempt_state', {attemptid: this.config.attemptid})
             .then((state) => {
                 this.setServerState(state, this.pendingevents.length === 0 && pendingbefore === 0);
                 this.update(false);
@@ -701,7 +701,7 @@ class Session {
      * @returns {Promise<Object>} {slot, html, javascript, answered}
      */
     getQuestion(slot) {
-        return this.flush().then(() => call('mod_mavr_get_question', {
+        return this.flush().then(() => call('mod_vrroom_get_question', {
             attemptid: this.config.attemptid,
             slot: Number(slot),
         }));
@@ -740,7 +740,7 @@ class Session {
             .filter((r) => r && typeof r.name === 'string')
             .map((r) => ({name: r.name, value: r.value === undefined || r.value === null ? '' : String(r.value)}));
         return this.flush()
-            .then(() => call('mod_mavr_submit_question', {
+            .then(() => call('mod_vrroom_submit_question', {
                 attemptid: this.config.attemptid,
                 slot: Number(slot),
                 responses: list,
@@ -791,7 +791,7 @@ class Session {
         }
         const id = String(objectiveid);
         return this.flush()
-            .then(() => call('mod_mavr_request_hint', {attemptid: this.config.attemptid, objectiveid: id}))
+            .then(() => call('mod_vrroom_request_hint', {attemptid: this.config.attemptid, objectiveid: id}))
             .then((result) => {
                 const hintid = String(result.hintid);
                 this.confirmed.push(normaliseEvent({
@@ -826,7 +826,7 @@ class Session {
             return Promise.resolve(null);
         }
         return call('core_xapi_get_state', {
-            component: 'mod_mavr',
+            component: 'mod_vrroom',
             activityId: this.config.resume.activityid,
             agent: JSON.stringify(this.config.actor),
             stateId: this.config.resume.stateid,
@@ -865,7 +865,7 @@ class Session {
                 return;
             }
             call('core_xapi_post_state', {
-                component: 'mod_mavr',
+                component: 'mod_vrroom',
                 activityId: this.config.resume.activityid,
                 agent: JSON.stringify(this.config.actor),
                 stateId: this.config.resume.stateid,
@@ -895,7 +895,7 @@ class Session {
         }
         this.stop();
         return this.flush()
-            .then(() => call('mod_mavr_finish_attempt', {attemptid: this.config.attemptid}))
+            .then(() => call('mod_vrroom_finish_attempt', {attemptid: this.config.attemptid}))
             .then((result) => {
                 this.closed = true;
                 this.destroy();

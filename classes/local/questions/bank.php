@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 use core_question\local\bank\question_bank_helper;
 use core_question\local\bank\question_version_status;
 
 /**
- * Question bank access for MAVR: the station question picker and entry checks.
+ * Question bank access for VR room: the station question picker and entry checks.
  *
- * MAVR never stores a question id. It stores a question bank entry and always
+ * VR room never stores a question id. It stores a question bank entry and always
  * uses the latest non-draft version of it, exactly as a quiz slot that is set to
  * "always latest" does. Everything that turns an entry into a question goes
  * through this class so the rule is applied in one place.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -120,7 +120,7 @@ final class bank {
                     continue;
                 }
                 $category = $categories[(int)$row->questioncategoryid];
-                $choices[(int)$row->qbeid] = get_string('questionchoice', 'mod_mavr', (object)[
+                $choices[(int)$row->qbeid] = get_string('questionchoice', 'mod_vrroom', (object)[
                     'bank' => $bankname,
                     'category' => format_string($category->name, true, ['context' => $bankcontext]),
                     'name' => format_string($row->name, true, ['context' => $bankcontext]),
@@ -145,7 +145,7 @@ final class bank {
      * @param int $qbeid The question bank entry id from the form.
      * @param int $courseid The course of the activity (the picker's scope; the use check is per bank).
      * @param int[] $keep Entry ids already bound to this activity.
-     * @return string|null Null when allowed, else a mod_mavr lang string key.
+     * @return string|null Null when allowed, else a mod_vrroom lang string key.
      */
     public static function validate_entry(int $qbeid, int $courseid, array $keep = []): ?string {
         global $USER;
@@ -210,7 +210,7 @@ final class bank {
     }
 
     /**
-     * Whether questions of a type may be placed in a MAVR room.
+     * Whether questions of a type may be placed in a VR room room.
      *
      * The question engine grades in-world answers immediately, so only
      * installed, real, automatically graded types qualify. Random questions are

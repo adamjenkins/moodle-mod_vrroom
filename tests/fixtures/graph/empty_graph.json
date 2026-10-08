@@ -2,7 +2,7 @@
   "name": "empty_graph",
   "intent": "No objectives; events ignored; score 0, nothing required.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [],
     "rules": []
   },

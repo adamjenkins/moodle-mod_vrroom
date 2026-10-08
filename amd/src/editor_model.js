@@ -21,7 +21,7 @@
  * never changed afterwards. The room editor and the logic editor share one model and so one
  * history.
  *
- * @module     mod_mavr/editor_model
+ * @module     mod_vrroom/editor_model
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -150,7 +150,7 @@ export const allIds = (doc) => {
 /**
  * Create the model.
  *
- * @param {Object} initial Parsed mavr-editdoc/1 document.
+ * @param {Object} initial Parsed vrroom-editdoc/1 document.
  * @returns {Object} Model
  */
 export const createModel = (initial) => {
@@ -159,7 +159,7 @@ export const createModel = (initial) => {
         current.scenes = [];
     }
     if (!current.graph || typeof current.graph !== 'object') {
-        current.graph = {schema: 'mavr-graph/1', hidden: [], objectives: [], rules: []};
+        current.graph = {schema: 'vrroom-graph/1', hidden: [], objectives: [], rules: []};
     }
     if (!Array.isArray(current.bindings)) {
         current.bindings = [];

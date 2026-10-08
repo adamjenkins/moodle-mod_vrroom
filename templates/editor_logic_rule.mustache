@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/editor_logic_rule
+    @template mod_vrroom/editor_logic_rule
 
     One rule card of the logic editor: when something happens, then run some actions.
     All labels are plain text.
@@ -40,41 +40,41 @@
         ]
     }
 }}
-<div class="card mb-3" data-region="mavr-logic-rule" data-rule-index="{{index}}">
+<div class="card mb-3" data-region="vrroom-logic-rule" data-rule-index="{{index}}">
     <fieldset class="card-body">
         <legend class="h6">{{heading}}</legend>
         <div class="row g-3">
             <div class="col-12 col-md-6">
-                <label class="form-label" for="mavr-logic-{{uid}}-r{{index}}-trigger">{{#str}}logicwhen, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-r{{index}}-trigger" data-field="trigger">
+                <label class="form-label" for="vrroom-logic-{{uid}}-r{{index}}-trigger">{{#str}}logicwhen, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-r{{index}}-trigger" data-field="trigger">
                     {{#triggeroptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/triggeroptions}}
                 </select>
             </div>
             {{#isobjectivetrigger}}
             <div class="col-12 col-md-6">
-                <label class="form-label" for="mavr-logic-{{uid}}-r{{index}}-objective">{{#str}}logictriggerobjective, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-r{{index}}-objective" data-field="triggerobjective">
+                <label class="form-label" for="vrroom-logic-{{uid}}-r{{index}}-objective">{{#str}}logictriggerobjective, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-r{{index}}-objective" data-field="triggerobjective">
                     {{#objectiveoptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/objectiveoptions}}
                 </select>
             </div>
             {{/isobjectivetrigger}}
             {{#isevent}}
             <div class="col-12 col-md-4">
-                <label class="form-label" for="mavr-logic-{{uid}}-r{{index}}-verb">{{#str}}logicverb, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-r{{index}}-verb" data-field="verb">
+                <label class="form-label" for="vrroom-logic-{{uid}}-r{{index}}-verb">{{#str}}logicverb, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-r{{index}}-verb" data-field="verb">
                     {{#verboptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/verboptions}}
                 </select>
             </div>
             <div class="col-12 col-md-4">
-                <label class="form-label" for="mavr-logic-{{uid}}-r{{index}}-kind">{{#str}}logicobjecttype, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-r{{index}}-kind" data-field="kind">
+                <label class="form-label" for="vrroom-logic-{{uid}}-r{{index}}-kind">{{#str}}logicobjecttype, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-r{{index}}-kind" data-field="kind">
                     {{#kindoptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/kindoptions}}
                 </select>
             </div>
             {{#hasid}}
             <div class="col-12 col-md-4">
-                <label class="form-label" for="mavr-logic-{{uid}}-r{{index}}-id">{{#str}}logicwhich, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-r{{index}}-id" data-field="eventid">
+                <label class="form-label" for="vrroom-logic-{{uid}}-r{{index}}-id">{{#str}}logicwhich, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-r{{index}}-id" data-field="eventid">
                     {{#idgroups}}
                     {{#label}}<optgroup label="{{label}}">{{/label}}
                     {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
@@ -86,28 +86,28 @@
             {{/isevent}}
             <div class="col-12">
                 <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="mavr-logic-{{uid}}-r{{index}}-once"
+                    <input type="checkbox" class="form-check-input" id="vrroom-logic-{{uid}}-r{{index}}-once"
                            data-field="once"{{#once}} checked{{/once}}>
-                    <label class="form-check-label" for="mavr-logic-{{uid}}-r{{index}}-once">{{#str}}logiconce, mod_mavr{{/str}}</label>
+                    <label class="form-check-label" for="vrroom-logic-{{uid}}-r{{index}}-once">{{#str}}logiconce, mod_vrroom{{/str}}</label>
                 </div>
             </div>
             <div class="col-12">
                 <fieldset>
-                    <legend class="form-label fs-6">{{#str}}logicthen, mod_mavr{{/str}}</legend>
+                    <legend class="form-label fs-6">{{#str}}logicthen, mod_vrroom{{/str}}</legend>
                     <ol class="ps-3">
                         {{#actions}}
                         <li class="mb-2" data-action-index="{{index}}">
                             <div class="d-flex flex-wrap align-items-end gap-2">
                                 <div>
-                                    <label class="visually-hidden" for="mavr-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do">{{#str}}logicactionno, mod_mavr, {{number}}{{/str}}</label>
-                                    <select class="form-select w-auto" id="mavr-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do" data-field="do">
+                                    <label class="visually-hidden" for="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do">{{#str}}logicactionno, mod_vrroom, {{number}}{{/str}}</label>
+                                    <select class="form-select w-auto" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do" data-field="do">
                                         {{#dooptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/dooptions}}
                                     </select>
                                 </div>
                                 {{#hastarget}}
                                 <div>
-                                    <label class="visually-hidden" for="mavr-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target">{{#str}}logicactiontarget, mod_mavr, {{number}}{{/str}}</label>
-                                    <select class="form-select w-auto" id="mavr-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target" data-field="actiontarget">
+                                    <label class="visually-hidden" for="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target">{{#str}}logicactiontarget, mod_vrroom, {{number}}{{/str}}</label>
+                                    <select class="form-select w-auto" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target" data-field="actiontarget">
                                         {{#targetgroups}}
                                         {{#label}}<optgroup label="{{label}}">{{/label}}
                                         {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
@@ -116,19 +116,19 @@
                                     </select>
                                 </div>
                                 {{/hastarget}}
-                                <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-remove-action">{{#str}}logicremove, mod_mavr{{/str}}</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-logic-remove-action">{{#str}}logicremove, mod_vrroom{{/str}}</button>
                             </div>
                         </li>
                         {{/actions}}
                     </ol>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-add-action">{{#str}}logicaddaction, mod_mavr{{/str}}</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-logic-add-action">{{#str}}logicaddaction, mod_vrroom{{/str}}</button>
                 </fieldset>
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
-            {{^isfirst}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-rule-up">{{#str}}logicmoveup, mod_mavr{{/str}}</button>{{/isfirst}}
-            {{^islast}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-logic-rule-down">{{#str}}logicmovedown, mod_mavr{{/str}}</button>{{/islast}}
-            <button type="button" class="btn btn-outline-danger btn-sm" data-action="mavr-logic-remove-rule">{{#str}}logicremove, mod_mavr{{/str}}</button>
+            {{^isfirst}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-logic-rule-up">{{#str}}logicmoveup, mod_vrroom{{/str}}</button>{{/isfirst}}
+            {{^islast}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-logic-rule-down">{{#str}}logicmovedown, mod_vrroom{{/str}}</button>{{/islast}}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-action="vrroom-logic-remove-rule">{{#str}}logicremove, mod_vrroom{{/str}}</button>
         </div>
     </fieldset>
 </div>

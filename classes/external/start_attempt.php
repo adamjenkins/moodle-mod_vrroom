@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\runtime\registry;
-use mod_mavr\local\token;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\runtime\registry;
+use mod_vrroom\local\token;
 
 /**
  * Start (or resume) the current user's attempt and return its launch descriptor.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -53,19 +53,19 @@ class start_attempt extends external_api {
         global $DB, $USER;
         ['cmid' => $cmid] = self::validate_parameters(self::execute_parameters(), ['cmid' => $cmid]);
 
-        [, $cm] = get_course_and_cm_from_cmid($cmid, 'mavr');
+        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrroom');
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
-        require_capability('mod/mavr:attempt', $context);
+        require_capability('mod/vrroom:attempt', $context);
 
-        $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
-        $runtime = registry::get((string)$mavr->runtime);
+        $vrroom = $DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST);
+        $runtime = registry::get((string)$vrroom->runtime);
         $readiness = $runtime->readiness();
         if (!$readiness->ready) {
-            throw new \moodle_exception('runtimenotready', 'mod_mavr', '', s($readiness->message));
+            throw new \moodle_exception('runtimenotready', 'mod_vrroom', '', s($readiness->message));
         }
 
-        [$attempt, $resumed] = attempt_manager::start_or_resume($cm, $mavr, (int)$USER->id);
+        [$attempt, $resumed] = attempt_manager::start_or_resume($cm, $vrroom, (int)$USER->id);
         $descriptor = $runtime->launch($cm, $attempt, $USER);
 
         return [

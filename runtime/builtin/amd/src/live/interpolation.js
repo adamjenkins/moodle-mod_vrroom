@@ -24,7 +24,7 @@
  *
  * This module is pure: it has no imports, so node's test runner can load it.
  *
- * @module     mavrruntime_builtin/live/interpolation
+ * @module     vrroomruntime_builtin/live/interpolation
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

@@ -10,8 +10,8 @@ All notable changes to this plugin are documented here. The format follows
 - Live mode for the built-in run mode (activity setting *Live mode*, 2 to 6 people per room):
   avatars with head and hand poses, positional voice with mute, push to talk and per-person mute,
   and a participant list. Browser-to-browser WebRTC with signalling relayed by Moodle web services
-  (`mavrruntime_builtin_live_join`, `_live_poll`, `_live_send`, `_live_leave`), tables
-  `mavrruntime_builtin_peers` and `mavrruntime_builtin_signals`, and the scheduled task
+  (`vrroomruntime_builtin_live_join`, `_live_poll`, `_live_send`, `_live_leave`), tables
+  `vrroomruntime_builtin_peers` and `vrroomruntime_builtin_signals`, and the scheduled task
   *Remove expired live room data*.
 - Site settings of the built-in run mode: live mode on/off, STUN servers, TURN servers, TURN shared
   secret and TURN credential lifetime (all servers empty by default).
@@ -19,7 +19,7 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Changed
 
-- The MAVR site settings are a category with *General settings* and one page per run mode.
+- The VR room site settings are a category with *General settings* and one page per run mode.
 
 ## [0.1.0] - 2026-10-08
 
@@ -27,17 +27,17 @@ ALPHA. First release, Moodle 5.2 only.
 
 ### Added
 
-- Activity module `mod_mavr` with two sub-plugin types: run modes (`mavrruntime`) and templates
-  (`mavrtemplate`).
-- Scene documents (`mavr-scene/1`), task graphs (`mavr-graph/1`) with objectives (visit a zone,
+- Activity module `mod_vrroom` with two sub-plugin types: run modes (`vrroomruntime`) and templates
+  (`vrroomtemplate`).
+- Scene documents (`vrroom-scene/1`), task graphs (`vrroom-graph/1`) with objectives (visit a zone,
   interact, answer a question, collect, sequence) and rules, and graph versions so old attempts
   replay under the graph they were played with.
-- Built-in run mode `mavrruntime_builtin`: a three.js viewer bundled in the plugin (desktop and
+- Built-in run mode `vrroomruntime_builtin`: a three.js viewer bundled in the plugin (desktop and
   touch controls, procedural environments, GLB models and images) and an accessible list view.
-- Gallery walk template `mavrtemplate_gallery`: environment choice (*Gallery hall*, *Courtyard* or
+- Gallery walk template `vrroomtemplate_gallery`: environment choice (*Gallery hall*, *Courtyard* or
   an uploaded GLB), repeated stations with text, model or image, optional question, required flag
   and points, and an optional visiting order.
-- xAPI statements (`mavr-vocab/1`) through core `core_xapi_statement_post`, validated by the
+- xAPI statements (`vrroom-vocab/1`) through core `core_xapi_statement_post`, validated by the
   activity's xAPI handler (owner, activity, open attempt, locked objectives, batch and attempt
   limits) and stored once per statement id.
 - Server-side task-graph evaluator that computes objectives, score and the finished state from the

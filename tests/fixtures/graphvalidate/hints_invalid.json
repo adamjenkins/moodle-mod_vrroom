@@ -2,7 +2,7 @@
   "name": "hints_invalid",
   "intent": "Each hint message once: hints not a list, a hint that is not an object, an invalid id, an empty text, a negative penalty, a repeated hint id.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "x-1",

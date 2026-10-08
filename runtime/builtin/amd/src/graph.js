@@ -14,16 +14,16 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Client evaluator and validator for mavr-graph/1 task graphs.
+ * Client evaluator and validator for vrroom-graph/1 task graphs.
  *
- * Twin of \mod_mavr\local\graph\evaluator and \mod_mavr\local\graph\graph_validator (PHP):
+ * Twin of \mod_vrroom\local\graph\evaluator and \mod_vrroom\local\graph\graph_validator (PHP):
  * same semantics (contract §4.4.1, normative), same validation messages in the same order.
- * The golden fixtures in mod/mavr/tests/fixtures/graph are run against both; any change here
+ * The golden fixtures in mod/vrroom/tests/fixtures/graph are run against both; any change here
  * must be made there too.
  *
  * Dependency-free ES module (no imports) so that both grunt (AMD build) and node --test load it.
  *
- * @module     mavrruntime_builtin/graph
+ * @module     vrroomruntime_builtin/graph
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -45,7 +45,7 @@ export const OBJECTIVE = Object.freeze({
 /** Most rule triggers processed for one event; the rest are dropped. */
 export const TRIGGER_CAP = 100;
 
-const SCHEMA = 'mavr-graph/1';
+const SCHEMA = 'vrroom-graph/1';
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const OBJECTIVE_TYPES = ['visit_zone', 'interact', 'answer_question', 'collect', 'sequence'];
 const TRIGGERS = ['start', 'event', 'objective_completed', 'objective_unlocked', 'all_required_completed'];
@@ -198,7 +198,7 @@ const isHintEvent = (event) => event.verb === 'requested' && event.type === 'hin
 /**
  * Normalise a graph into objectives, an id index, rules and the initial hidden list.
  *
- * @param {Object} graph decoded, validated mavr-graph/1
+ * @param {Object} graph decoded, validated vrroom-graph/1
  * @returns {Object}
  */
 const compile = (graph) => {
@@ -642,7 +642,7 @@ const triggerMatches = (trigger, on) => {
 /**
  * Run a graph over a list of events.
  *
- * @param {Object} graph decoded mavr-graph/1
+ * @param {Object} graph decoded vrroom-graph/1
  * @param {Object[]} events §4.4.1 events in order
  * @returns {Run}
  */
@@ -655,16 +655,16 @@ const runEvents = (graph, events) => {
 /**
  * Evaluate a graph against an ordered event list.
  *
- * @param {Object} graph decoded, validated mavr-graph/1
+ * @param {Object} graph decoded, validated vrroom-graph/1
  * @param {Object[]} events §4.4.1 events {verb, type, id, scene, fraction} in order
- * @returns {Object} same shape as \mod_mavr\local\graph\evaluation_result::to_array()
+ * @returns {Object} same shape as \mod_vrroom\local\graph\evaluation_result::to_array()
  */
 export const evaluate = (graph, events) => runEvents(graph, events).result();
 
 /**
  * Status a candidate event would get after the given events (§4.4.1 Classify).
  *
- * @param {Object} graph decoded, validated mavr-graph/1
+ * @param {Object} graph decoded, validated vrroom-graph/1
  * @param {Object[]} events events already accepted, in order
  * @param {Object} event the candidate event
  * @returns {string} a STATUS value
@@ -1013,7 +1013,7 @@ const validateObjectiveTarget = (objective, where, slots, errors) => {
 /**
  * Validate a decoded graph (same checks, order and messages as the PHP graph_validator).
  *
- * @param {Object} graph decoded mavr-graph/1 document
+ * @param {Object} graph decoded vrroom-graph/1 document
  * @returns {string[]} developer-facing English errors; [] = valid
  */
 export const validate = (graph) => {

@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_gallery\local;
+namespace vrroomtemplate_gallery\local;
 
 /**
  * Station placement for the Gallery walk template.
  *
- * Coordinates follow mavr-scene/1: metres, Y up, yaw in degrees about Y; an object at yaw θ
+ * Coordinates follow vrroom-scene/1: metres, Y up, yaw in degrees about Y; an object at yaw θ
  * faces (sin θ, 0, cos θ). Bundled presets bring their own anchor lists; an uploaded
  * environment gets its stations on a circle around the origin, each facing the centre.
  *
- * @package    mavrtemplate_gallery
+ * @package    vrroomtemplate_gallery
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -45,7 +45,7 @@ final class layout {
      * the stations are spread evenly on a circle: station k at φ = k·360/count, position
      * (r sin φ, 0, −r cos φ), yaw −φ, where r = circle_radius($count).
      *
-     * @param array|null $preset preset definition from \mod_mavr\local\scene\presets::get(), or null for uploads
+     * @param array|null $preset preset definition from \mod_vrroom\local\scene\presets::get(), or null for uploads
      * @param int $count number of stations
      * @return array[] list of ['position' => [x, y, z], 'yaw' => degrees]
      */

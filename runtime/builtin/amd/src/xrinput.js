@@ -22,7 +22,7 @@
  * a CDN, and the built-in viewer makes no external calls. The controller ray select follows
  * mod_gear's viewer.
  *
- * @module     mavrruntime_builtin/xrinput
+ * @module     vrroomruntime_builtin/xrinput
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -319,13 +319,13 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
             return;
         }
         let object = hit.object;
-        while (object && !(object.userData.mavrKind === 'grabbable' && object.userData.mavrItem !== undefined)) {
+        while (object && !(object.userData.vrroomKind === 'grabbable' && object.userData.vrroomItem !== undefined)) {
             object = object.parent;
         }
         if (!object) {
             return;
         }
-        const id = object.userData.mavrItem;
+        const id = object.userData.vrroomItem;
         // Taking it from the other hand.
         entries.forEach((other) => {
             if (other !== entry && other.grabbed && other.grabbed.object === object) {
@@ -335,8 +335,8 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
         if (options.onGrabStart && !options.onGrabStart(id, entry.controller)) {
             return;
         }
-        const parent = object.userData.mavrHome || object.parent;
-        object.userData.mavrHome = parent;
+        const parent = object.userData.vrroomHome || object.parent;
+        object.userData.vrroomHome = parent;
         entry.grabbed = {object: object, parent: parent, id: id};
         entry.controller.attach(object);
     };
@@ -347,7 +347,7 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
         const hand = renderer.xr.getHand(i);
 
         const line = new THREE.Line(linegeometry, new THREE.LineBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.6}));
-        line.name = 'mavr-xr-ray';
+        line.name = 'vrroom-xr-ray';
         line.scale.z = RAY;
         line.visible = false;
         controller.add(line);
@@ -355,13 +355,13 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
         const reticle = new THREE.Mesh(reticlegeometry, new THREE.MeshBasicMaterial({
             color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthTest: false,
         }));
-        reticle.name = 'mavr-xr-reticle';
+        reticle.name = 'vrroom-xr-reticle';
         reticle.renderOrder = 20;
         reticle.visible = false;
         controller.add(reticle);
 
         const gripmesh = new THREE.Mesh(gripgeometry, new THREE.MeshStandardMaterial({color: 0x495057, roughness: 0.6}));
-        gripmesh.name = 'mavr-xr-grip';
+        gripmesh.name = 'vrroom-xr-grip';
         gripmesh.visible = false;
         grip.add(gripmesh);
 

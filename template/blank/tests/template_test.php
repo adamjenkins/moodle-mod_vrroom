@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_blank;
+namespace vrroomtemplate_blank;
 
-use mod_mavr\local\graph\graph_validator;
-use mod_mavr\local\scene\scene_validator;
+use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\scene_validator;
 
 /**
  * Tests for the Empty room template.
  *
- * @package    mavrtemplate_blank
+ * @package    vrroomtemplate_blank
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -51,7 +51,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame('blank', $template->get_name());
         $this->assertSame([], $template->completion_rules());
         $this->assertSame(100, $template->default_grade());
-        $this->assertSame(get_string('chooserhelp', 'mavrtemplate_blank'), $template->get_chooser_help());
+        $this->assertSame(get_string('chooserhelp', 'vrroomtemplate_blank'), $template->get_chooser_help());
         $this->assertFalse($template->remap_question_entries((object)[], fn (int $old): int => $old + 1));
     }
 
@@ -69,7 +69,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame([], scene_validator::validate($scene));
         $this->assertSame([], scene_validator::validate_set($compiled->scenes));
         $this->assertSame(self::SCENEID, $scene['id']);
-        $this->assertSame(get_string('scenename', 'mavrtemplate_blank'), $scene['name']);
+        $this->assertSame(get_string('scenename', 'vrroomtemplate_blank'), $scene['name']);
         $this->assertSame('courtyard', $scene['environment']['preset']);
         $this->assertSame('courtyard', $scene['environment']['shape']['kind']);
         $this->assertSame([['id' => 's-start', 'position' => [0.0, 0.0, 0.0], 'yaw' => 0.0]], $scene['spawn']);
@@ -78,7 +78,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame([], $scene['interactables']);
 
         $this->assertSame(
-            ['schema' => 'mavr-graph/1', 'hidden' => [], 'objectives' => [], 'rules' => []],
+            ['schema' => 'vrroom-graph/1', 'hidden' => [], 'objectives' => [], 'rules' => []],
             $compiled->graph
         );
         $this->assertSame([], graph_validator::validate($compiled->graph));
@@ -104,7 +104,7 @@ final class template_test extends \advanced_testcase {
         );
 
         $course = $this->getDataGenerator()->create_course();
-        $mavrid = $DB->insert_record('mavr', (object)[
+        $vrroomid = $DB->insert_record('vrroom', (object)[
             'course' => $course->id,
             'name' => 'Empty',
             'runtime' => 'builtin',
@@ -114,7 +114,7 @@ final class template_test extends \advanced_testcase {
             'timecreated' => time(),
             'timemodified' => time(),
         ]);
-        $config = $template->extract_config((object)['instance' => $mavrid, 'blank_environment' => 'gallery-hall']);
+        $config = $template->extract_config((object)['instance' => $vrroomid, 'blank_environment' => 'gallery-hall']);
         $this->assertSame(self::SCENEID, $config->sceneid);
         $this->assertSame('gallery-hall', $config->environment);
     }

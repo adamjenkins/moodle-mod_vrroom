@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\backup;
+namespace mod_vrroom\backup;
 
 use backup;
 use backup_controller;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\instance_manager;
 use restore_controller;
 
 defined('MOODLE_INTERNAL') || die();
@@ -28,26 +28,26 @@ require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 require_once($CFG->dirroot . '/backup/moodle2/backup_plan_builder.class.php');
 require_once($CFG->dirroot . '/backup/moodle2/restore_plan_builder.class.php');
-require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/backup_mavr_activity_task.class.php');
-require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_activity_task.class.php');
+require_once($CFG->dirroot . '/mod/vrroom/backup/moodle2/backup_vrroom_activity_task.class.php');
+require_once($CFG->dirroot . '/mod/vrroom/backup/moodle2/restore_vrroom_activity_task.class.php');
 
 /**
- * Backup and restore of MAVR activities into a new course.
+ * Backup and restore of VR room activities into a new course.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\backup_mavr_activity_structure_step::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_structure_step::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\restore_mavr_activity_task::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\backup_vrroom_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrroom_activity_structure_step::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\restore_vrroom_activity_task::class)]
 final class backup_restore_test extends \advanced_testcase {
     /**
      * A course with a question bank, a two-station gallery walk (one question) and a student
      * attempt with a visit, an answer and a finish.
      *
-     * @return array [course, mavr row, cm, question, student, attempt]
+     * @return array [course, vrroom row, cm, question, student, attempt]
      */
     private function create_setup(): array {
         global $DB;
@@ -60,21 +60,21 @@ final class backup_restore_test extends \advanced_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'name' => 'Museum walk',
             'stationtitles' => 'Vase|Portrait',
             'stationquestions' => 'Q1|',
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
-        $cm = get_coursemodule_from_id('mavr', $module->cmid, 0, false, MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_id('vrroom', $module->cmid, 0, false, MUST_EXIST);
 
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
-        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
-        $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
-        $mavrgen->record_event(
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $attempt = $vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id);
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
+        $vrroomgen->record_event($attempt, 'entered', 'zone', $scene['id'], $scene['zones'][0]['id']);
+        $vrroomgen->record_event(
             $attempt,
             'answered',
             'question',
@@ -84,14 +84,14 @@ final class backup_restore_test extends \advanced_testcase {
             ['fraction' => 1.0, 'state' => 'gradedright', 'mark' => 1.0, 'maxmark' => 1.0]
         );
 
-        return [$course, $mavr, $cm, $question, $student, $attempt];
+        return [$course, $vrroom, $cm, $question, $student, $attempt];
     }
 
     /**
      * Back up a course (optionally with user data) and restore it into a new course.
      *
      * @param \stdClass $course the course
-     * @param \stdClass $cm the MAVR course module (its userinfo setting is forced too)
+     * @param \stdClass $cm the VR room course module (its userinfo setting is forced too)
      * @param bool $users include user data
      * @return int new course id
      */
@@ -108,7 +108,7 @@ final class backup_restore_test extends \advanced_testcase {
         $bc->get_plan()->get_setting('users')->set_status(\backup_setting::NOT_LOCKED);
         $bc->get_plan()->get_setting('users')->set_value($users);
         // In import mode the activity's userinfo setting does not follow the root setting.
-        $activitysetting = $bc->get_plan()->get_setting('mavr_' . $cm->id . '_userinfo');
+        $activitysetting = $bc->get_plan()->get_setting('vrroom_' . $cm->id . '_userinfo');
         $activitysetting->set_status(\backup_setting::NOT_LOCKED);
         $activitysetting->set_value($users);
         $backupid = $bc->get_backupid();
@@ -134,17 +134,17 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
-     * The restored MAVR activity of a course.
+     * The restored VR room activity of a course.
      *
      * @param int $courseid course id
-     * @return array [mavr row, cm_info]
+     * @return array [vrroom row, cm_info]
      */
     private function get_restored(int $courseid): array {
         global $DB;
-        $instances = get_fast_modinfo($courseid)->get_instances_of('mavr');
+        $instances = get_fast_modinfo($courseid)->get_instances_of('vrroom');
         $this->assertCount(1, $instances);
         $cm = reset($instances);
-        return [$DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST), $cm];
+        return [$DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST), $cm];
     }
 
     /**
@@ -154,35 +154,35 @@ final class backup_restore_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$course, $mavr, $cm, $question, $student, $attempt] = $this->create_setup();
+        [$course, $vrroom, $cm, $question, $student, $attempt] = $this->create_setup();
 
         $newcourseid = $this->backup_and_restore($course, $cm, true);
         [$new, $newcm] = $this->get_restored($newcourseid);
         $newcontext = \context_module::instance($newcm->id);
 
         // Activity settings and the graph are identical; ids are uuids, so nothing was remapped.
-        $this->assertSame($mavr->name, $new->name);
-        $this->assertSame($mavr->runtime, $new->runtime);
-        $this->assertSame($mavr->template, $new->template);
-        $this->assertEquals($mavr->graphversion, $new->graphversion);
-        $this->assertSame($mavr->graphjson, $new->graphjson);
+        $this->assertSame($vrroom->name, $new->name);
+        $this->assertSame($vrroom->runtime, $new->runtime);
+        $this->assertSame($vrroom->template, $new->template);
+        $this->assertEquals($vrroom->graphversion, $new->graphversion);
+        $this->assertSame($vrroom->graphjson, $new->graphjson);
         $this->assertEquals(
-            $DB->get_records_menu('mavr_graphs', ['mavrid' => $mavr->id], 'version', 'version, graphjson'),
-            $DB->get_records_menu('mavr_graphs', ['mavrid' => $new->id], 'version', 'version, graphjson')
+            $DB->get_records_menu('vrroom_graphs', ['vrroomid' => $vrroom->id], 'version', 'version, graphjson'),
+            $DB->get_records_menu('vrroom_graphs', ['vrroomid' => $new->id], 'version', 'version, graphjson')
         );
         $this->assertEquals(
-            $DB->get_records_menu('mavr_scenes', ['mavrid' => $mavr->id], 'sortorder', 'idnumber, scenejson'),
-            $DB->get_records_menu('mavr_scenes', ['mavrid' => $new->id], 'sortorder', 'idnumber, scenejson')
+            $DB->get_records_menu('vrroom_scenes', ['vrroomid' => $vrroom->id], 'sortorder', 'idnumber, scenejson'),
+            $DB->get_records_menu('vrroom_scenes', ['vrroomid' => $new->id], 'sortorder', 'idnumber, scenejson')
         );
 
         // The slot and its reference point at the new activity and a remapped bank entry.
-        $slots = $DB->get_records('mavr_slots', ['mavrid' => $new->id]);
+        $slots = $DB->get_records('vrroom_slots', ['vrroomid' => $new->id]);
         $this->assertCount(1, $slots);
         $slot = reset($slots);
         $this->assertEquals(1, $slot->slot);
         $reference = $DB->get_record(
             'question_references',
-            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id],
+            ['component' => 'mod_vrroom', 'questionarea' => 'slot', 'itemid' => $slot->id],
             '*',
             MUST_EXIST
         );
@@ -204,7 +204,7 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertEquals($reference->questionbankentryid, $config->stations[0]->questionbankentryid);
 
         // The attempt, its usage and its events came across.
-        $attempts = $DB->get_records('mavr_attempts', ['mavrid' => $new->id]);
+        $attempts = $DB->get_records('vrroom_attempts', ['vrroomid' => $new->id]);
         $this->assertCount(1, $attempts);
         $newattempt = reset($attempts);
         $this->assertEquals($student->id, $newattempt->userid);
@@ -213,12 +213,12 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertEquals($attempt->graphversion, $newattempt->graphversion);
         $this->assertNotEquals($attempt->uniqueid, $newattempt->uniqueid);
         $usage = $DB->get_record('question_usages', ['id' => $newattempt->uniqueid], '*', MUST_EXIST);
-        $this->assertSame('mod_mavr', $usage->component);
+        $this->assertSame('mod_vrroom', $usage->component);
         $this->assertEquals($newcontext->id, $usage->contextid);
         $this->assertEquals(1, $DB->count_records('question_attempts', ['questionusageid' => $usage->id]));
 
-        $oldevents = $DB->get_records('mavr_events', ['attemptid' => $attempt->id], 'id ASC');
-        $newevents = $DB->get_records('mavr_events', ['attemptid' => $newattempt->id], 'id ASC');
+        $oldevents = $DB->get_records('vrroom_events', ['attemptid' => $attempt->id], 'id ASC');
+        $newevents = $DB->get_records('vrroom_events', ['attemptid' => $newattempt->id], 'id ASC');
         $this->assertSame(array_column($oldevents, 'verb'), array_column($newevents, 'verb'));
         $this->assertSame(array_column($oldevents, 'objectid'), array_column($newevents, 'objectid'));
         $this->assertSame(array_column($oldevents, 'clientasserted'), array_column($newevents, 'clientasserted'));
@@ -230,7 +230,7 @@ final class backup_restore_test extends \advanced_testcase {
 
         // A replay of the restored attempt gives the same score.
         $this->assertEqualsWithDelta((float)$attempt->score, (float)$newattempt->score, 1e-6);
-        $restoredresult = \mod_mavr\local\attempt\attempt_manager::evaluate($newattempt);
+        $restoredresult = \mod_vrroom\local\attempt\attempt_manager::evaluate($newattempt);
         $this->assertEqualsWithDelta((float)$attempt->score, $restoredresult->score, 1e-6);
     }
 
@@ -241,17 +241,17 @@ final class backup_restore_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$course, $mavr, $cm] = $this->create_setup();
+        [$course, $vrroom, $cm] = $this->create_setup();
 
         $newcourseid = $this->backup_and_restore($course, $cm, false);
         [$new, $newcm] = $this->get_restored($newcourseid);
 
-        $this->assertSame($mavr->graphjson, $new->graphjson);
-        $this->assertEquals(1, $DB->count_records('mavr_slots', ['mavrid' => $new->id]));
-        $this->assertEquals(0, $DB->count_records('mavr_attempts', ['mavrid' => $new->id]));
+        $this->assertSame($vrroom->graphjson, $new->graphjson);
+        $this->assertEquals(1, $DB->count_records('vrroom_slots', ['vrroomid' => $new->id]));
+        $this->assertEquals(0, $DB->count_records('vrroom_attempts', ['vrroomid' => $new->id]));
         $this->assertEquals(0, $DB->count_records(
             'question_usages',
-            ['component' => 'mod_mavr', 'contextid' => \context_module::instance($newcm->id)->id]
+            ['component' => 'mod_vrroom', 'contextid' => \context_module::instance($newcm->id)->id]
         ));
     }
 
@@ -263,16 +263,16 @@ final class backup_restore_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$course, $mavr, $cm, , , $attempt] = $this->create_setup();
+        [$course, $vrroom, $cm, , , $attempt] = $this->create_setup();
 
         $customised = time() - 3600;
         $timedue = (int)$attempt->timestart + 900;
-        $DB->set_field('mavr', 'customised', $customised, ['id' => $mavr->id]);
-        $DB->set_field('mavr_attempts', 'timedue', $timedue, ['id' => $attempt->id]);
+        $DB->set_field('vrroom', 'customised', $customised, ['id' => $vrroom->id]);
+        $DB->set_field('vrroom_attempts', 'timedue', $timedue, ['id' => $attempt->id]);
         $context = \context_module::instance($cm->id);
         get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
             'filearea' => 'assets',
             'itemid' => 4,
             'filepath' => '/',
@@ -284,11 +284,11 @@ final class backup_restore_test extends \advanced_testcase {
         $newcontext = \context_module::instance($newcm->id);
 
         $this->assertEquals($customised, $new->customised);
-        $newattempt = $DB->get_record('mavr_attempts', ['mavrid' => $new->id], '*', MUST_EXIST);
+        $newattempt = $DB->get_record('vrroom_attempts', ['vrroomid' => $new->id], '*', MUST_EXIST);
         $this->assertEquals($timedue, $newattempt->timedue);
         $this->assertEquals($attempt->timestart, $newattempt->timestart);
 
-        $file = get_file_storage()->get_file($newcontext->id, 'mod_mavr', 'assets', 4, '/', 'tape.mp3');
+        $file = get_file_storage()->get_file($newcontext->id, 'mod_vrroom', 'assets', 4, '/', 'tape.mp3');
         $this->assertNotFalse($file);
         $this->assertSame('not really audio', $file->get_content());
     }
@@ -301,23 +301,23 @@ final class backup_restore_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
-        [$course, $mavr, $cm, , $student, $attempt] = $this->create_setup();
+        [$course, $vrroom, $cm, , $student, $attempt] = $this->create_setup();
 
-        $DB->update_record('mavr', (object)['id' => $mavr->id, 'livemode' => 1, 'livemaxusers' => 4]);
-        /** @var \mavrruntime_builtin_generator $livegen */
-        $livegen = $this->getDataGenerator()->get_plugin_generator('mavrruntime_builtin');
-        $peer = $livegen->create_peer(['mavrid' => $mavr->id, 'userid' => $student->id, 'attemptid' => $attempt->id]);
-        $livegen->create_signal(['mavrid' => $mavr->id, 'frompeer' => $peer->peerid, 'topeer' => str_repeat('d', 32)]);
+        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'livemode' => 1, 'livemaxusers' => 4]);
+        /** @var \vrroomruntime_builtin_generator $livegen */
+        $livegen = $this->getDataGenerator()->get_plugin_generator('vrroomruntime_builtin');
+        $peer = $livegen->create_peer(['vrroomid' => $vrroom->id, 'userid' => $student->id, 'attemptid' => $attempt->id]);
+        $livegen->create_signal(['vrroomid' => $vrroom->id, 'frompeer' => $peer->peerid, 'topeer' => str_repeat('d', 32)]);
 
         $newcourseid = $this->backup_and_restore($course, $cm, true);
         [$new] = $this->get_restored($newcourseid);
 
         $this->assertEquals(1, $new->livemode);
         $this->assertEquals(4, $new->livemaxusers);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $new->id]));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $new->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $new->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals', ['vrroomid' => $new->id]));
         // The original room is untouched by the backup.
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $mavr->id]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $vrroom->id]));
     }
 
     /**
@@ -335,7 +335,7 @@ final class backup_restore_test extends \advanced_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'name' => 'Escape',
             'template' => 'escape',
@@ -343,24 +343,24 @@ final class backup_restore_test extends \advanced_testcase {
             'puzzlelocks' => 'key|question',
             'puzzlequestions' => '|Q1',
         ]);
-        $cm = get_coursemodule_from_id('mavr', $module->cmid, 0, false, MUST_EXIST);
-        $config = json_decode($DB->get_field('mavr', 'templateconfig', ['id' => $module->id]));
+        $cm = get_coursemodule_from_id('vrroom', $module->cmid, 0, false, MUST_EXIST);
+        $config = json_decode($DB->get_field('vrroom', 'templateconfig', ['id' => $module->id]));
         $this->assertEquals($question->questionbankentryid, $config->puzzles[1]->questionbankentryid);
 
         $newcourseid = $this->backup_and_restore($course, $cm, false);
         [$new] = $this->get_restored($newcourseid);
 
-        $slot = $DB->get_record('mavr_slots', ['mavrid' => $new->id], '*', MUST_EXIST);
+        $slot = $DB->get_record('vrroom_slots', ['vrroomid' => $new->id], '*', MUST_EXIST);
         $reference = $DB->get_record(
             'question_references',
-            ['component' => 'mod_mavr', 'questionarea' => 'slot', 'itemid' => $slot->id],
+            ['component' => 'mod_vrroom', 'questionarea' => 'slot', 'itemid' => $slot->id],
             '*',
             MUST_EXIST
         );
         $this->assertNotEquals($question->questionbankentryid, $reference->questionbankentryid);
 
         $newconfig = json_decode($new->templateconfig);
-        $this->assertSame('mavrtemplate_escape/1', $newconfig->schema);
+        $this->assertSame('vrroomtemplate_escape/1', $newconfig->schema);
         $this->assertEquals($reference->questionbankentryid, $newconfig->puzzles[1]->questionbankentryid);
         $this->assertEquals(0, $newconfig->puzzles[0]->questionbankentryid);
     }
@@ -371,8 +371,8 @@ final class backup_restore_test extends \advanced_testcase {
     public function test_encode_content_links(): void {
         global $CFG;
         $this->resetAfterTest();
-        $content = $CFG->wwwroot . '/mod/mavr/view.php?id=12 and ' . $CFG->wwwroot . '/mod/mavr/index.php?id=3';
-        $encoded = \backup_mavr_activity_task::encode_content_links($content);
-        $this->assertSame('$@MAVRVIEWBYID*12@$ and $@MAVRINDEX*3@$', $encoded);
+        $content = $CFG->wwwroot . '/mod/vrroom/view.php?id=12 and ' . $CFG->wwwroot . '/mod/vrroom/index.php?id=3';
+        $encoded = \backup_vrroom_activity_task::encode_content_links($content);
+        $this->assertSame('$@VR roomVIEWBYID*12@$ and $@VR roomINDEX*3@$', $encoded);
     }
 }

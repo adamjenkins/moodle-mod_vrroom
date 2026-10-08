@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_escape\local;
+namespace vrroomtemplate_escape\local;
 
 /**
  * Puzzle and exit placement for the Escape chain template.
  *
- * Coordinates follow mavr-scene/1: metres, Y up, yaw in degrees about Y; an object at yaw θ
+ * Coordinates follow vrroom-scene/1: metres, Y up, yaw in degrees about Y; an object at yaw θ
  * faces (sin θ, 0, cos θ). A spawn point at yaw θ looks along (−sin θ, 0, −cos θ). Puzzles take
  * the preset's anchors in their stored order; the exit door takes the preset's "exit" anchor.
  *
- * @package    mavrtemplate_escape
+ * @package    vrroomtemplate_escape
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -36,7 +36,7 @@ final class layout {
      *
      * The caller checks that the preset has enough anchors.
      *
-     * @param array $preset preset definition from \mod_mavr\local\scene\presets::get()
+     * @param array $preset preset definition from \mod_vrroom\local\scene\presets::get()
      * @param int $count number of puzzles
      * @return array[] list of ['position' => [x, y, z], 'yaw' => degrees]
      */

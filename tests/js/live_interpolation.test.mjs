@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Tests of the live room pose interpolation (mavrruntime_builtin/live/interpolation).
+ * Tests of the live room pose interpolation (vrroomruntime_builtin/live/interpolation).
  *
  * Run from the repository root: node --test tests/js/live_interpolation.test.mjs
  *

@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\attempt;
+namespace mod_vrroom\local\attempt;
 
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\questions\slots;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\slots;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * Tests of the objective hints.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -37,7 +37,7 @@ final class hint_manager_test extends \advanced_testcase {
      * Graph: v-1 visits the station; x-1 (2 points, after v-1) uses the station's first object and
      * has two hints of 0.5 points; v-2 (no hints) is a second visit of the same station.
      *
-     * @return \stdClass course, module, mavr, context, student, attempt, zone, target, sceneid
+     * @return \stdClass course, module, vrroom, context, student, attempt, zone, target, sceneid
      */
     private function setup_attempt(): \stdClass {
         global $DB;
@@ -45,7 +45,7 @@ final class hint_manager_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'gallery',
             'stations' => [
@@ -53,14 +53,14 @@ final class hint_manager_test extends \advanced_testcase {
                     'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $context = \context_module::instance((int)$module->cmid);
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $zone = (string)$scene['zones'][0]['id'];
         $target = (string)$scene['interactables'][0]['id'];
 
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'hidden' => [],
             'objectives' => [
                 ['id' => 'v-1', 'type' => 'visit_zone', 'title' => 'Visit', 'zone' => $zone, 'points' => 0,
@@ -75,19 +75,19 @@ final class hint_manager_test extends \advanced_testcase {
             ],
             'rules' => [],
         ];
-        $this->assertSame([], \mod_mavr\local\graph\graph_validator::validate($graph));
-        $this->assertSame([], slots::get_slots((int)$mavr->id, $context));
-        instance_manager::apply_compiled($mavr, $context, new compiled_activity([$scene], $graph, []));
+        $this->assertSame([], \mod_vrroom\local\graph\graph_validator::validate($graph));
+        $this->assertSame([], slots::get_slots((int)$vrroom->id, $context));
+        instance_manager::apply_compiled($vrroom, $context, new compiled_activity([$scene], $graph, []));
 
         $student = $generator->create_and_enrol($course, 'student');
         $this->setUser($student);
         $cm = get_fast_modinfo($course)->get_cm((int)$module->cmid);
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
 
         return (object) [
             'course' => $course,
             'module' => $module,
-            'mavr' => $mavr,
+            'vrroom' => $vrroom,
             'context' => $context,
             'student' => $student,
             'attempt' => $attempt,
@@ -138,7 +138,7 @@ final class hint_manager_test extends \advanced_testcase {
     public function test_strip_texts(): void {
         $this->resetAfterTest();
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'x-1', 'type' => 'interact', 'title' => 'Use', 'target' => 'g-1',
                     'hints' => [['id' => 'hn-1', 'text' => 'Secret', 'penalty' => 0.5], ['id' => 'hn-2', 'text' => 'More']]],
@@ -150,8 +150,8 @@ final class hint_manager_test extends \advanced_testcase {
         $this->assertSame([['id' => 'hn-1', 'penalty' => 0.5], ['id' => 'hn-2']], $stripped['objectives'][0]['hints']);
         $this->assertSame($graph['objectives'][1], $stripped['objectives'][1]);
         $this->assertStringNotContainsString('Secret', json_encode($stripped));
-        $this->assertSame([], \mod_mavr\local\graph\graph_validator::validate($graph));
-        $this->assertSame(['schema' => 'mavr-graph/1'], hint_manager::strip_texts(['schema' => 'mavr-graph/1']));
+        $this->assertSame([], \mod_vrroom\local\graph\graph_validator::validate($graph));
+        $this->assertSame(['schema' => 'vrroom-graph/1'], hint_manager::strip_texts(['schema' => 'vrroom-graph/1']));
     }
 
     /**
@@ -160,7 +160,7 @@ final class hint_manager_test extends \advanced_testcase {
     public function test_plain_text(): void {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
-        $module = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id]);
+        $module = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id]);
         $context = \context_module::instance((int)$module->cmid);
         $this->assertSame('First hint & more', hint_manager::plain_text('First <b>hint</b> &amp; more', $context));
         $this->assertSame('a < b', hint_manager::plain_text('a &lt; b', $context));
@@ -177,7 +177,7 @@ final class hint_manager_test extends \advanced_testcase {
         $this->assert_error('errorhintlocked', fn() => hint_manager::request($fx->attempt, 'x-1', $fx->context));
         $this->assert_error('errorhintunknown', fn() => hint_manager::request($fx->attempt, 'v-2', $fx->context));
         $this->assert_error('errorhintunknown', fn() => hint_manager::request($fx->attempt, 'nope', $fx->context));
-        $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $fx->attempt->id, 'verb' => 'requested']));
+        $this->assertFalse($DB->record_exists('vrroom_events', ['attemptid' => $fx->attempt->id, 'verb' => 'requested']));
 
         $this->record($fx, 'entered', 'zone', $fx->zone);
         $first = hint_manager::request($fx->attempt, 'x-1', $fx->context);
@@ -195,7 +195,7 @@ final class hint_manager_test extends \advanced_testcase {
         $this->assert_error('errornomorehints', fn() => hint_manager::request($fx->attempt, 'x-1', $fx->context));
 
         $rows = array_values($DB->get_records(
-            'mavr_events',
+            'vrroom_events',
             ['attemptid' => $fx->attempt->id, 'verb' => 'requested'],
             'id ASC'
         ));
@@ -211,7 +211,7 @@ final class hint_manager_test extends \advanced_testcase {
         $this->assertSame(evaluator::OBJECTIVE_COMPLETED, $result->objectives['x-1']['status']);
         $this->assertEqualsWithDelta(1.0, $result->objectives['x-1']['earned'], 1e-6);
         $this->assertEqualsWithDelta(0.5, $result->score, 1e-6);
-        $this->assertEqualsWithDelta(0.5, (float)$DB->get_field('mavr_attempts', 'score', ['id' => $fx->attempt->id]), 1e-6);
+        $this->assertEqualsWithDelta(0.5, (float)$DB->get_field('vrroom_attempts', 'score', ['id' => $fx->attempt->id]), 1e-6);
 
         $this->assert_error('errorhintcompleted', fn() => hint_manager::request($fx->attempt, 'x-1', $fx->context));
     }
@@ -236,6 +236,6 @@ final class hint_manager_test extends \advanced_testcase {
         );
 
         // A graph without hints has none to release.
-        $this->assertSame([], hint_manager::launch_hints(['schema' => 'mavr-graph/1', 'objectives' => []], [], $fx->context));
+        $this->assertSame([], hint_manager::launch_hints(['schema' => 'vrroom-graph/1', 'objectives' => []], [], $fx->context));
     }
 }

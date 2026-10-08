@@ -15,16 +15,16 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version details for mod_mavr.
+ * Version details for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'mod_mavr';
+$plugin->component = 'mod_vrroom';
 $plugin->version = 2026100800;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;

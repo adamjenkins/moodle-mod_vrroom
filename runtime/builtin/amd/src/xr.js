@@ -20,7 +20,7 @@
  *
  * The isSessionSupported() detection and the AR session with hit-test follow mod_gear's viewer.
  *
- * @module     mavrruntime_builtin/xr
+ * @module     vrroomruntime_builtin/xr
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -273,7 +273,7 @@ export const createXr = (renderer, options = {}) => {
  * The wrist panel: a small canvas board with progress and time left, and an Exit button.
  *
  * It is attached to the left controller grip by the viewer; the button plane carries
- * userData.mavrWristAction = 'exit'.
+ * userData.vrroomWristAction = 'exit'.
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} options {exitlabel}
@@ -281,7 +281,7 @@ export const createXr = (renderer, options = {}) => {
  */
 export const createWristPanel = (THREE, options = {}) => {
     const group = new THREE.Group();
-    group.name = 'mavr-wrist';
+    group.name = 'vrroom-wrist';
     // Above the back of the left hand, tilted towards the eyes.
     group.position.set(0, 0.06, 0.06);
     group.rotation.set(-Math.PI / 3, 0, 0);
@@ -317,7 +317,7 @@ export const createWristPanel = (THREE, options = {}) => {
     );
     button.position.set(0, -0.048, 0.001);
     button.renderOrder = 11;
-    button.userData.mavrWristAction = 'exit';
+    button.userData.vrroomWristAction = 'exit';
     group.add(button);
 
     let current = '';
@@ -353,7 +353,7 @@ export const createWristPanel = (THREE, options = {}) => {
          * @param {Object} object3d Hit object.
          * @returns {boolean}
          */
-        isExit: (object3d) => !!object3d && object3d.userData.mavrWristAction === 'exit',
+        isExit: (object3d) => !!object3d && object3d.userData.vrroomWristAction === 'exit',
 
         /**
          * Show lines of plain text (redrawn only when they change).

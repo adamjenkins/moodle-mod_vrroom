@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled tasks of the MAVR built-in viewer run mode.
+ * Scheduled tasks of the VR room built-in viewer run mode.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
     [
-        'classname' => 'mavrruntime_builtin\task\purge_live',
+        'classname' => 'vrroomruntime_builtin\task\purge_live',
         'blocking' => 0,
         'minute' => '*',
         'hour' => '*',

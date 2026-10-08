@@ -2,7 +2,7 @@
   "name": "zero_points_required_ratio",
   "intent": "maxpoints 0, so score = requireddone / requiredtotal (2/3 = 0.66667).",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

@@ -17,15 +17,15 @@
 /**
  * Objective hints: hidden from students until requested, released one by one by the server.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace mod_mavr\local\attempt;
+namespace mod_vrroom\local\attempt;
 
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\instance_manager;
 
 /**
  * Objective hints (Phase 2 contract §3.2, §4.2.2).
@@ -35,7 +35,7 @@ use mod_mavr\local\instance_manager;
  * texts; each text is released by {@see self::request()} and, after a reload, by
  * {@see self::launch_hints()} for the hints already requested.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -46,7 +46,7 @@ final class hint_manager {
     /**
      * The graph without hint texts (ids and penalties kept).
      *
-     * @param array $graph decoded mavr-graph/1
+     * @param array $graph decoded vrroom-graph/1
      * @return array the same graph with every objective's hints[].text removed
      */
     public static function strip_texts(array $graph): array {
@@ -99,32 +99,32 @@ final class hint_manager {
      * The caller has checked that the attempt is the user's own, open and within its time
      * (attempt_manager::require_own_open_attempt()).
      *
-     * @param \stdClass $attempt mavr_attempts row (open)
+     * @param \stdClass $attempt vrroom_attempts row (open)
      * @param string $objectiveid objective id from the client
      * @param \context_module $context module context of the attempt
      * @return array ['hintid' => string, 'text' => string, 'hintsused' => int, 'hintstotal' => int,
-     *     'result' => \mod_mavr\local\graph\evaluation_result]
+     *     'result' => \mod_vrroom\local\graph\evaluation_result]
      * @throws \moodle_exception errorhintunknown, errorhintlocked, errorhintcompleted, errornomorehints
      */
     public static function request(\stdClass $attempt, string $objectiveid, \context_module $context): array {
-        $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
+        $graph = instance_manager::get_graph((int)$attempt->vrroomid, (int)$attempt->graphversion);
         $objectives = self::objectives_with_hints($graph);
         if (!array_key_exists($objectiveid, $objectives)) {
-            throw new \moodle_exception('errorhintunknown', 'mod_mavr');
+            throw new \moodle_exception('errorhintunknown', 'mod_vrroom');
         }
         $hints = $objectives[$objectiveid];
 
         $result = attempt_manager::recompute($attempt);
         $status = (string)($result->objectives[$objectiveid]['status'] ?? evaluator::OBJECTIVE_LOCKED);
         if ($status === evaluator::OBJECTIVE_LOCKED) {
-            throw new \moodle_exception('errorhintlocked', 'mod_mavr');
+            throw new \moodle_exception('errorhintlocked', 'mod_vrroom');
         }
         if ($status === evaluator::OBJECTIVE_COMPLETED) {
-            throw new \moodle_exception('errorhintcompleted', 'mod_mavr');
+            throw new \moodle_exception('errorhintcompleted', 'mod_vrroom');
         }
         $used = (int)($result->objectives[$objectiveid]['hintsused'] ?? 0);
         if ($used >= count($hints)) {
-            throw new \moodle_exception('errornomorehints', 'mod_mavr');
+            throw new \moodle_exception('errornomorehints', 'mod_vrroom');
         }
         $hint = $hints[$used];
         $penalty = $hint['penalty'] ?? 0;
@@ -168,7 +168,7 @@ final class hint_manager {
      *
      * Hints without a string id are left out (a validated graph has none).
      *
-     * @param array $graph decoded mavr-graph/1
+     * @param array $graph decoded vrroom-graph/1
      * @return array objective id => list of hint arrays, in graph order
      */
     private static function objectives_with_hints(array $graph): array {

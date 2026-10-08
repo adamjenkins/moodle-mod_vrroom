@@ -15,9 +15,9 @@
 
 /**
  * Files of the room editor: the list the server sent, lookups, and uploads through Moodle's file
- * picker in a modal form (mod_mavr\form\asset_upload).
+ * picker in a modal form (mod_vrroom\form\asset_upload).
  *
- * @module     mod_mavr/editor_assets
+ * @module     mod_vrroom/editor_assets
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -113,9 +113,9 @@ export const findAsset = (assets, ref) => assets.find((a) => sameRef(a, ref)) ||
  */
 export const upload = (cmid, kind, assets, returnfocus) => new Promise((resolve) => {
     const form = new ModalForm({
-        formClass: 'mod_mavr\\form\\asset_upload',
+        formClass: 'mod_vrroom\\form\\asset_upload',
         args: {cmid: cmid, kind: kind},
-        modalConfig: {title: getString('editoruploadtitle', 'mod_mavr')},
+        modalConfig: {title: getString('editoruploadtitle', 'mod_vrroom')},
         returnFocus: returnfocus || null,
     });
     let done = false;

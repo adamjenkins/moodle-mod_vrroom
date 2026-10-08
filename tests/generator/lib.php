@@ -15,18 +15,18 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Data generator for mod_mavr.
+ * Data generator for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
 
 /**
- * Creates MAVR activities, attempts and statements for tests.
+ * Creates VR room activities, attempts and statements for tests.
  *
  * The template is $record->template: 'gallery' (the default), 'escape' or 'blank'. Any other
  * template gets the record as given.
@@ -50,13 +50,13 @@ use mod_mavr\local\attempt\event_store;
  * Everything is turned into the template's own form fields (gallery_*, escape_*, blank_*),
  * exactly as the activity form would submit them.
  */
-class mod_mavr_generator extends testing_module_generator {
+class mod_vrroom_generator extends testing_module_generator {
     /**
-     * Create a MAVR activity.
+     * Create a VR room activity.
      *
      * @param array|stdClass|null $record data for the module, see the class comment for stations
      * @param array|null $options general options for course module
-     * @return stdClass the mavr record with cmid
+     * @return stdClass the vrroom record with cmid
      */
     public function create_instance($record = null, ?array $options = null) {
         $record = (object)(array)$record;
@@ -263,15 +263,15 @@ class mod_mavr_generator extends testing_module_generator {
     /**
      * Start (or resume) an attempt of a user.
      *
-     * @param int $mavrid mavr id
+     * @param int $vrroomid vrroom id
      * @param int $userid user id
      * @return stdClass the attempt row
      */
-    public function create_attempt(int $mavrid, int $userid): stdClass {
+    public function create_attempt(int $vrroomid, int $userid): stdClass {
         global $DB;
-        $mavr = $DB->get_record('mavr', ['id' => $mavrid], '*', MUST_EXIST);
-        [, $cm] = get_course_and_cm_from_instance($mavr->id, 'mavr', $mavr->course);
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, $userid);
+        $vrroom = $DB->get_record('vrroom', ['id' => $vrroomid], '*', MUST_EXIST);
+        [, $cm] = get_course_and_cm_from_instance($vrroom->id, 'vrroom', $vrroom->course);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, $userid);
         return $attempt;
     }
 
@@ -285,7 +285,7 @@ class mod_mavr_generator extends testing_module_generator {
      * @param string|null $id object id
      * @param bool $clientasserted whether the browser reported it
      * @param array|null $result server result (e.g. ['fraction' => 1.0] for 'answered')
-     * @return int the new mavr_events id
+     * @return int the new vrroom_events id
      */
     public function record_event(
         stdClass $attempt,

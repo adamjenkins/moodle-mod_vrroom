@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Builds one room (a mavr-scene/1 document) as three.js objects. Shared by the built-in viewer
+ * Builds one room (a vrroom-scene/1 document) as three.js objects. Shared by the built-in viewer
  * and the room editor, so the editor shows exactly what students see.
  *
  * Split out of the built-in viewer, whose model loading, hotspot markers and labels follow
@@ -25,7 +25,7 @@
  * scaled by their size, so readTransform(object).scale of a prop or zone helper is its size;
  * spawn helpers turn by their yaw (yaw θ looks towards (−sin θ, 0, −cos θ)).
  *
- * @module     mavrruntime_builtin/scenebuilder
+ * @module     vrroomruntime_builtin/scenebuilder
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,8 +33,8 @@
 
 import Log from 'core/log';
 import {getString} from 'core/str';
-import {buildEnvironment} from 'mavrruntime_builtin/environment';
-import {plainText} from 'mavrruntime_builtin/util';
+import {buildEnvironment} from 'vrroomruntime_builtin/environment';
+import {plainText} from 'vrroomruntime_builtin/util';
 
 /** Degrees to radians. */
 export const DEG = Math.PI / 180;
@@ -172,10 +172,10 @@ export const disposeTree = (object) => {
 const setOpacity = (object, factor) => {
     object.traverse((child) => {
         materialsOf(child).forEach((material) => {
-            if (material.userData.mavrBase === undefined) {
-                material.userData.mavrBase = {opacity: material.opacity, transparent: material.transparent};
+            if (material.userData.vrroomBase === undefined) {
+                material.userData.vrroomBase = {opacity: material.opacity, transparent: material.transparent};
             }
-            const base = material.userData.mavrBase;
+            const base = material.userData.vrroomBase;
             const transparent = factor < 1 ? true : base.transparent;
             const opacity = base.opacity * factor;
             if (material.opacity !== opacity || material.transparent !== transparent) {
@@ -239,7 +239,7 @@ const allSettledToUndefined = (promises) => Promise.all(promises).then(() => und
  * onLoadError(error, item), roomName(sceneid) → string|null (portal labels).
  *
  * @param {Object} THREE three.js namespace.
- * @param {Object} scenedoc mavr-scene/1 document.
+ * @param {Object} scenedoc vrroom-scene/1 document.
  * @param {Object} options Options.
  * @returns {Promise<Object>} SceneHandle
  */
@@ -267,7 +267,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
     const roomName = (sceneid) => (options.roomName ? options.roomName(sceneid) : null);
 
     const root = new THREE.Group();
-    root.name = 'mavr-room';
+    root.name = 'vrroom-room';
     const items = new Map();
     const props = new Map();
     const zones = new Map();
@@ -348,7 +348,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
             new THREE.MeshBasicMaterial({color: COLOURS.placeholder, wireframe: true})
         );
         mesh.position.y = size / 2;
-        mesh.name = 'mavr-placeholder';
+        mesh.name = 'vrroom-placeholder';
         return mesh;
     };
 
@@ -502,7 +502,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         record.portal = plane;
         const target = item.target && typeof item.target === 'object' ? item.target : {};
         const name = plainText(roomName(target.scene) || '');
-        const labeltext = name ? getString('portalto', 'mavrruntime_builtin', name) : Promise.resolve(plainText(item.name || ''));
+        const labeltext = name ? getString('portalto', 'vrroomruntime_builtin', name) : Promise.resolve(plainText(item.name || ''));
         track(Promise.resolve(labeltext).then((text) => {
             if (disposed || record.disposed || !text) {
                 return;
@@ -637,9 +637,9 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
     const buildInteractable = (item) => {
         const group = new THREE.Group();
         applyTransform(group, {position: vec3(item.position, [0, 0, 0]), rotation: vec3(item.rotation, [0, 0, 0])});
-        group.userData.mavrItem = item.id;
-        group.userData.mavrKind = item.kind;
-        group.name = `mavr-item-${item.id}`;
+        group.userData.vrroomItem = item.id;
+        group.userData.vrroomKind = item.kind;
+        group.name = `vrroom-item-${item.id}`;
         const record = {item: item, kind: item.kind, group: group, pickable: group, sphere: null, label: null,
             media: null, portal: null, disposed: false};
         const before = loads.length;
@@ -679,8 +679,8 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         const size = vec3(prop.size, [1, 1, 1]).map((v) => (v > 0 ? v : 1));
         const mesh = primitive(prop.shape, size, colourOf(prop.color, COLOURS.prop));
         applyTransform(mesh, {position: vec3(prop.position, [0, 0, 0]), rotation: vec3(prop.rotation, [0, 0, 0])});
-        mesh.userData.mavrProp = prop.id;
-        mesh.name = `mavr-prop-${prop.id}`;
+        mesh.userData.vrroomProp = prop.id;
+        mesh.name = `vrroom-prop-${prop.id}`;
         root.add(mesh);
         const record = {prop: prop, mesh: mesh};
         props.set(prop.id, record);
@@ -701,8 +701,8 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         const s = vec3(zone.size, [2, 3, 2]).map((v) => (v > 0 ? v : 1));
         helper.position.set(c[0], c[1], c[2]);
         helper.scale.set(s[0], s[1], s[2]);
-        helper.userData.mavrZone = zone.id;
-        helper.name = `mavr-zone-${zone.id}`;
+        helper.userData.vrroomZone = zone.id;
+        helper.name = `vrroom-zone-${zone.id}`;
         root.add(helper);
         return helper;
     };
@@ -728,8 +728,8 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
             const p = vec3(spawn.position, [0, 0, 0]);
             helper.position.set(p[0], p[1], p[2]);
             helper.rotation.y = (Number(spawn.yaw) || 0) * DEG;
-            helper.userData.mavrSpawn = spawn.id;
-            helper.name = `mavr-spawn-${spawn.id}`;
+            helper.userData.vrroomSpawn = spawn.id;
+            helper.name = `vrroom-spawn-${spawn.id}`;
             root.add(helper);
         }
         spawns.set(spawn.id, {spawn: spawn, helper: helper});
@@ -895,17 +895,17 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
             let object = object3d;
             while (object) {
                 const data = object.userData || {};
-                if (data.mavrItem !== undefined) {
-                    return {kind: 'interactable', id: data.mavrItem};
+                if (data.vrroomItem !== undefined) {
+                    return {kind: 'interactable', id: data.vrroomItem};
                 }
-                if (data.mavrProp !== undefined) {
-                    return {kind: 'prop', id: data.mavrProp};
+                if (data.vrroomProp !== undefined) {
+                    return {kind: 'prop', id: data.vrroomProp};
                 }
-                if (data.mavrZone !== undefined) {
-                    return {kind: 'zone', id: data.mavrZone};
+                if (data.vrroomZone !== undefined) {
+                    return {kind: 'zone', id: data.vrroomZone};
                 }
-                if (data.mavrSpawn !== undefined) {
-                    return {kind: 'spawn', id: data.mavrSpawn};
+                if (data.vrroomSpawn !== undefined) {
+                    return {kind: 'spawn', id: data.vrroomSpawn};
                 }
                 if (object === root) {
                     return null;

@@ -21,7 +21,7 @@
  * off after network errors. Poll and send pass nosessionupdate, so an abandoned tab does not keep
  * the login alive. The server never trusts anything sent here beyond the peer id it issued.
  *
- * @module     mavrruntime_builtin/live/signalling
+ * @module     vrroomruntime_builtin/live/signalling
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -173,7 +173,7 @@ class Signalling {
             attemptid: this.attemptid,
             groupid: isFinite(group) && group > 0 ? Math.floor(group) : this.defaultgroupid,
         };
-        return call('mavrruntime_builtin_live_join', args, false).then((result) => {
+        return call('vrroomruntime_builtin_live_join', args, false).then((result) => {
             this.peerid = result.peerid;
             this.interval = clampInterval(result.interval);
             return result;
@@ -229,7 +229,7 @@ class Signalling {
         }
         const refreshice = this.refreshice;
         this.refreshice = false;
-        call('mavrruntime_builtin_live_poll', {peerid: this.peerid, refreshice: refreshice}, true).then((result) => {
+        call('vrroomruntime_builtin_live_poll', {peerid: this.peerid, refreshice: refreshice}, true).then((result) => {
             if (!this.running || token !== this.token) {
                 return;
             }
@@ -312,7 +312,7 @@ class Signalling {
         const batch = this.queue.splice(0, MAX_PER_CALL);
         const peerid = this.peerid;
         this.sending = true;
-        call('mavrruntime_builtin_live_send', {peerid: peerid, signals: batch}, true).then((result) => {
+        call('vrroomruntime_builtin_live_send', {peerid: peerid, signals: batch}, true).then((result) => {
             if (!result || result.status !== 'ok') {
                 const status = result && typeof result.status === 'string' ? result.status : 'gone';
                 batch.forEach((signal) => this.reportSendError({to: signal.to, type: signal.type, error: status}));
@@ -392,7 +392,7 @@ class Signalling {
         if (!peerid) {
             return Promise.resolve();
         }
-        return call('mavrruntime_builtin_live_leave', {peerid: peerid}, false).then(() => undefined, (exception) => {
+        return call('vrroomruntime_builtin_live_leave', {peerid: peerid}, false).then(() => undefined, (exception) => {
             Log.debug(exception);
         });
     }
@@ -409,8 +409,8 @@ class Signalling {
             return;
         }
         const url = M.cfg.wwwroot + '/lib/ajax/service.php?sesskey=' + encodeURIComponent(M.cfg.sesskey)
-            + '&info=mavrruntime_builtin_live_leave';
-        const body = JSON.stringify([{index: 0, methodname: 'mavrruntime_builtin_live_leave', args: {peerid: peerid}}]);
+            + '&info=vrroomruntime_builtin_live_leave';
+        const body = JSON.stringify([{index: 0, methodname: 'vrroomruntime_builtin_live_leave', args: {peerid: peerid}}]);
         try {
             if (typeof fetch === 'function') {
                 fetch(url, {

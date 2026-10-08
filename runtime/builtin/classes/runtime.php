@@ -17,37 +17,37 @@
 /**
  * The built-in viewer run mode.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace mavrruntime_builtin;
+namespace vrroomruntime_builtin;
 
-use mavrruntime_builtin\local\live\access;
-use mavrruntime_builtin\local\live\config;
-use mavrruntime_builtin\local\live\room_manager;
-use mod_mavr\local\launch\config_builder;
-use mod_mavr\local\runtime\base;
-use mod_mavr\local\runtime\cleanup_scope;
-use mod_mavr\local\runtime\launch_descriptor;
-use mod_mavr\local\runtime\readiness_result;
-use mod_mavr\local\runtime\runtime_capabilities;
+use vrroomruntime_builtin\local\live\access;
+use vrroomruntime_builtin\local\live\config;
+use vrroomruntime_builtin\local\live\room_manager;
+use mod_vrroom\local\launch\config_builder;
+use mod_vrroom\local\runtime\base;
+use mod_vrroom\local\runtime\cleanup_scope;
+use mod_vrroom\local\runtime\launch_descriptor;
+use mod_vrroom\local\runtime\readiness_result;
+use mod_vrroom\local\runtime\runtime_capabilities;
 
 /**
  * Built-in run mode: a three.js viewer inside the Moodle page, small live rooms, browser statements.
  *
  * Every person keeps their own attempt. With live mode on, up to six people can share a live
  * room where their browsers connect directly to each other for avatars and voice; Moodle only
- * relays the connection messages (\mavrruntime_builtin\local\live\room_manager).
+ * relays the connection messages (\vrroomruntime_builtin\local\live\room_manager).
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class runtime extends base {
     /** @var string AMD module that view.php boots. */
-    public const CLIENT_MODULE = 'mavrruntime_builtin/launch';
+    public const CLIENT_MODULE = 'vrroomruntime_builtin/launch';
 
     /** @var string Function of the AMD module that view.php calls. */
     public const CLIENT_FUNCTION = 'init';
@@ -83,7 +83,7 @@ class runtime extends base {
      * Inline launch: the client receives the launch config built by the activity.
      *
      * @param \cm_info $cm The course module.
-     * @param \stdClass $attempt The attempt row (mavr_attempts).
+     * @param \stdClass $attempt The attempt row (vrroom_attempts).
      * @param \stdClass $user The user who launches.
      * @return launch_descriptor
      */
@@ -120,20 +120,20 @@ class runtime extends base {
     public function cleanup(cleanup_scope $scope): void {
         switch ($scope->type) {
             case cleanup_scope::INSTANCE_DELETE:
-                if ($scope->mavrid > 0) {
-                    room_manager::purge_activity($scope->mavrid);
+                if ($scope->vrroomid > 0) {
+                    room_manager::purge_activity($scope->vrroomid);
                 }
                 break;
             case cleanup_scope::COURSE_RESET:
-                if ($scope->mavrid > 0) {
-                    room_manager::purge_activity($scope->mavrid);
+                if ($scope->vrroomid > 0) {
+                    room_manager::purge_activity($scope->vrroomid);
                 } else if ($scope->courseid > 0) {
                     room_manager::purge_course($scope->courseid);
                 }
                 break;
             case cleanup_scope::USER_DELETE:
                 if ($scope->userid > 0) {
-                    room_manager::purge_user($scope->userid, $scope->mavrid);
+                    room_manager::purge_user($scope->userid, $scope->vrroomid);
                 }
                 break;
         }
@@ -158,10 +158,10 @@ class runtime extends base {
      */
     protected function build_descriptor(\cm_info $cm, ?\stdClass $attempt, \stdClass $user): launch_descriptor {
         global $DB;
-        $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST);
         $context = \context_module::instance($cm->id);
-        $config = config_builder::build($cm, $context, $mavr, $attempt, $user);
-        $config['live'] = access::launch_block($cm, $context, $mavr, $attempt, $user);
+        $config = config_builder::build($cm, $context, $vrroom, $attempt, $user);
+        $config['live'] = access::launch_block($cm, $context, $vrroom, $attempt, $user);
         return new launch_descriptor(launch_descriptor::TYPE_INLINE, $config);
     }
 }

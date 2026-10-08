@@ -2,7 +2,7 @@
   "name": "unlock_action_cascade",
   "intent": "A rule unlock action forces a locked objective available, which fires an objective_unlocked rule; objectives available at initialisation fire no objective_unlocked trigger; a once rule does not re-fire.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

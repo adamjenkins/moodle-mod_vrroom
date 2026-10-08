@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\form;
+namespace mod_vrroom\form;
 
 /**
  * Tests of the room editor's upload form, submitted the way core_form/modalform submits it.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -38,7 +38,7 @@ final class asset_upload_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
         return (object)[
             'module' => $module,
             'context' => \context_module::instance($module->cmid),
@@ -83,7 +83,7 @@ final class asset_upload_test extends \advanced_testcase {
             'kind' => $kind,
             'assetfile' => $draftid,
             'sesskey' => sesskey(),
-            '_qf__mod_mavr_form_asset_upload' => 1,
+            '_qf__mod_vrroom_form_asset_upload' => 1,
         ], '', '&');
         return \core_form\external\dynamic_form::execute(asset_upload::class, $formdata);
     }
@@ -106,10 +106,10 @@ final class asset_upload_test extends \advanced_testcase {
             $this->assertSame('/', $asset['filepath']);
             $this->assertGreaterThan($itemid, $asset['itemid']);
             $itemid = $asset['itemid'];
-            $this->assertStringContainsString("/mod_mavr/assets/{$itemid}/{$filename}", $asset['url']);
+            $this->assertStringContainsString("/mod_vrroom/assets/{$itemid}/{$filename}", $asset['url']);
             $this->assertTrue(get_file_storage()->file_exists(
                 $fx->context->id,
-                'mod_mavr',
+                'mod_vrroom',
                 'assets',
                 $itemid,
                 '/',
@@ -133,7 +133,7 @@ final class asset_upload_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('erroreditorinvalid', $e->errorcode);
         }
-        $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_mavr', 'assets', false, 'id', false));
+        $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));
     }
 
     /**

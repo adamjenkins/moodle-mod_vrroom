@@ -15,11 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Site settings of the MAVR built-in viewer run mode (live mode).
+ * Site settings of the VR room built-in viewer run mode (live mode).
  *
- * Included by \mod_mavr\plugininfo\mavrruntime::load_settings(), which provides $settings.
+ * Included by \mod_vrroom\plugininfo\vrroomruntime::load_settings(), which provides $settings.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -28,43 +28,43 @@ defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_heading(
-        'mavrruntime_builtin/liveheading',
-        new lang_string('livesettings', 'mavrruntime_builtin'),
-        new lang_string('livesettings_desc', 'mavrruntime_builtin')
+        'vrroomruntime_builtin/liveheading',
+        new lang_string('livesettings', 'vrroomruntime_builtin'),
+        new lang_string('livesettings_desc', 'vrroomruntime_builtin')
     ));
 
     $settings->add(new admin_setting_configcheckbox(
-        'mavrruntime_builtin/liveenabled',
-        new lang_string('liveenabled', 'mavrruntime_builtin'),
-        new lang_string('liveenabled_desc', 'mavrruntime_builtin'),
+        'vrroomruntime_builtin/liveenabled',
+        new lang_string('liveenabled', 'vrroomruntime_builtin'),
+        new lang_string('liveenabled_desc', 'vrroomruntime_builtin'),
         1
     ));
 
-    $settings->add(new \mavrruntime_builtin\admin\setting_iceurls(
-        'mavrruntime_builtin/livestunurls',
-        new lang_string('livestunurls', 'mavrruntime_builtin'),
-        new lang_string('livestunurls_desc', 'mavrruntime_builtin'),
+    $settings->add(new \vrroomruntime_builtin\admin\setting_iceurls(
+        'vrroomruntime_builtin/livestunurls',
+        new lang_string('livestunurls', 'vrroomruntime_builtin'),
+        new lang_string('livestunurls_desc', 'vrroomruntime_builtin'),
         ['stun', 'stuns']
     ));
 
-    $settings->add(new \mavrruntime_builtin\admin\setting_iceurls(
-        'mavrruntime_builtin/liveturnurls',
-        new lang_string('liveturnurls', 'mavrruntime_builtin'),
-        new lang_string('liveturnurls_desc', 'mavrruntime_builtin'),
+    $settings->add(new \vrroomruntime_builtin\admin\setting_iceurls(
+        'vrroomruntime_builtin/liveturnurls',
+        new lang_string('liveturnurls', 'vrroomruntime_builtin'),
+        new lang_string('liveturnurls_desc', 'vrroomruntime_builtin'),
         ['turn', 'turns']
     ));
 
     $settings->add(new admin_setting_configpasswordunmask(
-        'mavrruntime_builtin/liveturnsecret',
-        new lang_string('liveturnsecret', 'mavrruntime_builtin'),
-        new lang_string('liveturnsecret_desc', 'mavrruntime_builtin'),
+        'vrroomruntime_builtin/liveturnsecret',
+        new lang_string('liveturnsecret', 'vrroomruntime_builtin'),
+        new lang_string('liveturnsecret_desc', 'vrroomruntime_builtin'),
         ''
     ));
 
     $settings->add(new admin_setting_configduration(
-        'mavrruntime_builtin/liveturnttl',
-        new lang_string('liveturnttl', 'mavrruntime_builtin'),
-        new lang_string('liveturnttl_desc', 'mavrruntime_builtin'),
-        \mavrruntime_builtin\local\live\config::DEFAULT_TURN_TTL
+        'vrroomruntime_builtin/liveturnttl',
+        new lang_string('liveturnttl', 'vrroomruntime_builtin'),
+        new lang_string('liveturnttl_desc', 'vrroomruntime_builtin'),
+        \vrroomruntime_builtin\local\live\config::DEFAULT_TURN_TTL
     ));
 }

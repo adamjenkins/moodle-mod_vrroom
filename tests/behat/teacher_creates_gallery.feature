@@ -1,8 +1,8 @@
-@mod @mod_mavr @javascript
+@mod @mod_vrroom @javascript
 Feature: A teacher builds a gallery walk with the form
   In order to give students a room to explore
   As a teacher
-  I need to create a MAVR gallery walk from the activity form
+  I need to create a VR room gallery walk from the activity form
 
   Background:
     Given the following "users" exist:
@@ -26,7 +26,7 @@ Feature: A teacher builds a gallery walk with the form
 
   Scenario: Create a gallery walk with two stations and one question
     Given I log in as "teacher1"
-    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1"
+    When I add a VR room activity using the "gallery" template to course "Course 1" section "1"
     And I set the following fields to these values:
       | Name             | Museum walk |
       | gallery_title[0] | Vase        |
@@ -35,16 +35,16 @@ Feature: A teacher builds a gallery walk with the form
     And I set the field "Question" in the "#fitem_id_gallery_question_0" "css_element" to "Q1"
     And I press "Save and return to course"
     Then I should see "Museum walk"
-    And I am on the "Museum walk" "mavr activity" page
+    And I am on the "Museum walk" "vrroom activity" page
     And I should see "Preview the list view"
     And I press "Preview the list view"
-    And the MAVR room is ready
-    And I should see "Vase" in the "[data-region='mavr-listview']" "css_element"
-    And I should see "Portrait" in the "[data-region='mavr-listview']" "css_element"
+    And the VR room room is ready
+    And I should see "Vase" in the "[data-region='vrroom-listview']" "css_element"
+    And I should see "Portrait" in the "[data-region='vrroom-listview']" "css_element"
 
   Scenario: Station titles are required
     Given I log in as "teacher1"
-    When I add a MAVR activity using the "gallery" template to course "Course 1" section "1"
+    When I add a VR room activity using the "gallery" template to course "Course 1" section "1"
     And I set the following fields to these values:
       | Name | Empty walk |
     And I press "Save and return to course"

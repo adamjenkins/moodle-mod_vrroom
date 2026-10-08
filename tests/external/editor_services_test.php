@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 
 /**
- * Tests of mod_mavr_editor_load and mod_mavr_editor_save.
+ * Tests of mod_vrroom_editor_load and mod_vrroom_editor_save.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -39,7 +39,7 @@ final class editor_services_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id, 'stationtitles' => 'Vase|Portrait']);
+        $module = $generator->create_module('vrroom', ['course' => $course->id, 'stationtitles' => 'Vase|Portrait']);
         return (object)[
             'course' => $course,
             'module' => $module,
@@ -87,7 +87,7 @@ final class editor_services_test extends \advanced_testcase {
         foreach (['documentjson', 'assetsjson', 'presetsjson', 'questionsjson', 'infojson'] as $key) {
             $this->assertIsArray(json_decode($loaded[$key], true), $key);
         }
-        $this->assertSame('mavr-editdoc/1', json_decode($loaded['documentjson'], true)['schema']);
+        $this->assertSame('vrroom-editdoc/1', json_decode($loaded['documentjson'], true)['schema']);
 
         $result = external_api::clean_returnvalue(
             editor_save::execute_returns(),
@@ -125,7 +125,7 @@ final class editor_services_test extends \advanced_testcase {
     }
 
     /**
-     * A course module that does not exist, or is not a MAVR activity, is refused.
+     * A course module that does not exist, or is not a VR room activity, is refused.
      */
     public function test_unknown_cmid(): void {
         $fx = $this->setup_activity();
@@ -148,7 +148,7 @@ final class editor_services_test extends \advanced_testcase {
         global $DB;
         $fx = $this->setup_activity();
         $loaded = $this->load_as_editor($fx);
-        $before = $DB->get_records('mavr_scenes', ['mavrid' => $fx->module->id]);
+        $before = $DB->get_records('vrroom_scenes', ['vrroomid' => $fx->module->id]);
         $document = json_decode(self::payload($loaded), true);
         $document['scenes'][0]['spawn'] = [];
 
@@ -158,7 +158,7 @@ final class editor_services_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('erroreditorinvalid', $e->errorcode);
         }
-        $this->assertEquals($before, $DB->get_records('mavr_scenes', ['mavrid' => $fx->module->id]));
-        $this->assertEquals(0, $DB->get_field('mavr', 'customised', ['id' => $fx->module->id]));
+        $this->assertEquals($before, $DB->get_records('vrroom_scenes', ['vrroomid' => $fx->module->id]));
+        $this->assertEquals(0, $DB->get_field('vrroom', 'customised', ['id' => $fx->module->id]));
     }
 }

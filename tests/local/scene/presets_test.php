@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\scene;
+namespace mod_vrroom\local\scene;
 
 /**
  * Tests for the bundled environment presets.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -57,9 +57,9 @@ final class presets_test extends \advanced_testcase {
      */
     public function test_choices(): void {
         $this->assertSame([
-            'gallery-hall' => get_string('preset_galleryhall', 'mod_mavr'),
-            'courtyard' => get_string('preset_courtyard', 'mod_mavr'),
-            'escape-room' => get_string('preset_escaperoom', 'mod_mavr'),
+            'gallery-hall' => get_string('preset_galleryhall', 'mod_vrroom'),
+            'courtyard' => get_string('preset_courtyard', 'mod_vrroom'),
+            'escape-room' => get_string('preset_escaperoom', 'mod_vrroom'),
         ], presets::get_choices());
     }
 

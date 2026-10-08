@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_escape\privacy;
+namespace vrroomtemplate_escape\privacy;
 
 /**
  * Privacy provider for the Escape chain template: it stores no personal data.
  *
  * The template only turns the teacher's form into a room and its tasks; attempts and
- * statements are stored (and exported/deleted) by mod_mavr.
+ * statements are stored (and exported/deleted) by mod_vrroom.
  *
- * @package    mavrtemplate_escape
+ * @package    vrroomtemplate_escape
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

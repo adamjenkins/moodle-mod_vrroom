@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\runtime\registry;
+use mod_vrroom\local\runtime\registry;
 
 /**
  * Launch descriptor for a teacher preview (no attempt, nothing recorded).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -51,21 +51,21 @@ class get_preview extends external_api {
         global $DB, $USER;
         ['cmid' => $cmid] = self::validate_parameters(self::execute_parameters(), ['cmid' => $cmid]);
 
-        [, $cm] = get_course_and_cm_from_cmid($cmid, 'mavr');
+        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrroom');
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
-        require_capability('mod/mavr:manage', $context);
+        require_capability('mod/vrroom:manage', $context);
 
-        $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
-        $runtime = registry::get((string)$mavr->runtime);
+        $vrroom = $DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST);
+        $runtime = registry::get((string)$vrroom->runtime);
         $readiness = $runtime->readiness();
         if (!$readiness->ready) {
-            throw new \moodle_exception('runtimenotready', 'mod_mavr', '', s($readiness->message));
+            throw new \moodle_exception('runtimenotready', 'mod_vrroom', '', s($readiness->message));
         }
         try {
             $descriptor = $runtime->preview($cm, $USER);
         } catch (\coding_exception $e) {
-            throw new \moodle_exception('errornopreview', 'mod_mavr');
+            throw new \moodle_exception('errornopreview', 'mod_vrroom');
         }
         return ['launchjson' => json_encode($descriptor->to_array())];
     }

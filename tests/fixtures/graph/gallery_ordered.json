@@ -2,7 +2,7 @@
   "name": "gallery_ordered",
   "intent": "Realistic 3-station ordered gallery compile (visit chain, questions, sequence, finish rule) with a full walk-through including server events (launched, completed objective) and early locked attempts.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "hidden": [],
     "objectives": [
       {

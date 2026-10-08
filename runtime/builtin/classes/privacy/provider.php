@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\privacy;
+namespace vrroomruntime_builtin\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
@@ -25,18 +25,18 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * Privacy provider for the MAVR built-in viewer run mode.
+ * Privacy provider for the VR room built-in viewer run mode.
  *
- * Personal data: the user's presence in a live room (mavrruntime_builtin_peers, kept only while the
+ * Personal data: the user's presence in a live room (vrroomruntime_builtin_peers, kept only while the
  * user is in the room) and the connection messages passed between the browsers of a room
- * (mavrruntime_builtin_signals, deleted when delivered or after 60 seconds). In a live room the
+ * (vrroomruntime_builtin_signals, deleted when delivered or after 60 seconds). In a live room the
  * browsers connect directly to each other, so the other participants (and any STUN or TURN server
  * the site sets up) receive the user's name, IP addresses, pose and voice: described as external
- * locations. The attempts themselves belong to mod_mavr.
+ * locations. The attempts themselves belong to mod_vrroom.
  *
  * Deletes use direct SQL so this provider does not depend on the live room classes.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -45,13 +45,13 @@ class provider implements
     \core_privacy\local\request\core_userlist_provider,
     \core_privacy\local\request\plugin\provider {
     /** @var string This component. */
-    private const COMPONENT = 'mavrruntime_builtin';
+    private const COMPONENT = 'vrroomruntime_builtin';
 
     /** @var string Live room presences. */
-    private const TABLE_PEERS = 'mavrruntime_builtin_peers';
+    private const TABLE_PEERS = 'vrroomruntime_builtin_peers';
 
     /** @var string Connection messages. */
-    private const TABLE_SIGNALS = 'mavrruntime_builtin_signals';
+    private const TABLE_SIGNALS = 'vrroomruntime_builtin_signals';
 
     /** @var int Peer ids per IN () chunk. */
     private const CHUNK = 500;
@@ -103,11 +103,11 @@ class provider implements
                   FROM {context} ctx
                   JOIN {course_modules} cm ON cm.id = ctx.instanceid AND ctx.contextlevel = :contextlevel
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
-                  JOIN {" . self::TABLE_PEERS . "} p ON p.mavrid = cm.instance
+                  JOIN {" . self::TABLE_PEERS . "} p ON p.vrroomid = cm.instance
                  WHERE p.userid = :userid";
         $contextlist->add_from_sql($sql, [
             'contextlevel' => CONTEXT_MODULE,
-            'modname' => 'mavr',
+            'modname' => 'vrroom',
             'userid' => $userid,
         ]);
         return $contextlist;
@@ -127,9 +127,9 @@ class provider implements
         $sql = "SELECT p.userid
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
-                  JOIN {" . self::TABLE_PEERS . "} p ON p.mavrid = cm.instance
+                  JOIN {" . self::TABLE_PEERS . "} p ON p.vrroomid = cm.instance
                  WHERE cm.id = :cmid";
-        $userlist->add_from_sql('userid', $sql, ['modname' => 'mavr', 'cmid' => $context->instanceid]);
+        $userlist->add_from_sql('userid', $sql, ['modname' => 'vrroom', 'cmid' => $context->instanceid]);
     }
 
     /**
@@ -143,11 +143,11 @@ class provider implements
 
         $userid = (int)$contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-            $mavrid = self::get_mavrid($context);
-            if ($mavrid === null) {
+            $vrroomid = self::get_vrroomid($context);
+            if ($vrroomid === null) {
                 continue;
             }
-            $peers = $DB->get_records(self::TABLE_PEERS, ['mavrid' => $mavrid, 'userid' => $userid], 'id ASC');
+            $peers = $DB->get_records(self::TABLE_PEERS, ['vrroomid' => $vrroomid, 'userid' => $userid], 'id ASC');
             if (!$peers) {
                 continue;
             }
@@ -168,8 +168,8 @@ class provider implements
             [$insql, $inparams] = $DB->get_in_or_equal($peerids, SQL_PARAMS_NAMED, 'peer');
             $rows = $DB->get_records_select(
                 self::TABLE_SIGNALS,
-                "mavrid = :mavrid AND frompeer {$insql}",
-                ['mavrid' => $mavrid] + $inparams,
+                "vrroomid = :vrroomid AND frompeer {$insql}",
+                ['vrroomid' => $vrroomid] + $inparams,
                 'id ASC',
                 'id, type, payload, timecreated'
             );
@@ -195,11 +195,11 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
-        $mavrid = self::get_mavrid($context);
-        if ($mavrid === null) {
+        $vrroomid = self::get_vrroomid($context);
+        if ($vrroomid === null) {
             return;
         }
-        self::delete_peers($mavrid, null);
+        self::delete_peers($vrroomid, null);
     }
 
     /**
@@ -211,11 +211,11 @@ class provider implements
     public static function delete_data_for_user(approved_contextlist $contextlist): void {
         $userid = (int)$contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-            $mavrid = self::get_mavrid($context);
-            if ($mavrid === null) {
+            $vrroomid = self::get_vrroomid($context);
+            if ($vrroomid === null) {
                 continue;
             }
-            self::delete_peers($mavrid, [$userid]);
+            self::delete_peers($vrroomid, [$userid]);
         }
     }
 
@@ -226,24 +226,24 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_users(approved_userlist $userlist): void {
-        $mavrid = self::get_mavrid($userlist->get_context());
-        if ($mavrid === null) {
+        $vrroomid = self::get_vrroomid($userlist->get_context());
+        if ($vrroomid === null) {
             return;
         }
         $userids = array_map('intval', $userlist->get_userids());
         if (!$userids) {
             return;
         }
-        self::delete_peers($mavrid, $userids);
+        self::delete_peers($vrroomid, $userids);
     }
 
     /**
-     * The mavr id behind a module context, or null when the context is not a MAVR activity.
+     * The vrroom id behind a module context, or null when the context is not a VR room activity.
      *
      * @param \context $context the context
      * @return int|null
      */
-    private static function get_mavrid(\context $context): ?int {
+    private static function get_vrroomid(\context $context): ?int {
         global $DB;
         if (!$context instanceof \context_module) {
             return null;
@@ -252,22 +252,22 @@ class provider implements
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
                  WHERE cm.id = :cmid";
-        $instance = $DB->get_field_sql($sql, ['modname' => 'mavr', 'cmid' => $context->instanceid]);
+        $instance = $DB->get_field_sql($sql, ['modname' => 'vrroom', 'cmid' => $context->instanceid]);
         return $instance === false ? null : (int)$instance;
     }
 
     /**
      * Delete presences of an activity with every message sent from or to them.
      *
-     * @param int $mavrid mavr id
+     * @param int $vrroomid vrroom id
      * @param int[]|null $userids users, or null for everyone
      * @return void
      */
-    private static function delete_peers(int $mavrid, ?array $userids): void {
+    private static function delete_peers(int $vrroomid, ?array $userids): void {
         global $DB;
 
-        $select = 'mavrid = :mavrid';
-        $params = ['mavrid' => $mavrid];
+        $select = 'vrroomid = :vrroomid';
+        $params = ['vrroomid' => $vrroomid];
         if ($userids !== null) {
             [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'user');
             $select .= " AND userid {$insql}";
@@ -277,7 +277,7 @@ class provider implements
 
         if ($userids === null) {
             // Everything of the activity, including messages of presences already gone.
-            $DB->delete_records(self::TABLE_SIGNALS, ['mavrid' => $mavrid]);
+            $DB->delete_records(self::TABLE_SIGNALS, ['vrroomid' => $vrroomid]);
         }
         foreach (array_chunk($peerids, self::CHUNK) as $chunk) {
             [$fromsql, $fromparams] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED, 'from');

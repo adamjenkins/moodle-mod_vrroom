@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local;
+namespace mod_vrroom\local;
 
 /**
  * Launch tokens for run modes that post statements through the server channel.
@@ -23,7 +23,7 @@ namespace mod_mavr\local;
  * "v1." + payload with the site secret). A token is bound to one user, course module and
  * attempt, and expires after the configured lifetime.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -40,9 +40,9 @@ final class token {
      * @return void
      */
     public static function ensure_secret(): void {
-        $secret = get_config('mod_mavr', 'tokensecret');
+        $secret = get_config('mod_vrroom', 'tokensecret');
         if (empty($secret) || strlen((string)$secret) < 32) {
-            set_config('tokensecret', random_string(64), 'mod_mavr');
+            set_config('tokensecret', random_string(64), 'mod_vrroom');
         }
     }
 
@@ -58,7 +58,7 @@ final class token {
     public static function issue(int $userid, int $cmid, int $attemptid, ?int $ttl = null): string {
         self::ensure_secret();
         if ($ttl === null) {
-            $ttl = (int)get_config('mod_mavr', 'tokenttl');
+            $ttl = (int)get_config('mod_vrroom', 'tokenttl');
             if ($ttl <= 0) {
                 $ttl = self::DEFAULT_TTL;
             }
@@ -126,7 +126,7 @@ final class token {
      * @return string
      */
     private static function secret(): string {
-        return (string)get_config('mod_mavr', 'tokensecret');
+        return (string)get_config('mod_vrroom', 'tokensecret');
     }
 
     /**

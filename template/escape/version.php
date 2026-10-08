@@ -17,18 +17,18 @@
 /**
  * Version details for the Escape chain template.
  *
- * @package    mavrtemplate_escape
+ * @package    vrroomtemplate_escape
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'mavrtemplate_escape';
+$plugin->component = 'vrroomtemplate_escape';
 $plugin->version = 2026100800;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 // Moodle 5.2.0 (the v5.2.0 tag's public/version.php: 2026042000.00).
 $plugin->requires = 2026042000;
 $plugin->supported = [502, 502];
-$plugin->dependencies = ['mod_mavr' => 2026100800];
+$plugin->dependencies = ['mod_vrroom' => 2026100800];

@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/question
+    @template vrroomruntime_builtin/question
 
     A question-bank question rendered by the question engine, with a submit button until it has
     been answered. The html is rendered by the server's question renderer.
@@ -40,15 +40,15 @@
     }
 }}
 {{#locked}}
-<p class="text-muted" data-region="mavr-question-locked">{{lockedmessage}}</p>
+<p class="text-muted" data-region="vrroom-question-locked">{{lockedmessage}}</p>
 {{/locked}}
 {{^locked}}
-<form class="mavr-question-form" data-region="mavr-question-form" data-slot="{{slot}}" data-double-submit-protection="off" novalidate>
-    <div data-region="mavr-question-html">{{{html}}}</div>
-    {{^answered}}<button type="submit" class="btn btn-primary mt-2" data-action="mavr-submit-question">{{#str}}submitanswer, mavrruntime_builtin{{/str}}</button>{{/answered}}
+<form class="vrroom-question-form" data-region="vrroom-question-form" data-slot="{{slot}}" data-double-submit-protection="off" novalidate>
+    <div data-region="vrroom-question-html">{{{html}}}</div>
+    {{^answered}}<button type="submit" class="btn btn-primary mt-2" data-action="vrroom-submit-question">{{#str}}submitanswer, vrroomruntime_builtin{{/str}}</button>{{/answered}}
 </form>
 {{#retry}}
-<p class="alert alert-warning mt-2" data-region="mavr-retry-notice">{{#str}}retrynotice, mavrruntime_builtin{{/str}}</p>
-<button type="button" class="btn btn-secondary mt-2" data-action="mavr-retry-question">{{#str}}tryagain, mavrruntime_builtin{{/str}}</button>
+<p class="alert alert-warning mt-2" data-region="vrroom-retry-notice">{{#str}}retrynotice, vrroomruntime_builtin{{/str}}</p>
+<button type="button" class="btn btn-secondary mt-2" data-action="vrroom-retry-question">{{#str}}tryagain, vrroomruntime_builtin{{/str}}</button>
 {{/retry}}
 {{/locked}}

@@ -15,7 +15,7 @@
 
 /**
  * Tests of the live-room message codec and the transport interface
- * (mavrruntime_builtin/live/codec and mavrruntime_builtin/live/transport).
+ * (vrroomruntime_builtin/live/codec and vrroomruntime_builtin/live/transport).
  *
  * Run from the repository root: node --test tests/js/live_codec.test.mjs
  *

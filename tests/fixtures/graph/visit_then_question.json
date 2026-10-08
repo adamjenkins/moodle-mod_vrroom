@@ -2,7 +2,7 @@
   "name": "visit_then_question",
   "intent": "A visit unlocks a question and opens it; a partial answer earns points x fraction (0.5 x 2 = 1).",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

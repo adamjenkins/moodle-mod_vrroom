@@ -2,7 +2,7 @@
   "name": "rules_show_hide",
   "intent": "Initial hidden list; show/hide via event rules (ignored events still trigger rules); once false re-fires; a once rule with wildcard verb and id fires only for the first object event; hidden output is sorted.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "hidden": [
       "t-9",
       "t-2",

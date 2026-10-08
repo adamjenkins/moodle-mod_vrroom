@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
- * The question usage behind one MAVR attempt.
+ * The question usage behind one VR room attempt.
  *
  * Every attempt owns one question_usage_by_activity. Questions are rendered and
  * graded only by the core question engine; the room just shows the HTML this
@@ -26,12 +26,12 @@ namespace mod_mavr\local\questions;
  * own slot number (a slot whose question has gone is simply absent from the
  * usage).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class usage {
-    /** @var string The question behaviour every MAVR usage uses. */
+    /** @var string The question behaviour every VR room usage uses. */
     public const BEHAVIOUR = 'immediatefeedback';
 
     /**
@@ -57,7 +57,7 @@ final class usage {
     public static function create(\context_module $context, array $slots): array {
         self::require_engine();
 
-        $quba = \question_engine::make_questions_usage_by_activity('mod_mavr', $context);
+        $quba = \question_engine::make_questions_usage_by_activity('mod_vrroom', $context);
         $quba->set_preferred_behaviour(self::BEHAVIOUR);
 
         ksort($slots);
@@ -101,7 +101,7 @@ final class usage {
      * core/fragment processCollectedJavascript. The client also wraps the HTML
      * in a form, because core's submit button code needs one.
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @param bool $feedback True for the graded feedback view (read-only).
      * @return array{0: string, 1: string} [html, javascript].
@@ -116,7 +116,7 @@ final class usage {
         $context = $quba->get_owning_context();
         $PAGE->set_context($context);
         if ($context instanceof \context_module && !$PAGE->has_set_url()) {
-            $PAGE->set_url('/mod/mavr/view.php', ['id' => $context->instanceid]);
+            $PAGE->set_url('/mod/vrroom/view.php', ['id' => $context->instanceid]);
         }
         $PAGE->initialise_theme_and_output();
         self::start_collecting_javascript();
@@ -143,7 +143,7 @@ final class usage {
      * still saved so the re-rendered question shows the engine's own validation
      * message, and the result reports finished = false.
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @param array $responses Either [['name' => ..., 'value' => ...], ...] (web service shape) or name => value.
      * @param int $timenow The time of the submission.
@@ -156,7 +156,7 @@ final class usage {
         $qa = $quba->get_question_attempt($slot);
 
         if ($qa->get_state()->is_finished()) {
-            throw new \moodle_exception('errorquestionanswered', 'mod_mavr');
+            throw new \moodle_exception('errorquestionanswered', 'mod_vrroom');
         }
 
         $prefix = $quba->get_field_prefix($slot);
@@ -177,7 +177,7 @@ final class usage {
             $quba->process_all_actions($timenow, $postdata);
         } catch (\question_out_of_sequence_exception $e) {
             // A stale form (another tab answered first). Nothing was changed.
-            throw new \moodle_exception('errorquestionanswered', 'mod_mavr');
+            throw new \moodle_exception('errorquestionanswered', 'mod_vrroom');
         }
         \question_engine::save_questions_usage_by_activity($quba);
 
@@ -205,7 +205,7 @@ final class usage {
      * so the attempt's slot map does not change. Nothing happens when the question is not
      * finished yet.
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @param int $timenow The time the new try starts.
      */
@@ -226,7 +226,7 @@ final class usage {
     /**
      * The current question attempt of a graph slot (for the in-world question view).
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid, slotmap).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @return \question_attempt The question attempt in the usage slot the slot map names.
      */
@@ -239,7 +239,7 @@ final class usage {
     /**
      * Close every question in an attempt's usage (unanswered ones become "gave up").
      *
-     * @param \stdClass $attempt The mavr_attempts record (uniqueid).
+     * @param \stdClass $attempt The vrroom_attempts record (uniqueid).
      * @param int $timenow The finish time.
      */
     public static function finish(\stdClass $attempt, int $timenow): void {
@@ -338,11 +338,11 @@ final class usage {
      */
     private static function load(\stdClass $attempt): \question_usage_by_activity {
         if (empty($attempt->uniqueid)) {
-            throw new \moodle_exception('questionmissing', 'mod_mavr');
+            throw new \moodle_exception('questionmissing', 'mod_vrroom');
         }
         $quba = \question_engine::load_questions_usage_by_activity((int)$attempt->uniqueid);
-        if ($quba->get_owning_component() !== 'mod_mavr') {
-            throw new \coding_exception('Question usage ' . $attempt->uniqueid . ' does not belong to mod_mavr.');
+        if ($quba->get_owning_component() !== 'mod_vrroom') {
+            throw new \coding_exception('Question usage ' . $attempt->uniqueid . ' does not belong to mod_vrroom.');
         }
         return $quba;
     }
@@ -358,7 +358,7 @@ final class usage {
     private static function usage_slot(\stdClass $attempt, \question_usage_by_activity $quba, int $graphslot): int {
         $slot = self::get_usage_slot($attempt, $graphslot);
         if ($slot === null || !in_array($slot, $quba->get_slots(), false)) {
-            throw new \moodle_exception('questionmissing', 'mod_mavr');
+            throw new \moodle_exception('questionmissing', 'mod_vrroom');
         }
         return $slot;
     }

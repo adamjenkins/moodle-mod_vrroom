@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Tests of mod_mavr_get_question and mod_mavr_submit_question.
+ * Tests of mod_vrroom_get_question and mod_vrroom_submit_question.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -46,7 +46,7 @@ final class question_services_test extends \advanced_testcase {
         $qgen = $generator->get_plugin_generator('core_question');
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id]);
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'stations' => [
                 ['title' => 'Vase', 'text' => '<p>Vase</p>', 'questionbankentryid' => (int)$question->questionbankentryid,
@@ -161,7 +161,7 @@ final class question_services_test extends \advanced_testcase {
             'errorquestionlocked',
             fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '1'))
         );
-        $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
+        $this->assertFalse($DB->record_exists('vrroom_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
 
         $this->visit($fx);
 
@@ -171,7 +171,7 @@ final class question_services_test extends \advanced_testcase {
             submit_question::execute($attemptid, $fx->slot, $this->responses($fx, ''))
         );
         $this->assertNull($result['fraction'] ?? null);
-        $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
+        $this->assertFalse($DB->record_exists('vrroom_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
 
         $result = external_api::clean_returnvalue(
@@ -183,7 +183,7 @@ final class question_services_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(2.0, $result['state']['earnedpoints'], 1e-6);
         $this->assertEqualsWithDelta(1.0, $result['state']['score'], 1e-6);
 
-        $answered = $DB->get_records('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']);
+        $answered = $DB->get_records('vrroom_events', ['attemptid' => $attemptid, 'verb' => 'answered']);
         $this->assertCount(1, $answered);
         $row = reset($answered);
         $this->assertEquals(0, $row->clientasserted);
@@ -195,7 +195,7 @@ final class question_services_test extends \advanced_testcase {
             'errorquestionanswered',
             fn() => submit_question::execute($attemptid, $fx->slot, $this->responses($fx, '0'))
         );
-        $this->assertCount(1, $DB->get_records('mavr_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
+        $this->assertCount(1, $DB->get_records('vrroom_events', ['attemptid' => $attemptid, 'verb' => 'answered']));
 
         // The answered question renders with feedback.
         $result = get_question::execute($attemptid, $fx->slot);

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/mavr/runtime/builtin/db" VERSION="2026100800" COMMENT="XMLDB file for the MAVR built-in run mode (live rooms)"
+<XMLDB PATH="mod/vrroom/runtime/builtin/db" VERSION="2026100800" COMMENT="XMLDB file for the VR room built-in run mode (live rooms)"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../../../lib/xmldb/xmldb.xsd"
 >
   <TABLES>
-    <TABLE NAME="mavrruntime_builtin_peers" COMMENT="People in a live room right now. Rows go when a person leaves or stops polling for 20 seconds.">
+    <TABLE NAME="vrroomruntime_builtin_peers" COMMENT="People in a live room right now. Rows go when a person leaves or stops polling for 20 seconds.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="vrroomid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
         <FIELD NAME="groupid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The group whose room it is; 0 without groups."/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The person."/>
         <FIELD NAME="peerid" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false" COMMENT="Random id of this presence, shown to the others in the room."/>
@@ -22,20 +22,20 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+        <KEY NAME="vrroomid" TYPE="foreign" FIELDS="vrroomid" REFTABLE="vrroom" REFFIELDS="id"/>
         <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="peerid" UNIQUE="true" FIELDS="peerid"/>
-        <INDEX NAME="mavrid-userid" UNIQUE="true" FIELDS="mavrid, userid"/>
-        <INDEX NAME="mavrid-groupid" UNIQUE="false" FIELDS="mavrid, groupid"/>
+        <INDEX NAME="vrroomid-userid" UNIQUE="true" FIELDS="vrroomid, userid"/>
+        <INDEX NAME="vrroomid-groupid" UNIQUE="false" FIELDS="vrroomid, groupid"/>
         <INDEX NAME="timeseen" UNIQUE="false" FIELDS="timeseen"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="mavrruntime_builtin_signals" COMMENT="Connection messages between the browsers of a live room, deleted when delivered or after 60 seconds.">
+    <TABLE NAME="vrroomruntime_builtin_signals" COMMENT="Connection messages between the browsers of a live room, deleted when delivered or after 60 seconds.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="mavrid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
+        <FIELD NAME="vrroomid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="The activity."/>
         <FIELD NAME="frompeer" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false" COMMENT="Sender peer id."/>
         <FIELD NAME="topeer" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false" COMMENT="Recipient peer id."/>
         <FIELD NAME="type" TYPE="char" LENGTH="16" NOTNULL="true" SEQUENCE="false" COMMENT="description or candidates."/>
@@ -44,7 +44,7 @@
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
-        <KEY NAME="mavrid" TYPE="foreign" FIELDS="mavrid" REFTABLE="mavr" REFFIELDS="id"/>
+        <KEY NAME="vrroomid" TYPE="foreign" FIELDS="vrroomid" REFTABLE="vrroom" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
         <INDEX NAME="topeer" UNIQUE="false" FIELDS="topeer"/>

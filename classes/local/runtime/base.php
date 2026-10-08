@@ -14,31 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\runtime;
+namespace mod_vrroom\local\runtime;
 
 /**
- * Base class every mavrruntime sub-plugin extends as \mavrruntime_<name>\runtime.
+ * Base class every vrroomruntime sub-plugin extends as \vrroomruntime_<name>\runtime.
  *
  * A run mode delivers the room to the learner. It never stores grades, never evaluates the task
- * graph authoritatively and never defines statements outside the mavr-vocab/1 vocabulary.
+ * graph authoritatively and never defines statements outside the vrroom-vocab/1 vocabulary.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 abstract class base {
     /** @var string Frankenstyle prefix of the sub-plugin type. */
-    public const PREFIX = 'mavrruntime_';
+    public const PREFIX = 'vrroomruntime_';
 
     /**
      * Frankenstyle component of the run mode, taken from the class's namespace.
      *
-     * @return string e.g. 'mavrruntime_builtin'
+     * @return string e.g. 'vrroomruntime_builtin'
      */
     final public function get_component(): string {
         $component = strstr(static::class, '\\', true);
         if ($component === false || !str_starts_with($component, self::PREFIX) || $component === self::PREFIX) {
-            throw new \coding_exception('A run mode class must live in a mavrruntime_<name> namespace: ' . static::class);
+            throw new \coding_exception('A run mode class must live in a vrroomruntime_<name> namespace: ' . static::class);
         }
         return $component;
     }
@@ -79,7 +79,7 @@ abstract class base {
      * Launch an attempt.
      *
      * @param \cm_info $cm The course module.
-     * @param \stdClass $attempt The mavr_attempts row.
+     * @param \stdClass $attempt The vrroom_attempts row.
      * @param \stdClass $user The learner.
      * @return launch_descriptor
      */
@@ -88,7 +88,7 @@ abstract class base {
     /**
      * How statements reach Moodle.
      *
-     * @return string 'browser' (core xAPI web service) or 'server' (MAVR web service with a launch token).
+     * @return string 'browser' (core xAPI web service) or 'server' (VR room web service with a launch token).
      */
     abstract public function statement_channel(): string;
 

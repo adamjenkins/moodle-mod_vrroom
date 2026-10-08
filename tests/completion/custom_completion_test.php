@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\completion;
+namespace mod_vrroom\completion;
 
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
 
 /**
  * Tests of the completionobjectives rule.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -42,7 +42,7 @@ final class custom_completion_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course(['enablecompletion' => 1]);
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'completion' => COMPLETION_TRACKING_AUTOMATIC,
             'completionobjectives' => 1,
@@ -53,7 +53,7 @@ final class custom_completion_test extends \advanced_testcase {
                     'points' => 1, 'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $student = $generator->create_and_enrol($course, 'student');
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
 
@@ -67,19 +67,19 @@ final class custom_completion_test extends \advanced_testcase {
         $this->assertSame(COMPLETION_INCOMPLETE, $completion->get_state('completionobjectives'));
 
         // A finished attempt that missed the required station does not complete the rule.
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
         attempt_manager::finish($attempt);
         $this->assertSame(COMPLETION_INCOMPLETE, $completion->get_state('completionobjectives'));
 
         // An in-progress attempt that visited it does not either, until it is finished.
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $vase = null;
         foreach ($scene['zones'] as $zone) {
             if ($zone['name'] === 'Vase') {
                 $vase = $zone['id'];
             }
         }
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
         event_store::insert(
             (int)$attempt->id,
             \core\uuid::generate(),

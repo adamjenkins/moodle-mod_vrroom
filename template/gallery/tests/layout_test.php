@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_gallery;
+namespace vrroomtemplate_gallery;
 
-use mavrtemplate_gallery\local\layout;
-use mod_mavr\local\scene\presets;
+use vrroomtemplate_gallery\local\layout;
+use mod_vrroom\local\scene\presets;
 
 /**
  * Tests for the Gallery walk station layout.
  *
- * @package    mavrtemplate_gallery
+ * @package    vrroomtemplate_gallery
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later

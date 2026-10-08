@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\xapi;
+namespace mod_vrroom\xapi;
 
 use core_xapi\local\state;
 use core_xapi\local\statement;
 use core_xapi\xapi_exception;
-use mod_mavr\event\statement_recorded;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\launch\config_builder;
-use mod_mavr\local\xapi\iri;
+use mod_vrroom\event\statement_recorded;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\launch\config_builder;
+use mod_vrroom\local\xapi\iri;
 
 /**
- * xAPI handler of mod_mavr: validates and stores browser statements (core_xapi_statement_post)
+ * xAPI handler of mod_vrroom: validates and stores browser statements (core_xapi_statement_post)
  * and guards the resume state (core_xapi_post_state and friends).
  *
  * Trust rules (DESIGN §5.3): the actor is the logged-in user (core checks it, and the attempt
@@ -39,7 +39,7 @@ use mod_mavr\local\xapi\iri;
  * is refused and the attempt is finished. Accepted statements are labelled
  * client-asserted. Results sent by a client are ignored.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -53,10 +53,10 @@ class handler extends \core_xapi\handler {
     /** @var array Per-batch cache: attempt id => attempt row or false. */
     private array $attempts = [];
 
-    /** @var array Per-batch cache: mavr id => activity data. */
+    /** @var array Per-batch cache: vrroom id => activity data. */
     private array $activities = [];
 
-    /** @var array Per-batch cache: "mavrid:version" => evaluator. */
+    /** @var array Per-batch cache: "vrroomid:version" => evaluator. */
     private array $evaluators = [];
 
     /** @var array Per-batch cache: attempt id => §4.4.1 events so far. */
@@ -94,7 +94,7 @@ class handler extends \core_xapi\handler {
             try {
                 $results[$key] = $this->process_statement($statement, $touched);
             } catch (\Throwable $e) {
-                debugging('MAVR statement rejected: ' . $e->getMessage(), DEBUG_DEVELOPER);
+                debugging('VR room statement rejected: ' . $e->getMessage(), DEBUG_DEVELOPER);
                 $results[$key] = false;
             }
         }
@@ -107,7 +107,7 @@ class handler extends \core_xapi\handler {
     }
 
     /**
-     * Validate a state request: only the resume state of a MAVR module the user can attempt.
+     * Validate a state request: only the resume state of a VR room module the user can attempt.
      *
      * @param state $state
      * @return bool
@@ -124,11 +124,11 @@ class handler extends \core_xapi\handler {
         if (!$context instanceof \context_module) {
             return false;
         }
-        $cm = get_coursemodule_from_id('mavr', $context->instanceid, 0, false, IGNORE_MISSING);
+        $cm = get_coursemodule_from_id('vrroom', $context->instanceid, 0, false, IGNORE_MISSING);
         if (!$cm) {
             return false;
         }
-        return has_capability('mod/mavr:attempt', $context, $state->get_user());
+        return has_capability('mod/vrroom:attempt', $context, $state->get_user());
     }
 
     /**
@@ -177,7 +177,7 @@ class handler extends \core_xapi\handler {
             return false;
         }
         $activity = $this->get_activity($attempt);
-        if (!$activity || !has_capability('mod/mavr:attempt', $activity['context'], $userid)) {
+        if (!$activity || !has_capability('mod/vrroom:attempt', $activity['context'], $userid)) {
             return false;
         }
 
@@ -196,7 +196,7 @@ class handler extends \core_xapi\handler {
             return false;
         }
 
-        $limit = (int)get_config('mod_mavr', 'maxattemptevents');
+        $limit = (int)get_config('mod_vrroom', 'maxattemptevents');
         if ($limit <= 0) {
             $limit = 5000;
         }
@@ -219,7 +219,7 @@ class handler extends \core_xapi\handler {
         if (!isset($this->events[$attemptid])) {
             $this->events[$attemptid] = event_store::get_events($attemptid);
         }
-        $evaluator = $this->get_evaluator((int)$attempt->mavrid, (int)$attempt->graphversion);
+        $evaluator = $this->get_evaluator((int)$attempt->vrroomid, (int)$attempt->graphversion);
         if ($evaluator->classify($this->events[$attemptid], $event) === evaluator::STATUS_LOCKED) {
             return false;
         }
@@ -261,7 +261,7 @@ class handler extends \core_xapi\handler {
     private function owns_statement(string $statementid, int $userid): bool {
         global $DB;
         return $DB->record_exists_sql(
-            'SELECT 1 FROM {mavr_events} e JOIN {mavr_attempts} a ON a.id = e.attemptid
+            'SELECT 1 FROM {vrroom_events} e JOIN {vrroom_attempts} a ON a.id = e.attemptid
               WHERE e.statementid = :sid AND a.userid = :userid',
             ['sid' => $statementid, 'userid' => $userid]
         );
@@ -276,7 +276,7 @@ class handler extends \core_xapi\handler {
     private function get_attempt(int $attemptid): ?\stdClass {
         global $DB;
         if (!array_key_exists($attemptid, $this->attempts)) {
-            $this->attempts[$attemptid] = $DB->get_record('mavr_attempts', ['id' => $attemptid]) ?: false;
+            $this->attempts[$attemptid] = $DB->get_record('vrroom_attempts', ['id' => $attemptid]) ?: false;
         }
         return $this->attempts[$attemptid] ?: null;
     }
@@ -288,13 +288,13 @@ class handler extends \core_xapi\handler {
      * @return array|null ['cm' => \stdClass, 'context' => \context_module, 'index' => array]
      */
     private function get_activity(\stdClass $attempt): ?array {
-        $mavrid = (int)$attempt->mavrid;
-        if (!array_key_exists($mavrid, $this->activities)) {
-            $this->activities[$mavrid] = false;
-            $cm = get_coursemodule_from_instance('mavr', $mavrid, 0, false, IGNORE_MISSING);
+        $vrroomid = (int)$attempt->vrroomid;
+        if (!array_key_exists($vrroomid, $this->activities)) {
+            $this->activities[$vrroomid] = false;
+            $cm = get_coursemodule_from_instance('vrroom', $vrroomid, 0, false, IGNORE_MISSING);
             if ($cm) {
                 $index = [];
-                foreach (instance_manager::get_scenes($mavrid) as $scene) {
+                foreach (instance_manager::get_scenes($vrroomid) as $scene) {
                     $sceneid = (string)($scene['id'] ?? '');
                     if ($sceneid === '') {
                         continue;
@@ -312,14 +312,14 @@ class handler extends \core_xapi\handler {
                     }
                     $index[$sceneid] = $entry;
                 }
-                $this->activities[$mavrid] = [
+                $this->activities[$vrroomid] = [
                     'cm' => $cm,
                     'context' => \context_module::instance($cm->id),
                     'index' => $index,
                 ];
             }
         }
-        return $this->activities[$mavrid] ?: null;
+        return $this->activities[$vrroomid] ?: null;
     }
 
     /**
@@ -346,14 +346,14 @@ class handler extends \core_xapi\handler {
     /**
      * Evaluator for a graph version (cached per batch).
      *
-     * @param int $mavrid
+     * @param int $vrroomid
      * @param int $version
      * @return evaluator
      */
-    private function get_evaluator(int $mavrid, int $version): evaluator {
-        $key = $mavrid . ':' . $version;
+    private function get_evaluator(int $vrroomid, int $version): evaluator {
+        $key = $vrroomid . ':' . $version;
         if (!isset($this->evaluators[$key])) {
-            $this->evaluators[$key] = new evaluator(instance_manager::get_graph($mavrid, $version));
+            $this->evaluators[$key] = new evaluator(instance_manager::get_graph($vrroomid, $version));
         }
         return $this->evaluators[$key];
     }

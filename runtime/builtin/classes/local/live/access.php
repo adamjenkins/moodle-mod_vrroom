@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
-use mod_mavr\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\attempt_manager;
 
 /**
  * Who may join which live room, and the live block of the launch config.
@@ -24,9 +24,9 @@ use mod_mavr\local\attempt\attempt_manager;
  * A live room belongs to an activity, or to one group of it when the activity uses groups.
  * Learners join only rooms of groups they are members of, in separate and in visible groups
  * mode; people with moodle/site:accessallgroups may join any group's room. A learner needs an
- * attempt in progress; a teacher previewing needs mod/mavr:manage.
+ * attempt in progress; a teacher previewing needs mod/vrroom:manage.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -44,50 +44,50 @@ final class access {
      * Load an activity by course module id.
      *
      * @param int $cmid Course module id.
-     * @return array{0: \cm_info, 1: \context_module, 2: \stdClass} [cm, context, mavr]
+     * @return array{0: \cm_info, 1: \context_module, 2: \stdClass} [cm, context, vrroom]
      */
     public static function load_by_cmid(int $cmid): array {
         global $DB;
-        [, $cm] = get_course_and_cm_from_cmid($cmid, 'mavr');
-        $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
-        return [$cm, \context_module::instance($cm->id), $mavr];
+        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrroom');
+        $vrroom = $DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST);
+        return [$cm, \context_module::instance($cm->id), $vrroom];
     }
 
     /**
-     * Load an activity by its mavr id.
+     * Load an activity by its vrroom id.
      *
-     * @param int $mavrid mavr id.
-     * @return array{0: \cm_info, 1: \context_module, 2: \stdClass} [cm, context, mavr]
+     * @param int $vrroomid vrroom id.
+     * @return array{0: \cm_info, 1: \context_module, 2: \stdClass} [cm, context, vrroom]
      * @throws \dml_missing_record_exception when the activity no longer exists
      */
-    public static function load_by_mavrid(int $mavrid): array {
+    public static function load_by_vrroomid(int $vrroomid): array {
         global $DB;
-        $mavr = $DB->get_record('mavr', ['id' => $mavrid], '*', MUST_EXIST);
-        $rawcm = get_coursemodule_from_instance('mavr', $mavrid, (int)$mavr->course, false, MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $vrroomid], '*', MUST_EXIST);
+        $rawcm = get_coursemodule_from_instance('vrroom', $vrroomid, (int)$vrroom->course, false, MUST_EXIST);
         $cm = get_fast_modinfo((int)$rawcm->course)->get_cm((int)$rawcm->id);
-        return [$cm, \context_module::instance($cm->id), $mavr];
+        return [$cm, \context_module::instance($cm->id), $vrroom];
     }
 
     /**
      * Whether live mode is available in an activity.
      *
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @return bool
      */
-    public static function is_available(\stdClass $mavr): bool {
+    public static function is_available(\stdClass $vrroom): bool {
         return config::is_enabled()
-            && (int)($mavr->livemode ?? 0) === 1
-            && (string)($mavr->runtime ?? '') === 'builtin';
+            && (int)($vrroom->livemode ?? 0) === 1
+            && (string)($vrroom->runtime ?? '') === 'builtin';
     }
 
     /**
      * The room size of an activity, capped at what the mesh supports.
      *
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @return int
      */
-    public static function max_peers(\stdClass $mavr): int {
-        return min(room_manager::MAX_PEERS, max(2, (int)($mavr->livemaxusers ?? room_manager::MAX_PEERS)));
+    public static function max_peers(\stdClass $vrroom): int {
+        return min(room_manager::MAX_PEERS, max(2, (int)($vrroom->livemaxusers ?? room_manager::MAX_PEERS)));
     }
 
     /**
@@ -95,28 +95,28 @@ final class access {
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param int $attemptid The attempt in progress, or 0 for a preview.
      * @param int $userid The user.
      * @return array{kind: string, attemptid: int}
-     * @throws \moodle_exception errorlivenotallowed, or mod_mavr's attempt errors
+     * @throws \moodle_exception errorlivenotallowed, or mod_vrroom's attempt errors
      */
     public static function resolve_kind(
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         int $attemptid,
         int $userid
     ): array {
         if ($attemptid > 0) {
             [$attempt] = attempt_manager::require_own_open_attempt($attemptid, $userid);
-            if ((int)$attempt->mavrid !== (int)$mavr->id) {
-                throw new \moodle_exception('errorlivenotallowed', 'mavrruntime_builtin');
+            if ((int)$attempt->vrroomid !== (int)$vrroom->id) {
+                throw new \moodle_exception('errorlivenotallowed', 'vrroomruntime_builtin');
             }
             return ['kind' => self::KIND_ATTEMPT, 'attemptid' => (int)$attempt->id];
         }
-        if (!has_capability('mod/mavr:manage', $context, $userid)) {
-            throw new \moodle_exception('errorlivenotallowed', 'mavrruntime_builtin');
+        if (!has_capability('mod/vrroom:manage', $context, $userid)) {
+            throw new \moodle_exception('errorlivenotallowed', 'vrroomruntime_builtin');
         }
         return ['kind' => self::KIND_PREVIEW, 'attemptid' => 0];
     }
@@ -159,11 +159,11 @@ final class access {
         }
         $groups = self::allowed_groups($cm, $context, $userid);
         if (!$groups) {
-            throw new \moodle_exception('errorlivenoroom', 'mavrruntime_builtin');
+            throw new \moodle_exception('errorlivenoroom', 'vrroomruntime_builtin');
         }
         if ($requested > 0) {
             if (!array_key_exists($requested, $groups)) {
-                throw new \moodle_exception('errorlivenoroom', 'mavrruntime_builtin');
+                throw new \moodle_exception('errorlivenoroom', 'vrroomruntime_builtin');
             }
             return $requested;
         }
@@ -173,31 +173,31 @@ final class access {
     /**
      * Whether a presence may stay in its room (checked on every poll and send).
      *
-     * @param \stdClass $peer mavrruntime_builtin_peers row.
+     * @param \stdClass $peer vrroomruntime_builtin_peers row.
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @return bool
      */
-    public static function still_allowed(\stdClass $peer, \cm_info $cm, \context_module $context, \stdClass $mavr): bool {
+    public static function still_allowed(\stdClass $peer, \cm_info $cm, \context_module $context, \stdClass $vrroom): bool {
         global $DB;
-        if ((int)$peer->mavrid !== (int)$mavr->id || !self::is_available($mavr)) {
+        if ((int)$peer->vrroomid !== (int)$vrroom->id || !self::is_available($vrroom)) {
             return false;
         }
         $userid = (int)$peer->userid;
         if ($peer->kind === self::KIND_ATTEMPT) {
-            $attempt = $DB->get_record('mavr_attempts', ['id' => (int)$peer->attemptid]);
+            $attempt = $DB->get_record('vrroom_attempts', ['id' => (int)$peer->attemptid]);
             if (
-                !$attempt || (int)$attempt->userid !== $userid || (int)$attempt->mavrid !== (int)$mavr->id
+                !$attempt || (int)$attempt->userid !== $userid || (int)$attempt->vrroomid !== (int)$vrroom->id
                     || $attempt->state !== attempt_manager::STATE_INPROGRESS || attempt_manager::is_overdue($attempt)
             ) {
                 return false;
             }
-            if (!has_capability('mod/mavr:attempt', $context, $userid)) {
+            if (!has_capability('mod/vrroom:attempt', $context, $userid)) {
                 return false;
             }
         } else if ($peer->kind === self::KIND_PREVIEW) {
-            if (!has_capability('mod/mavr:manage', $context, $userid)) {
+            if (!has_capability('mod/vrroom:manage', $context, $userid)) {
                 return false;
             }
         } else {
@@ -217,7 +217,7 @@ final class access {
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param \stdClass|null $attempt The attempt, or null for a preview.
      * @param \stdClass $user The user launching.
      * @return array
@@ -225,7 +225,7 @@ final class access {
     public static function launch_block(
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         ?\stdClass $attempt,
         \stdClass $user
     ): array {
@@ -242,19 +242,19 @@ final class access {
             'defaultgroupid' => 0,
             'selfname' => '',
         ];
-        if (!self::is_available($mavr)) {
+        if (!self::is_available($vrroom)) {
             return $block;
         }
         $userid = (int)$user->id;
         $block['available'] = true;
-        $block['maxpeers'] = self::max_peers($mavr);
+        $block['maxpeers'] = self::max_peers($vrroom);
         $block['selfname'] = fullname($user);
 
         if ($attempt) {
-            $mayjoin = (int)$attempt->userid === $userid && (int)$attempt->mavrid === (int)$mavr->id
+            $mayjoin = (int)$attempt->userid === $userid && (int)$attempt->vrroomid === (int)$vrroom->id
                 && $attempt->state === attempt_manager::STATE_INPROGRESS && !attempt_manager::is_overdue($attempt);
         } else {
-            $mayjoin = has_capability('mod/mavr:manage', $context, $userid);
+            $mayjoin = has_capability('mod/vrroom:manage', $context, $userid);
         }
 
         $groupok = true;
@@ -282,18 +282,18 @@ final class access {
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param int $groupid The room's group, 0 without groups.
      * @return string
      */
-    public static function room_name(\cm_info $cm, \context_module $context, \stdClass $mavr, int $groupid): string {
+    public static function room_name(\cm_info $cm, \context_module $context, \stdClass $vrroom, int $groupid): string {
         if ($groupid > 0) {
             $group = groups_get_group($groupid, 'id, name, courseid');
             if ($group && (int)$group->courseid === (int)$cm->course) {
                 return self::plain((string)$group->name, $context);
             }
         }
-        return self::plain((string)$mavr->name, $context);
+        return self::plain((string)$vrroom->name, $context);
     }
 
     /**

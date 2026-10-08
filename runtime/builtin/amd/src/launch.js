@@ -14,10 +14,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Entry point of the built-in viewer (booted by mod/mavr/view.php): renders the shell, starts
+ * Entry point of the built-in viewer (booted by mod/vrroom/view.php): renders the shell, starts
  * an attempt or a preview, and switches between the 3D room and the list view.
  *
- * @module     mavrruntime_builtin/launch
+ * @module     vrroomruntime_builtin/launch
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -28,12 +28,12 @@ import Notification from 'core/notification';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getStrings} from 'core/str';
-import {createSession} from 'mavrruntime_builtin/session';
-import * as Viewer from 'mavrruntime_builtin/viewer';
-import * as ListView from 'mavrruntime_builtin/listview';
-import {createProgress} from 'mavrruntime_builtin/panels';
-import {createLiveController} from 'mavrruntime_builtin/live/controller';
-import {region, announce, showMessage, clearMessage} from 'mavrruntime_builtin/util';
+import {createSession} from 'vrroomruntime_builtin/session';
+import * as Viewer from 'vrroomruntime_builtin/viewer';
+import * as ListView from 'vrroomruntime_builtin/listview';
+import {createProgress} from 'vrroomruntime_builtin/panels';
+import {createLiveController} from 'vrroomruntime_builtin/live/controller';
+import {region, announce, showMessage, clearMessage} from 'vrroomruntime_builtin/util';
 
 /**
  * Call one web service and return a native promise.
@@ -45,13 +45,13 @@ import {region, announce, showMessage, clearMessage} from 'mavrruntime_builtin/u
 const call = (methodname, args) => Promise.resolve(Ajax.call([{methodname: methodname, args: args}])[0]);
 
 /**
- * Drives one MAVR root element.
+ * Drives one VR room root element.
  */
 class Controller {
     /**
      * Constructor.
      *
-     * @param {HTMLElement} root The MAVR root.
+     * @param {HTMLElement} root The VR room root.
      * @param {Object} boot Boot data from view.php.
      * @param {Object} strings Strings used here.
      */
@@ -82,27 +82,27 @@ class Controller {
             return;
         }
         switch (button.dataset.action) {
-            case 'mavr-enter-3d':
+            case 'vrroom-enter-3d':
                 e.preventDefault();
                 this.launch('3d', false);
                 break;
-            case 'mavr-enter-list':
+            case 'vrroom-enter-list':
                 e.preventDefault();
                 this.launch('list', false);
                 break;
-            case 'mavr-preview-3d':
+            case 'vrroom-preview-3d':
                 e.preventDefault();
                 this.launch('3d', true);
                 break;
-            case 'mavr-preview-list':
+            case 'vrroom-preview-list':
                 e.preventDefault();
                 this.launch('list', true);
                 break;
-            case 'mavr-switch-list':
+            case 'vrroom-switch-list':
                 e.preventDefault();
                 this.switchTo('list');
                 break;
-            case 'mavr-toggle-progress':
+            case 'vrroom-toggle-progress':
                 e.preventDefault();
                 this.toggleProgress(button);
                 break;
@@ -117,7 +117,7 @@ class Controller {
      * @param {boolean} disabled Disabled.
      */
     setLaunchDisabled(disabled) {
-        region(this.root, 'mavr-launchbar').querySelectorAll('button').forEach((b) => {
+        region(this.root, 'vrroom-launchbar').querySelectorAll('button').forEach((b) => {
             b.disabled = disabled;
         });
     }
@@ -135,10 +135,10 @@ class Controller {
         }
         this.busy = true;
         this.setLaunchDisabled(true);
-        const pending = new Pending('mavrruntime_builtin/launch:launch');
+        const pending = new Pending('vrroomruntime_builtin/launch:launch');
         const request = preview
-            ? call('mod_mavr_get_preview', {cmid: this.boot.cmid})
-            : call('mod_mavr_start_attempt', {cmid: this.boot.cmid});
+            ? call('mod_vrroom_get_preview', {cmid: this.boot.cmid})
+            : call('mod_vrroom_start_attempt', {cmid: this.boot.cmid});
         return request.then((result) => {
             const descriptor = JSON.parse(result.launchjson);
             if (descriptor.type === 'external' && descriptor.url) {
@@ -149,7 +149,7 @@ class Controller {
             this.session = createSession(this.config);
             this.session.on((message) => this.onSessionMessage(message));
             this.live = createLiveController(this.root, this.config, this.session);
-            region(this.root, 'mavr-launchbar').classList.add('d-none');
+            region(this.root, 'vrroom-launchbar').classList.add('d-none');
             if (this.config.preview) {
                 showMessage(this.root, this.strings.previewnotice, 'info');
             } else {
@@ -203,10 +203,10 @@ class Controller {
             return this.startList();
         }
         this.mode = '3d';
-        this.root.querySelector('[data-region="mavr-shell"]').classList.add('mavr-mode-3d');
+        this.root.querySelector('[data-region="vrroom-shell"]').classList.add('vrroom-mode-3d');
         return Viewer.start(this.root, this.session, this.config, {live: this.live}).then((handle) => {
             this.view = handle;
-            const aside = region(this.root, 'mavr-progress');
+            const aside = region(this.root, 'vrroom-progress');
             return createProgress(aside, this.session, {onFinish: () => this.finish()});
         }).then((progress) => {
             this.progress = progress;
@@ -230,7 +230,7 @@ class Controller {
         if (this.live) {
             this.live.setLocalMode('list');
         }
-        this.root.querySelector('[data-region="mavr-shell"]').classList.remove('mavr-mode-3d');
+        this.root.querySelector('[data-region="vrroom-shell"]').classList.remove('vrroom-mode-3d');
         const listconfig = Object.assign({}, this.config, {
             canswitch3d: this.webgl,
             onFinish: () => this.finish(),
@@ -250,9 +250,9 @@ class Controller {
             this.progress.destroy();
             this.progress = null;
         }
-        const aside = region(this.root, 'mavr-progress');
+        const aside = region(this.root, 'vrroom-progress');
         aside.classList.add('d-none');
-        const toggle = this.root.querySelector('[data-action="mavr-toggle-progress"]');
+        const toggle = this.root.querySelector('[data-action="vrroom-toggle-progress"]');
         if (toggle) {
             toggle.setAttribute('aria-expanded', 'false');
         }
@@ -274,7 +274,7 @@ class Controller {
             return Promise.resolve();
         }
         this.busy = true;
-        const pending = new Pending('mavrruntime_builtin/launch:switch');
+        const pending = new Pending('vrroomruntime_builtin/launch:switch');
         this.stopView();
         const promise = mode === '3d' ? this.start3d() : this.startList();
         return promise.catch(Notification.exception).then(() => {
@@ -290,7 +290,7 @@ class Controller {
      * @param {HTMLElement} button The toggle button.
      */
     toggleProgress(button) {
-        const aside = region(this.root, 'mavr-progress');
+        const aside = region(this.root, 'vrroom-progress');
         const show = aside.classList.contains('d-none');
         aside.classList.toggle('d-none', !show);
         button.setAttribute('aria-expanded', show ? 'true' : 'false');
@@ -359,23 +359,23 @@ class Controller {
  */
 export const init = (boot) => {
     const root = document.getElementById(boot.rootid);
-    if (!root || root.dataset.mavrInit) {
+    if (!root || root.dataset.vrroomInit) {
         return Promise.resolve();
     }
-    root.dataset.mavrInit = '1';
-    const pending = new Pending('mavrruntime_builtin/launch:init');
+    root.dataset.vrroomInit = '1';
+    const pending = new Pending('vrroomruntime_builtin/launch:init');
     const canstart = !!(boot.canattempt && boot.canstart);
     const canpreview = !!boot.canpreview;
     let strings = null;
     return getStrings([
-        {key: 'previewnotice', component: 'mavrruntime_builtin'},
-        {key: 'webglunavailable', component: 'mavrruntime_builtin'},
-        {key: 'loadfailed', component: 'mavrruntime_builtin'},
-        {key: 'allrequireddone', component: 'mavrruntime_builtin'},
-        {key: 'statementsfailed', component: 'mavrruntime_builtin'},
+        {key: 'previewnotice', component: 'vrroomruntime_builtin'},
+        {key: 'webglunavailable', component: 'vrroomruntime_builtin'},
+        {key: 'loadfailed', component: 'vrroomruntime_builtin'},
+        {key: 'allrequireddone', component: 'vrroomruntime_builtin'},
+        {key: 'statementsfailed', component: 'vrroomruntime_builtin'},
     ]).then(([previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed]) => {
         strings = {previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed};
-        return Templates.renderForPromise('mavrruntime_builtin/shell', {
+        return Templates.renderForPromise('vrroomruntime_builtin/shell', {
             cmid: boot.cmid,
             canstart: canstart,
             canpreview: canpreview,

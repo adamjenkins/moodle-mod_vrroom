@@ -15,9 +15,9 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/report_overview
+    @template mod_vrroom/report_overview
 
-    The attempts overview of the MAVR report.
+    The attempts overview of the VR room report.
 
     Classes required for JS:
     * none
@@ -46,28 +46,28 @@
                 "grade": "75.00",
                 "timestart": "Thursday, 8 October 2026, 10:00 AM",
                 "timefinish": "Thursday, 8 October 2026, 10:20 AM",
-                "viewurl": "https://example.com/mod/mavr/report.php?id=12&attemptid=7",
+                "viewurl": "https://example.com/mod/vrroom/report.php?id=12&attemptid=7",
                 "candelete": true,
-                "deleteurl": "https://example.com/mod/mavr/report.php?id=12&delete=7"
+                "deleteurl": "https://example.com/mod/vrroom/report.php?id=12&delete=7"
             }
         ]
     }
 }}
-<div class="mod-mavr-report" data-region="mavr-report-overview">
-    <h3>{{#str}}reportoverview, mod_mavr{{/str}}</h3>
+<div class="mod-vrroom-report" data-region="vrroom-report-overview">
+    <h3>{{#str}}reportoverview, mod_vrroom{{/str}}</h3>
     {{#hasattempts}}
     <div class="table-responsive">
-        <table class="table table-striped table-sm generaltable" data-region="mavr-report-attempts">
+        <table class="table table-striped table-sm generaltable" data-region="vrroom-report-attempts">
             <thead>
                 <tr>
-                    <th scope="col">{{#str}}reportuser, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportattempt, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportstate, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportscore, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportgrade, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reporttimestart, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reporttimefinish, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}reportactions, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}reportuser, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportattempt, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportstate, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportscore, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportgrade, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reporttimestart, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reporttimefinish, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}reportactions, mod_vrroom{{/str}}</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,9 +81,9 @@
                     <td>{{timestart}}</td>
                     <td>{{timefinish}}</td>
                     <td>
-                        <a href="{{viewurl}}" class="me-2">{{#str}}reportviewattempt, mod_mavr{{/str}}</a>
+                        <a href="{{viewurl}}" class="me-2">{{#str}}reportviewattempt, mod_vrroom{{/str}}</a>
                         {{#candelete}}
-                        <a href="{{deleteurl}}" class="text-danger">{{#str}}reportdeleteattempt, mod_mavr{{/str}}</a>
+                        <a href="{{deleteurl}}" class="text-danger">{{#str}}reportdeleteattempt, mod_vrroom{{/str}}</a>
                         {{/candelete}}
                     </td>
                 </tr>
@@ -93,6 +93,6 @@
     </div>
     {{/hasattempts}}
     {{^hasattempts}}
-    <div class="alert alert-info">{{#str}}noattempts, mod_mavr{{/str}}</div>
+    <div class="alert alert-info">{{#str}}noattempts, mod_vrroom{{/str}}</div>
     {{/hasattempts}}
 </div>

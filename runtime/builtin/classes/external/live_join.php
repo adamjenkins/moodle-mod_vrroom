@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\external;
+namespace vrroomruntime_builtin\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mavrruntime_builtin\local\live\access;
-use mavrruntime_builtin\local\live\config;
-use mavrruntime_builtin\local\live\room_manager;
+use vrroomruntime_builtin\local\live\access;
+use vrroomruntime_builtin\local\live\config;
+use vrroomruntime_builtin\local\live\room_manager;
 
 /**
  * Join the live room of an activity (or of one of the user's groups).
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -61,25 +61,25 @@ class live_join extends external_api {
             ['cmid' => $cmid, 'attemptid' => $attemptid, 'groupid' => $groupid]
         );
 
-        [$cm, $context, $mavr] = access::load_by_cmid((int)$params['cmid']);
+        [$cm, $context, $vrroom] = access::load_by_cmid((int)$params['cmid']);
         self::validate_context($context);
-        require_capability('mod/mavr:view', $context);
-        if (!access::is_available($mavr)) {
-            throw new \moodle_exception('errorlivedisabled', 'mavrruntime_builtin');
+        require_capability('mod/vrroom:view', $context);
+        if (!access::is_available($vrroom)) {
+            throw new \moodle_exception('errorlivedisabled', 'vrroomruntime_builtin');
         }
 
         $userid = (int)$USER->id;
-        $kind = access::resolve_kind($cm, $context, $mavr, (int)$params['attemptid'], $userid);
+        $kind = access::resolve_kind($cm, $context, $vrroom, (int)$params['attemptid'], $userid);
         $room = access::resolve_group($cm, $context, $userid, (int)$params['groupid']);
-        $joined = room_manager::join($cm, $context, $mavr, $userid, $kind['kind'], $kind['attemptid'], $room);
+        $joined = room_manager::join($cm, $context, $vrroom, $userid, $kind['kind'], $kind['attemptid'], $room);
 
         $peer = $joined['peer'];
         $ice = config::ice_servers((string)$peer->peerid);
         return [
             'peerid' => (string)$peer->peerid,
             'groupid' => $room,
-            'roomname' => access::room_name($cm, $context, $mavr, $room),
-            'maxpeers' => access::max_peers($mavr),
+            'roomname' => access::room_name($cm, $context, $vrroom, $room),
+            'maxpeers' => access::max_peers($vrroom),
             'interval' => (int)$joined['interval'],
             'peers' => $joined['peers'],
             'iceservers' => self::export_ice($ice['servers']),

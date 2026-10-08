@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\privacy;
+namespace mod_vrroom\privacy;
 
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
@@ -24,17 +24,17 @@ use core_privacy\local\request\helper;
 use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\questions\usage;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\questions\usage;
 
 /**
- * Privacy provider for mod_mavr.
+ * Privacy provider for mod_vrroom.
  *
- * Personal data: the user's attempts (mavr_attempts), the statements recorded during them
- * (mavr_events), the answers stored by the question engine (one usage per attempt) and the
+ * Personal data: the user's attempts (vrroom_attempts), the statements recorded during them
+ * (vrroom_events), the answers stored by the question engine (one usage per attempt) and the
  * user's last position in a room (core xAPI state store, item id = module context id).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -43,35 +43,35 @@ class provider implements
     \core_privacy\local\request\core_userlist_provider,
     \core_privacy\local\request\plugin\provider {
     /** @var string This component. */
-    private const COMPONENT = 'mod_mavr';
+    private const COMPONENT = 'mod_vrroom';
 
     /**
-     * Describe the personal data MAVR stores.
+     * Describe the personal data VR room stores.
      *
      * @param collection $collection the collection to add to
      * @return collection
      */
     public static function get_metadata(collection $collection): collection {
-        $collection->add_database_table('mavr_attempts', [
-            'userid' => 'privacy:metadata:mavr_attempts:userid',
-            'attempt' => 'privacy:metadata:mavr_attempts:attempt',
-            'state' => 'privacy:metadata:mavr_attempts:state',
-            'score' => 'privacy:metadata:mavr_attempts:score',
-            'timestart' => 'privacy:metadata:mavr_attempts:timestart',
-            'timefinish' => 'privacy:metadata:mavr_attempts:timefinish',
-            'timedue' => 'privacy:metadata:mavr_attempts:timedue',
-            'timemodified' => 'privacy:metadata:mavr_attempts:timemodified',
-        ], 'privacy:metadata:mavr_attempts');
+        $collection->add_database_table('vrroom_attempts', [
+            'userid' => 'privacy:metadata:vrroom_attempts:userid',
+            'attempt' => 'privacy:metadata:vrroom_attempts:attempt',
+            'state' => 'privacy:metadata:vrroom_attempts:state',
+            'score' => 'privacy:metadata:vrroom_attempts:score',
+            'timestart' => 'privacy:metadata:vrroom_attempts:timestart',
+            'timefinish' => 'privacy:metadata:vrroom_attempts:timefinish',
+            'timedue' => 'privacy:metadata:vrroom_attempts:timedue',
+            'timemodified' => 'privacy:metadata:vrroom_attempts:timemodified',
+        ], 'privacy:metadata:vrroom_attempts');
 
-        $collection->add_database_table('mavr_events', [
-            'verb' => 'privacy:metadata:mavr_events:verb',
-            'objecttype' => 'privacy:metadata:mavr_events:objecttype',
-            'objectid' => 'privacy:metadata:mavr_events:objectid',
-            'resultjson' => 'privacy:metadata:mavr_events:resultjson',
-            'clientasserted' => 'privacy:metadata:mavr_events:clientasserted',
-            'timestamp' => 'privacy:metadata:mavr_events:timestamp',
-            'timecreated' => 'privacy:metadata:mavr_events:timecreated',
-        ], 'privacy:metadata:mavr_events');
+        $collection->add_database_table('vrroom_events', [
+            'verb' => 'privacy:metadata:vrroom_events:verb',
+            'objecttype' => 'privacy:metadata:vrroom_events:objecttype',
+            'objectid' => 'privacy:metadata:vrroom_events:objectid',
+            'resultjson' => 'privacy:metadata:vrroom_events:resultjson',
+            'clientasserted' => 'privacy:metadata:vrroom_events:clientasserted',
+            'timestamp' => 'privacy:metadata:vrroom_events:timestamp',
+            'timecreated' => 'privacy:metadata:vrroom_events:timecreated',
+        ], 'privacy:metadata:vrroom_events');
 
         $collection->add_subsystem_link('core_question', [], 'privacy:metadata:core_question');
         $collection->add_subsystem_link('core_xapi', [], 'privacy:metadata:core_xapi');
@@ -80,7 +80,7 @@ class provider implements
     }
 
     /**
-     * The module contexts in which the user has MAVR data.
+     * The module contexts in which the user has VR room data.
      *
      * @param int $userid user id
      * @return contextlist
@@ -91,11 +91,11 @@ class provider implements
                   FROM {context} ctx
                   JOIN {course_modules} cm ON cm.id = ctx.instanceid AND ctx.contextlevel = :contextlevel
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
-                  JOIN {mavr_attempts} a ON a.mavrid = cm.instance
+                  JOIN {vrroom_attempts} a ON a.vrroomid = cm.instance
                  WHERE a.userid = :userid";
         $contextlist->add_from_sql($sql, [
             'contextlevel' => CONTEXT_MODULE,
-            'modname' => 'mavr',
+            'modname' => 'vrroom',
             'userid' => $userid,
         ]);
 
@@ -105,7 +105,7 @@ class provider implements
     }
 
     /**
-     * The users who have MAVR data in a context.
+     * The users who have VR room data in a context.
      *
      * @param userlist $userlist the userlist to add to
      * @return void
@@ -118,9 +118,9 @@ class provider implements
         $sql = "SELECT a.userid
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
-                  JOIN {mavr_attempts} a ON a.mavrid = cm.instance
+                  JOIN {vrroom_attempts} a ON a.vrroomid = cm.instance
                  WHERE cm.id = :cmid";
-        $userlist->add_from_sql('userid', $sql, ['modname' => 'mavr', 'cmid' => $context->instanceid]);
+        $userlist->add_from_sql('userid', $sql, ['modname' => 'vrroom', 'cmid' => $context->instanceid]);
 
         \core_xapi\privacy\provider::add_userids_for_context($userlist);
     }
@@ -139,8 +139,8 @@ class provider implements
         $userid = (int)$user->id;
 
         foreach ($contextlist->get_contexts() as $context) {
-            $mavrid = self::get_mavrid($context);
-            if ($mavrid === null) {
+            $vrroomid = self::get_vrroomid($context);
+            if ($vrroomid === null) {
                 continue;
             }
 
@@ -156,7 +156,7 @@ class provider implements
                 );
             }
 
-            $attempts = $DB->get_records('mavr_attempts', ['mavrid' => $mavrid, 'userid' => $userid], 'attempt ASC');
+            $attempts = $DB->get_records('vrroom_attempts', ['vrroomid' => $vrroomid, 'userid' => $userid], 'attempt ASC');
             foreach ($attempts as $attempt) {
                 self::export_attempt($context, $userid, $attempt);
             }
@@ -168,11 +168,11 @@ class provider implements
      *
      * @param \context $context module context
      * @param int $userid the user being exported (the attempt owner)
-     * @param \stdClass $attempt mavr_attempts row
+     * @param \stdClass $attempt vrroom_attempts row
      * @return void
      */
     private static function export_attempt(\context $context, int $userid, \stdClass $attempt): void {
-        $subcontext = [get_string('privacy:attemptpath', 'mod_mavr', $attempt->attempt)];
+        $subcontext = [get_string('privacy:attemptpath', 'mod_vrroom', $attempt->attempt)];
 
         $data = (object)[
             'attempt' => (int)$attempt->attempt,
@@ -227,11 +227,11 @@ class provider implements
      * @return void
      */
     public static function delete_data_for_all_users_in_context(\context $context): void {
-        $mavrid = self::get_mavrid($context);
-        if ($mavrid === null) {
+        $vrroomid = self::get_vrroomid($context);
+        if ($vrroomid === null) {
             return;
         }
-        self::delete_attempts($mavrid, null);
+        self::delete_attempts($vrroomid, null);
         \core_xapi\privacy\provider::delete_states_for_all_users($context, self::COMPONENT);
     }
 
@@ -244,11 +244,11 @@ class provider implements
     public static function delete_data_for_user(approved_contextlist $contextlist): void {
         $userid = (int)$contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-            $mavrid = self::get_mavrid($context);
-            if ($mavrid === null) {
+            $vrroomid = self::get_vrroomid($context);
+            if ($vrroomid === null) {
                 continue;
             }
-            self::delete_attempts($mavrid, [$userid]);
+            self::delete_attempts($vrroomid, [$userid]);
             // Scoped to this context: the state item id is the module context id.
             \core_xapi\privacy\provider::delete_states_for_user($contextlist, self::COMPONENT, (int)$context->id);
         }
@@ -262,25 +262,25 @@ class provider implements
      */
     public static function delete_data_for_users(approved_userlist $userlist): void {
         $context = $userlist->get_context();
-        $mavrid = self::get_mavrid($context);
-        if ($mavrid === null) {
+        $vrroomid = self::get_vrroomid($context);
+        if ($vrroomid === null) {
             return;
         }
         $userids = array_map('intval', $userlist->get_userids());
         if (!$userids) {
             return;
         }
-        self::delete_attempts($mavrid, $userids);
+        self::delete_attempts($vrroomid, $userids);
         \core_xapi\privacy\provider::delete_states_for_userlist($userlist, (int)$context->id);
     }
 
     /**
-     * The mavr id behind a module context, or null when the context is not a MAVR activity.
+     * The vrroom id behind a module context, or null when the context is not a VR room activity.
      *
      * @param \context $context the context
      * @return int|null
      */
-    private static function get_mavrid(\context $context): ?int {
+    private static function get_vrroomid(\context $context): ?int {
         global $DB;
         if (!$context instanceof \context_module) {
             return null;
@@ -289,7 +289,7 @@ class provider implements
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modname
                  WHERE cm.id = :cmid";
-        $instance = $DB->get_field_sql($sql, ['modname' => 'mavr', 'cmid' => $context->instanceid]);
+        $instance = $DB->get_field_sql($sql, ['modname' => 'vrroom', 'cmid' => $context->instanceid]);
         return $instance === false ? null : (int)$instance;
     }
 
@@ -298,20 +298,20 @@ class provider implements
      *
      * Direct deletes only: privacy requests must not trigger regrades or events.
      *
-     * @param int $mavrid mavr id
+     * @param int $vrroomid vrroom id
      * @param int[]|null $userids users, or null for everyone
      * @return void
      */
-    private static function delete_attempts(int $mavrid, ?array $userids): void {
+    private static function delete_attempts(int $vrroomid, ?array $userids): void {
         global $DB;
-        $select = 'mavrid = :mavrid';
-        $params = ['mavrid' => $mavrid];
+        $select = 'vrroomid = :vrroomid';
+        $params = ['vrroomid' => $vrroomid];
         if ($userids !== null) {
             [$insql, $inparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'user');
             $select .= " AND userid {$insql}";
             $params += $inparams;
         }
-        $attempts = $DB->get_records_select('mavr_attempts', $select, $params, '', 'id, uniqueid');
+        $attempts = $DB->get_records_select('vrroom_attempts', $select, $params, '', 'id, uniqueid');
         if (!$attempts) {
             return;
         }
@@ -323,6 +323,6 @@ class provider implements
         }
         usage::delete($qubaids);
         event_store::delete_for_attempts(array_keys($attempts));
-        $DB->delete_records_select('mavr_attempts', $select, $params);
+        $DB->delete_records_select('vrroom_attempts', $select, $params);
     }
 }

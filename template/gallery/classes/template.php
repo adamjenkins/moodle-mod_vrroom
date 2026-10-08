@@ -14,31 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_gallery;
+namespace vrroomtemplate_gallery;
 
-use mavrtemplate_gallery\local\layout;
-use mod_mavr\local\questions\bank;
-use mod_mavr\local\scene\presets;
-use mod_mavr\local\template\compiled_activity;
+use vrroomtemplate_gallery\local\layout;
+use mod_vrroom\local\questions\bank;
+use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * Gallery walk template: an environment with stations (text, a model or an image, an optional question).
  *
- * The form fields are stored as a mavrtemplate_gallery/1 config in mavr.templateconfig and compiled
- * into one mavr-scene/1 room plus a mavr-graph/1 task graph: one visit objective per station, one
+ * The form fields are stored as a vrroomtemplate_gallery/1 config in vrroom.templateconfig and compiled
+ * into one vrroom-scene/1 room plus a vrroom-graph/1 task graph: one visit objective per station, one
  * question objective per station question (unlocked by the visit), an optional strict sequence
  * over the visits, and a rule that finishes the attempt when every required objective is done.
  *
- * @package    mavrtemplate_gallery
+ * @package    vrroomtemplate_gallery
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class template extends \mod_mavr\local\template\base {
+class template extends \mod_vrroom\local\template\base {
     /** @var string Frankenstyle component of this template (string and file lookups). */
-    public const COMPONENT = 'mavrtemplate_gallery';
+    public const COMPONENT = 'vrroomtemplate_gallery';
 
     /** @var string Schema identifier written into the stored config. */
-    public const SCHEMA = 'mavrtemplate_gallery/1';
+    public const SCHEMA = 'vrroomtemplate_gallery/1';
 
     /** @var string Environment choice for a teacher-uploaded GLB. */
     public const ENVIRONMENT_UPLOAD = 'upload';
@@ -64,7 +64,7 @@ class template extends \mod_mavr\local\template\base {
     /** @var int Longest station title, in characters. */
     public const MAX_TITLE_LENGTH = 255;
 
-    /** @var string[] Image types a station accepts (all are served inline by mavr_pluginfile). */
+    /** @var string[] Image types a station accepts (all are served inline by vrroom_pluginfile). */
     public const IMAGE_TYPES = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
 
     /** @var string Scene id of the single spawn point. */
@@ -231,7 +231,7 @@ class template extends \mod_mavr\local\template\base {
             file_prepare_draft_area(
                 $draftitemid,
                 $context->id,
-                'mod_mavr',
+                'mod_vrroom',
                 'environment',
                 0,
                 self::model_file_options()
@@ -265,7 +265,7 @@ class template extends \mod_mavr\local\template\base {
                 file_prepare_draft_area(
                     $modeldraft,
                     $context->id,
-                    'mod_mavr',
+                    'mod_vrroom',
                     'models',
                     $itemid,
                     self::model_file_options()
@@ -275,7 +275,7 @@ class template extends \mod_mavr\local\template\base {
                 file_prepare_draft_area(
                     $imagedraft,
                     $context->id,
-                    'mod_mavr',
+                    'mod_vrroom',
                     'media',
                     $itemid,
                     self::image_file_options()
@@ -360,12 +360,12 @@ class template extends \mod_mavr\local\template\base {
             $qbeid = (int)($data['gallery_question'][$i] ?? 0);
             if ($qbeid > 0) {
                 if (isset($usedquestions[$qbeid])) {
-                    $errors["gallery_question[{$i}]"] = get_string('errorquestionduplicate', 'mod_mavr');
+                    $errors["gallery_question[{$i}]"] = get_string('errorquestionduplicate', 'mod_vrroom');
                 } else {
                     $usedquestions[$qbeid] = true;
                     $error = bank::validate_entry($qbeid, $courseid, $keep);
                     if ($error !== null) {
-                        $errors["gallery_question[{$i}]"] = get_string($error, 'mod_mavr');
+                        $errors["gallery_question[{$i}]"] = get_string($error, 'mod_vrroom');
                     }
                 }
             }
@@ -377,7 +377,7 @@ class template extends \mod_mavr\local\template\base {
     // Config and files.
 
     /**
-     * Turn submitted form data into the stored mavrtemplate_gallery/1 config.
+     * Turn submitted form data into the stored vrroomtemplate_gallery/1 config.
      *
      * Rows without a title are dropped; the remaining stations are numbered in form order and
      * their files live at itemid index + 1. Station ids posted back in hidden fields are kept
@@ -476,14 +476,14 @@ class template extends \mod_mavr\local\template\base {
                 file_save_draft_area_files(
                     (int)$data['gallery_environmentfile'],
                     $context->id,
-                    'mod_mavr',
+                    'mod_vrroom',
                     'environment',
                     0,
                     self::model_file_options()
                 );
             }
         } else {
-            $fs->delete_area_files($context->id, 'mod_mavr', 'environment');
+            $fs->delete_area_files($context->id, 'mod_vrroom', 'environment');
         }
 
         $rows = self::station_rows($data);
@@ -496,14 +496,14 @@ class template extends \mod_mavr\local\template\base {
                     file_save_draft_area_files(
                         (int)$data['gallery_model'][$i],
                         $context->id,
-                        'mod_mavr',
+                        'mod_vrroom',
                         'models',
                         $itemid,
                         self::model_file_options()
                     );
                 }
             } else {
-                $fs->delete_area_files($context->id, 'mod_mavr', 'models', $itemid);
+                $fs->delete_area_files($context->id, 'mod_vrroom', 'models', $itemid);
             }
 
             if ($mediatype === self::MEDIA_IMAGE) {
@@ -511,20 +511,20 @@ class template extends \mod_mavr\local\template\base {
                     file_save_draft_area_files(
                         (int)$data['gallery_image'][$i],
                         $context->id,
-                        'mod_mavr',
+                        'mod_vrroom',
                         'media',
                         $itemid,
                         self::image_file_options()
                     );
                 }
             } else {
-                $fs->delete_area_files($context->id, 'mod_mavr', 'media', $itemid);
+                $fs->delete_area_files($context->id, 'mod_vrroom', 'media', $itemid);
             }
         }
 
         $count = count($rows);
         foreach (['models', 'media'] as $area) {
-            foreach ($fs->get_area_files($context->id, 'mod_mavr', $area, false, 'itemid, filepath, filename', true) as $file) {
+            foreach ($fs->get_area_files($context->id, 'mod_vrroom', $area, false, 'itemid, filepath, filename', true) as $file) {
                 if ((int)$file->get_itemid() > $count) {
                     $file->delete();
                 }
@@ -537,7 +537,7 @@ class template extends \mod_mavr\local\template\base {
     /**
      * Compile a stored config into one scene, the task graph and the question slot bindings.
      *
-     * @param \stdClass $config mavrtemplate_gallery/1 config
+     * @param \stdClass $config vrroomtemplate_gallery/1 config
      * @param \context_module $context module context (file areas are read from it)
      * @return compiled_activity
      */
@@ -554,14 +554,14 @@ class template extends \mod_mavr\local\template\base {
             if ($count > layout::MAX_UPLOAD_STATIONS) {
                 throw new \moodle_exception(
                     'invalidscene',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     "An uploaded environment takes at most " . layout::MAX_UPLOAD_STATIONS . " stations."
                 );
             }
             $envfile = self::file_ref($fs, $context, 'environment', 0);
             if ($envfile === null) {
-                throw new \moodle_exception('invalidscene', 'mod_mavr', '', 'The environment model file is missing.');
+                throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'The environment model file is missing.');
             }
             $preset = null;
             $environment = [
@@ -578,13 +578,13 @@ class template extends \mod_mavr\local\template\base {
         } else {
             $preset = presets::get($environmentid);
             if ($preset === null) {
-                throw new \moodle_exception('invalidscene', 'mod_mavr', '', "Unknown environment preset.");
+                throw new \moodle_exception('invalidscene', 'mod_vrroom', '', "Unknown environment preset.");
             }
             $available = count($preset['anchors'] ?? []);
             if ($count > $available) {
                 throw new \moodle_exception(
                     'invalidscene',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     "The environment has room for {$available} stations."
                 );
@@ -760,7 +760,7 @@ class template extends \mod_mavr\local\template\base {
         ];
 
         $scene = [
-            'schema' => 'mavr-scene/1',
+            'schema' => 'vrroom-scene/1',
             'id' => $sceneid,
             'name' => get_string('pluginname', self::COMPONENT),
             'environment' => $environment,
@@ -770,7 +770,7 @@ class template extends \mod_mavr\local\template\base {
             'interactables' => $interactables,
         ];
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'hidden' => [],
             'objectives' => $objectives,
             'rules' => $rules,
@@ -782,7 +782,7 @@ class template extends \mod_mavr\local\template\base {
     /**
      * Replace the stations' question bank entry ids after a restore.
      *
-     * @param \stdClass $config decoded mavrtemplate_gallery/1 config, changed in place
+     * @param \stdClass $config decoded vrroomtemplate_gallery/1 config, changed in place
      * @param callable $map fn(int $old): int, returns $old when there is no mapping
      * @return bool whether any id changed
      */
@@ -854,12 +854,12 @@ class template extends \mod_mavr\local\template\base {
     }
 
     /**
-     * Largest upload in bytes, from the mod_mavr maxmodelsize setting (MB, default 20).
+     * Largest upload in bytes, from the mod_vrroom maxmodelsize setting (MB, default 20).
      *
      * @return int
      */
     public static function max_model_bytes(): int {
-        $mb = (int)get_config('mod_mavr', 'maxmodelsize');
+        $mb = (int)get_config('mod_vrroom', 'maxmodelsize');
         if ($mb <= 0) {
             $mb = 20;
         }
@@ -888,17 +888,17 @@ class template extends \mod_mavr\local\template\base {
     /**
      * Load and decode the stored config of an activity.
      *
-     * @param int $mavrid activity instance id
+     * @param int $vrroomid activity instance id
      * @param int|null $courseid when given, the activity must belong to this course
      * @return \stdClass|null null when absent or not a gallery config
      */
-    private static function load_stored_config(int $mavrid, ?int $courseid = null): ?\stdClass {
+    private static function load_stored_config(int $vrroomid, ?int $courseid = null): ?\stdClass {
         global $DB;
-        $conditions = ['id' => $mavrid, 'template' => 'gallery'];
+        $conditions = ['id' => $vrroomid, 'template' => 'gallery'];
         if ($courseid !== null) {
             $conditions['course'] = $courseid;
         }
-        $json = $DB->get_field('mavr', 'templateconfig', $conditions);
+        $json = $DB->get_field('vrroom', 'templateconfig', $conditions);
         if (!is_string($json) || $json === '') {
             return null;
         }
@@ -996,7 +996,7 @@ class template extends \mod_mavr\local\template\base {
     }
 
     /**
-     * mavr-scene/1 file reference to the first file in a module file area item.
+     * vrroom-scene/1 file reference to the first file in a module file area item.
      *
      * @param \file_storage $fs file storage
      * @param \context_module $context module context
@@ -1005,7 +1005,7 @@ class template extends \mod_mavr\local\template\base {
      * @return array|null ['area', 'itemid', 'filepath', 'filename'], or null when the item is empty
      */
     private static function file_ref(\file_storage $fs, \context_module $context, string $area, int $itemid): ?array {
-        $files = $fs->get_area_files($context->id, 'mod_mavr', $area, $itemid, 'filepath, filename', false);
+        $files = $fs->get_area_files($context->id, 'mod_vrroom', $area, $itemid, 'filepath, filename', false);
         $file = reset($files);
         if (!$file) {
             return null;
@@ -1034,7 +1034,7 @@ class template extends \mod_mavr\local\template\base {
         $records = $DB->get_records_sql($sql, ['qbeid' => $qbeid], 0, 1);
         $record = reset($records);
         if (!$record) {
-            return get_string('questionmissing', 'mod_mavr');
+            return get_string('questionmissing', 'mod_vrroom');
         }
         return format_string($record->name, true, ['context' => \context_system::instance()]);
     }

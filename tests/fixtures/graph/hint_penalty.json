@@ -2,7 +2,7 @@
   "name": "hint_penalty",
   "intent": "Two hints of 0.5 on a 2-point interact: both requested (one twice, counted once), then completed -> earned 2 - 1 = 1. A 1.5-point hint on a 1-point objective floors its earned points at 0.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "x-a",

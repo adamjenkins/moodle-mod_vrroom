@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Upgrade steps for mod_mavr.
+ * Upgrade steps for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,6 +30,6 @@
  * @param int $oldversion The version being upgraded from.
  * @return bool
  */
-function xmldb_mavr_upgrade(int $oldversion): bool {
+function xmldb_vrroom_upgrade(int $oldversion): bool {
     return true;
 }

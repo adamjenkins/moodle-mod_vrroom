@@ -14,22 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local;
+namespace mod_vrroom\local;
 
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\grading\grader;
-use mod_mavr\local\graph\graph_validator;
-use mod_mavr\local\questions\slots;
-use mod_mavr\local\runtime\cleanup_scope;
-use mod_mavr\local\runtime\registry as runtime_registry;
-use mod_mavr\local\scene\scene_validator;
-use mod_mavr\local\template\compiled_activity;
-use mod_mavr\local\template\registry as template_registry;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\grading\grader;
+use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\questions\slots;
+use mod_vrroom\local\runtime\cleanup_scope;
+use mod_vrroom\local\runtime\registry as runtime_registry;
+use mod_vrroom\local\scene\scene_validator;
+use mod_vrroom\local\template\compiled_activity;
+use mod_vrroom\local\template\registry as template_registry;
 
 /**
- * Creates, updates and deletes MAVR activities and stores their compiled scenes and graphs.
+ * Creates, updates and deletes VR room activities and stores their compiled scenes and graphs.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -42,7 +42,7 @@ final class instance_manager {
      *
      * @param \stdClass $data Form data; $data->coursemodule is set by core.
      * @param \moodleform_mod|null $form The form, when there is one.
-     * @return int The new mavr id.
+     * @return int The new vrroom id.
      */
     public static function add_instance(\stdClass $data, ?\moodleform_mod $form = null): int {
         global $DB;
@@ -54,62 +54,62 @@ final class instance_manager {
         $template = template_registry::get($templatename);
 
         $now = time();
-        $mavr = new \stdClass();
-        $mavr->course = (int)$data->course;
-        $mavr->name = (string)$data->name;
-        $mavr->intro = $data->intro ?? '';
-        $mavr->introformat = (int)($data->introformat ?? FORMAT_HTML);
-        $mavr->runtime = $runtimename;
-        $mavr->template = $templatename;
-        $mavr->templateconfig = null;
-        $mavr->graphjson = null;
-        $mavr->graphversion = 0;
-        $mavr->grade = self::clean_grade($data->grade ?? $template->default_grade());
-        $mavr->grademethod = self::clean_grademethod($data->grademethod ?? grader::GRADE_HIGHEST);
-        $mavr->maxattempts = max(0, (int)($data->maxattempts ?? 0));
-        $mavr->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
-        $mavr->livemode = empty($data->livemode) ? 0 : 1;
-        $mavr->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
-        $mavr->customised = 0;
-        $mavr->timecreated = $now;
-        $mavr->timemodified = $now;
+        $vrroom = new \stdClass();
+        $vrroom->course = (int)$data->course;
+        $vrroom->name = (string)$data->name;
+        $vrroom->intro = $data->intro ?? '';
+        $vrroom->introformat = (int)($data->introformat ?? FORMAT_HTML);
+        $vrroom->runtime = $runtimename;
+        $vrroom->template = $templatename;
+        $vrroom->templateconfig = null;
+        $vrroom->graphjson = null;
+        $vrroom->graphversion = 0;
+        $vrroom->grade = self::clean_grade($data->grade ?? $template->default_grade());
+        $vrroom->grademethod = self::clean_grademethod($data->grademethod ?? grader::GRADE_HIGHEST);
+        $vrroom->maxattempts = max(0, (int)($data->maxattempts ?? 0));
+        $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $vrroom->livemode = empty($data->livemode) ? 0 : 1;
+        $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
+        $vrroom->customised = 0;
+        $vrroom->timecreated = $now;
+        $vrroom->timemodified = $now;
 
         $transaction = $DB->start_delegated_transaction();
         try {
-            $mavr->id = $DB->insert_record('mavr', $mavr);
+            $vrroom->id = $DB->insert_record('vrroom', $vrroom);
 
             // No lookup by instance works inside add_instance: course_modules.instance is set
             // only after this returns, so the context comes from $data->coursemodule.
             $context = \context_module::instance($data->coursemodule);
 
             $template->save_files($data, $context);
-            $mavr->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
-            $DB->set_field('mavr', 'templateconfig', $mavr->templateconfig, ['id' => $mavr->id]);
+            $vrroom->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
+            $DB->set_field('vrroom', 'templateconfig', $vrroom->templateconfig, ['id' => $vrroom->id]);
             // Compile from the stored shape, exactly as a later recompile or the form would see it.
-            $config = self::decode_config($mavr->templateconfig) ?? new \stdClass();
+            $config = self::decode_config($vrroom->templateconfig) ?? new \stdClass();
 
             $compiled = $template->compile($config, $context);
             self::validate_compiled($compiled);
-            self::apply_compiled($mavr, $context, $compiled);
+            self::apply_compiled($vrroom, $context, $compiled);
 
-            $mavr->coursemodule = $data->coursemodule;
-            $mavr->cmidnumber = $data->cmidnumber ?? '';
-            grader::grade_item_update($mavr);
+            $vrroom->coursemodule = $data->coursemodule;
+            $vrroom->cmidnumber = $data->cmidnumber ?? '';
+            grader::grade_item_update($vrroom);
 
             $transaction->allow_commit();
         } catch (\Throwable $e) {
             $transaction->rollback($e);
         }
 
-        return (int)$mavr->id;
+        return (int)$vrroom->id;
     }
 
     /**
      * Update an activity from the form (or generator) data.
      *
      * The template never changes after creation. While the room has been changed in the room
-     * editor (mavr.customised > 0), only the activity's own settings are saved and the room is
-     * not rebuilt, unless the form asks for it with mavr_rebuild, which recompiles the room from
+     * editor (vrroom.customised > 0), only the activity's own settings are saved and the room is
+     * not rebuilt, unless the form asks for it with vrroom_rebuild, which recompiles the room from
      * the template's settings and clears the customised flag.
      *
      * @param \stdClass $data Form data; $data->instance and $data->coursemodule are set by core.
@@ -119,80 +119,80 @@ final class instance_manager {
     public static function update_instance(\stdClass $data, ?\moodleform_mod $form = null): bool {
         global $DB;
 
-        $mavr = $DB->get_record('mavr', ['id' => $data->instance], '*', MUST_EXIST);
-        $template = template_registry::get($mavr->template);
-        $runtimename = (string)($data->runtime ?? $mavr->runtime);
+        $vrroom = $DB->get_record('vrroom', ['id' => $data->instance], '*', MUST_EXIST);
+        $template = template_registry::get($vrroom->template);
+        $runtimename = (string)($data->runtime ?? $vrroom->runtime);
         runtime_registry::get($runtimename);
-        $rebuild = !empty($data->mavr_rebuild);
-        $keeproom = (int)($mavr->customised ?? 0) > 0 && !$rebuild;
+        $rebuild = !empty($data->vrroom_rebuild);
+        $keeproom = (int)($vrroom->customised ?? 0) > 0 && !$rebuild;
 
-        $oldgrade = (int)$mavr->grade;
+        $oldgrade = (int)$vrroom->grade;
 
-        $mavr->name = (string)$data->name;
+        $vrroom->name = (string)$data->name;
         if (property_exists($data, 'intro')) {
-            $mavr->intro = $data->intro;
-            $mavr->introformat = (int)($data->introformat ?? $mavr->introformat);
+            $vrroom->intro = $data->intro;
+            $vrroom->introformat = (int)($data->introformat ?? $vrroom->introformat);
         }
-        $mavr->runtime = $runtimename;
+        $vrroom->runtime = $runtimename;
         if (property_exists($data, 'grade')) {
-            $mavr->grade = self::clean_grade($data->grade);
+            $vrroom->grade = self::clean_grade($data->grade);
         }
         if (property_exists($data, 'grademethod')) {
-            $mavr->grademethod = self::clean_grademethod($data->grademethod);
+            $vrroom->grademethod = self::clean_grademethod($data->grademethod);
         }
         if (property_exists($data, 'maxattempts')) {
-            $mavr->maxattempts = max(0, (int)$data->maxattempts);
+            $vrroom->maxattempts = max(0, (int)$data->maxattempts);
         }
-        $mavr->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
         if (property_exists($data, 'livemode')) {
             // Without these fields (no run mode can run a live room) the stored values stay.
-            $mavr->livemode = empty($data->livemode) ? 0 : 1;
-            $mavr->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? ($mavr->livemaxusers ?? 6));
+            $vrroom->livemode = empty($data->livemode) ? 0 : 1;
+            $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? ($vrroom->livemaxusers ?? 6));
         }
-        $mavr->timemodified = time();
+        $vrroom->timemodified = time();
 
-        $cmid = $data->coursemodule ?? get_coursemodule_from_instance('mavr', $mavr->id, $mavr->course, false, MUST_EXIST)->id;
+        $cmid = $data->coursemodule ?? get_coursemodule_from_instance('vrroom', $vrroom->id, $vrroom->course, false, MUST_EXIST)->id;
         $context = \context_module::instance($cmid);
 
         $transaction = $DB->start_delegated_transaction();
         try {
             if ($keeproom) {
                 // The room editor owns the room: the template's settings are neither saved nor compiled.
-                $DB->update_record('mavr', (object)[
-                    'id' => $mavr->id,
-                    'name' => $mavr->name,
-                    'intro' => $mavr->intro,
-                    'introformat' => $mavr->introformat,
-                    'runtime' => $mavr->runtime,
-                    'grade' => $mavr->grade,
-                    'grademethod' => $mavr->grademethod,
-                    'maxattempts' => $mavr->maxattempts,
-                    'completionobjectives' => $mavr->completionobjectives,
-                    'livemode' => $mavr->livemode,
-                    'livemaxusers' => $mavr->livemaxusers,
-                    'timemodified' => $mavr->timemodified,
+                $DB->update_record('vrroom', (object)[
+                    'id' => $vrroom->id,
+                    'name' => $vrroom->name,
+                    'intro' => $vrroom->intro,
+                    'introformat' => $vrroom->introformat,
+                    'runtime' => $vrroom->runtime,
+                    'grade' => $vrroom->grade,
+                    'grademethod' => $vrroom->grademethod,
+                    'maxattempts' => $vrroom->maxattempts,
+                    'completionobjectives' => $vrroom->completionobjectives,
+                    'livemode' => $vrroom->livemode,
+                    'livemaxusers' => $vrroom->livemaxusers,
+                    'timemodified' => $vrroom->timemodified,
                 ]);
             } else {
                 $template->save_files($data, $context);
-                $mavr->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
-                $mavr->customised = 0;
-                $DB->update_record('mavr', $mavr);
-                $config = self::decode_config($mavr->templateconfig) ?? new \stdClass();
+                $vrroom->templateconfig = json_encode($template->extract_config($data), self::JSON_FLAGS);
+                $vrroom->customised = 0;
+                $DB->update_record('vrroom', $vrroom);
+                $config = self::decode_config($vrroom->templateconfig) ?? new \stdClass();
 
                 $compiled = $template->compile($config, $context);
                 self::validate_compiled($compiled);
-                self::apply_compiled($mavr, $context, $compiled);
+                self::apply_compiled($vrroom, $context, $compiled);
             }
 
-            $mavr->coursemodule = $cmid;
-            $mavr->cmidnumber = $data->cmidnumber ?? null;
-            if ($mavr->cmidnumber === null) {
-                unset($mavr->cmidnumber);
+            $vrroom->coursemodule = $cmid;
+            $vrroom->cmidnumber = $data->cmidnumber ?? null;
+            if ($vrroom->cmidnumber === null) {
+                unset($vrroom->cmidnumber);
             }
-            if ((int)$mavr->grade !== $oldgrade) {
-                grader::update_grades($mavr);
+            if ((int)$vrroom->grade !== $oldgrade) {
+                grader::update_grades($vrroom);
             } else {
-                grader::grade_item_update($mavr);
+                grader::grade_item_update($vrroom);
             }
 
             $transaction->allow_commit();
@@ -208,44 +208,44 @@ final class instance_manager {
      *
      * Files go with the module context (core deletes them).
      *
-     * @param int $id The mavr id.
+     * @param int $id The vrroom id.
      * @return bool False when there is no such activity.
      */
     public static function delete_instance(int $id): bool {
         global $DB;
 
-        $mavr = $DB->get_record('mavr', ['id' => $id]);
-        if (!$mavr) {
+        $vrroom = $DB->get_record('vrroom', ['id' => $id]);
+        if (!$vrroom) {
             return false;
         }
-        $cm = get_coursemodule_from_instance('mavr', $mavr->id, $mavr->course, false, IGNORE_MISSING);
+        $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, $vrroom->course, false, IGNORE_MISSING);
         $context = $cm ? \context_module::instance($cm->id, IGNORE_MISSING) : false;
 
-        attempt_manager::delete_all_for_instance($mavr);
+        attempt_manager::delete_all_for_instance($vrroom);
 
         if ($context) {
-            slots::delete_all($mavr, $context);
+            slots::delete_all($vrroom, $context);
         }
         // Covers the no-context case; slots::delete_all has already removed the rows otherwise.
-        $DB->delete_records('mavr_slots', ['mavrid' => $mavr->id]);
+        $DB->delete_records('vrroom_slots', ['vrroomid' => $vrroom->id]);
 
         try {
-            $runtime = runtime_registry::get($mavr->runtime);
-            $runtime->cleanup(new cleanup_scope(cleanup_scope::INSTANCE_DELETE, (int)$mavr->course, (int)$mavr->id));
+            $runtime = runtime_registry::get($vrroom->runtime);
+            $runtime->cleanup(new cleanup_scope(cleanup_scope::INSTANCE_DELETE, (int)$vrroom->course, (int)$vrroom->id));
         } catch (\moodle_exception $e) {
             // The run mode is not installed: there is nothing it could clean up.
-            debugging('MAVR run mode cleanup skipped: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            debugging('VR room run mode cleanup skipped: ' . $e->getMessage(), DEBUG_DEVELOPER);
         }
 
-        if ($context && \core_xapi\handler::supports_xapi('mod_mavr')) {
-            \core_xapi\handler::create('mod_mavr')->wipe_states((string)$context->id);
+        if ($context && \core_xapi\handler::supports_xapi('mod_vrroom')) {
+            \core_xapi\handler::create('mod_vrroom')->wipe_states((string)$context->id);
         }
 
-        $DB->delete_records('mavr_scenes', ['mavrid' => $mavr->id]);
-        $DB->delete_records('mavr_graphs', ['mavrid' => $mavr->id]);
-        $DB->delete_records('mavr', ['id' => $mavr->id]);
+        $DB->delete_records('vrroom_scenes', ['vrroomid' => $vrroom->id]);
+        $DB->delete_records('vrroom_graphs', ['vrroomid' => $vrroom->id]);
+        $DB->delete_records('vrroom', ['id' => $vrroom->id]);
 
-        grader::grade_item_delete($mavr);
+        grader::grade_item_delete($vrroom);
 
         return true;
     }
@@ -253,42 +253,42 @@ final class instance_manager {
     /**
      * Persist the scenes, the graph version and the question slots of a compiled activity.
      *
-     * Scenes are upserted by (mavrid, idnumber) and scenes that vanished are deleted. A new graph
+     * Scenes are upserted by (vrroomid, idnumber) and scenes that vanished are deleted. A new graph
      * version is stored only when the graph or the slot bindings changed.
      *
-     * @param \stdClass $mavr The mavr row (graphjson and graphversion are updated in place).
+     * @param \stdClass $vrroom The vrroom row (graphjson and graphversion are updated in place).
      * @param \context_module $context Module context.
      * @param compiled_activity $compiled The compiled activity.
      * @return int The current graph version afterwards.
      */
-    public static function apply_compiled(\stdClass $mavr, \context_module $context, compiled_activity $compiled): int {
+    public static function apply_compiled(\stdClass $vrroom, \context_module $context, compiled_activity $compiled): int {
         global $DB;
 
         // Scenes.
         $existing = [];
-        foreach ($DB->get_records('mavr_scenes', ['mavrid' => $mavr->id]) as $row) {
+        foreach ($DB->get_records('vrroom_scenes', ['vrroomid' => $vrroom->id]) as $row) {
             $existing[$row->idnumber] = $row;
         }
         $keep = [];
         foreach (array_values($compiled->scenes) as $sortorder => $scene) {
             $idnumber = (string)$scene['id'];
             $row = $existing[$idnumber] ?? new \stdClass();
-            $row->mavrid = $mavr->id;
+            $row->vrroomid = $vrroom->id;
             $row->idnumber = $idnumber;
             $row->name = \core_text::substr((string)$scene['name'], 0, 255);
             $row->sortorder = $sortorder;
             $row->scenejson = json_encode($scene, self::JSON_FLAGS);
             $row->schemaversion = (string)($scene['schema'] ?? scene_validator::SCHEMA);
             if (isset($row->id)) {
-                $DB->update_record('mavr_scenes', $row);
+                $DB->update_record('vrroom_scenes', $row);
             } else {
-                $row->id = $DB->insert_record('mavr_scenes', $row);
+                $row->id = $DB->insert_record('vrroom_scenes', $row);
             }
             $keep[$idnumber] = true;
         }
         foreach ($existing as $idnumber => $row) {
             if (!isset($keep[$idnumber])) {
-                $DB->delete_records('mavr_scenes', ['id' => $row->id]);
+                $DB->delete_records('vrroom_scenes', ['id' => $row->id]);
             }
         }
 
@@ -296,46 +296,46 @@ final class instance_manager {
         $graphjson = json_encode($compiled->graph, self::JSON_FLAGS);
         $currentbindings = self::normalise_bindings(array_map(
             fn(\stdClass $slot): array => (array)$slot,
-            array_values(slots::get_slots((int)$mavr->id, $context))
+            array_values(slots::get_slots((int)$vrroom->id, $context))
         ));
         $newbindings = self::normalise_bindings($compiled->slots);
-        $graphchanged = (int)$mavr->graphversion === 0 || !self::same_json($graphjson, (string)$mavr->graphjson);
+        $graphchanged = (int)$vrroom->graphversion === 0 || !self::same_json($graphjson, (string)$vrroom->graphjson);
         $slotschanged = $currentbindings !== $newbindings;
 
         if ($graphchanged || $slotschanged) {
-            $version = (int)$DB->get_field_sql('SELECT MAX(version) FROM {mavr_graphs} WHERE mavrid = ?', [$mavr->id]);
-            $version = max($version, (int)$mavr->graphversion) + 1;
-            $DB->insert_record('mavr_graphs', (object)[
-                'mavrid' => $mavr->id,
+            $version = (int)$DB->get_field_sql('SELECT MAX(version) FROM {vrroom_graphs} WHERE vrroomid = ?', [$vrroom->id]);
+            $version = max($version, (int)$vrroom->graphversion) + 1;
+            $DB->insert_record('vrroom_graphs', (object)[
+                'vrroomid' => $vrroom->id,
                 'version' => $version,
                 'graphjson' => $graphjson,
                 'timecreated' => time(),
             ]);
-            $mavr->graphjson = $graphjson;
-            $mavr->graphversion = $version;
-            $DB->update_record('mavr', (object)[
-                'id' => $mavr->id,
+            $vrroom->graphjson = $graphjson;
+            $vrroom->graphversion = $version;
+            $DB->update_record('vrroom', (object)[
+                'id' => $vrroom->id,
                 'graphjson' => $graphjson,
                 'graphversion' => $version,
             ]);
         }
         if ($slotschanged) {
-            slots::sync($mavr, $context, $compiled->slots);
+            slots::sync($vrroom, $context, $compiled->slots);
         }
 
-        return (int)$mavr->graphversion;
+        return (int)$vrroom->graphversion;
     }
 
     /**
      * The scenes of an activity.
      *
-     * @param int $mavrid The mavr id.
+     * @param int $vrroomid The vrroom id.
      * @return array[] Decoded scene documents ordered by sortorder.
      */
-    public static function get_scenes(int $mavrid): array {
+    public static function get_scenes(int $vrroomid): array {
         global $DB;
         $scenes = [];
-        foreach ($DB->get_records('mavr_scenes', ['mavrid' => $mavrid], 'sortorder ASC, id ASC') as $row) {
+        foreach ($DB->get_records('vrroom_scenes', ['vrroomid' => $vrroomid], 'sortorder ASC, id ASC') as $row) {
             $scenes[] = json_decode($row->scenejson, true, 512, JSON_THROW_ON_ERROR);
         }
         return $scenes;
@@ -344,30 +344,30 @@ final class instance_manager {
     /**
      * One version of an activity's task graph.
      *
-     * @param int $mavrid The mavr id.
+     * @param int $vrroomid The vrroom id.
      * @param int|null $version The version; null for the current one.
      * @return array The decoded graph.
      * @throws \moodle_exception When that version does not exist.
      */
-    public static function get_graph(int $mavrid, ?int $version = null): array {
+    public static function get_graph(int $vrroomid, ?int $version = null): array {
         global $DB;
         if ($version === null) {
-            $version = (int)$DB->get_field('mavr', 'graphversion', ['id' => $mavrid], MUST_EXIST);
+            $version = (int)$DB->get_field('vrroom', 'graphversion', ['id' => $vrroomid], MUST_EXIST);
         }
-        $json = $DB->get_field('mavr_graphs', 'graphjson', ['mavrid' => $mavrid, 'version' => $version]);
+        $json = $DB->get_field('vrroom_graphs', 'graphjson', ['vrroomid' => $vrroomid, 'version' => $version]);
         if ($json === false) {
             throw new \moodle_exception(
                 'invalidgraph',
-                'mod_mavr',
+                'mod_vrroom',
                 '',
-                "graph version {$version} of activity {$mavrid} does not exist"
+                "graph version {$version} of activity {$vrroomid} does not exist"
             );
         }
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**
-     * Decode a stored template config (mavr.templateconfig) into the object shape templates receive.
+     * Decode a stored template config (vrroom.templateconfig) into the object shape templates receive.
      *
      * @param string|null $json The stored JSON.
      * @return \stdClass|null Null when nothing is stored.
@@ -388,16 +388,16 @@ final class instance_manager {
      */
     private static function validate_compiled(compiled_activity $compiled): void {
         if (count($compiled->scenes) < 1) {
-            throw new \moodle_exception('invalidscene', 'mod_mavr', '', 'the template produced no scene');
+            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'the template produced no scene');
         }
         // Every room on its own, and the rooms together (ids unique across rooms, portal targets).
         $errors = scene_validator::validate_set(array_values($compiled->scenes));
         if ($errors) {
-            throw new \moodle_exception('invalidscene', 'mod_mavr', '', reset($errors));
+            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', reset($errors));
         }
         $errors = graph_validator::validate($compiled->graph);
         if ($errors) {
-            throw new \moodle_exception('invalidgraph', 'mod_mavr', '', reset($errors));
+            throw new \moodle_exception('invalidgraph', 'mod_vrroom', '', reset($errors));
         }
         $seen = [];
         foreach ($compiled->slots as $binding) {
@@ -405,7 +405,7 @@ final class instance_manager {
             if ($slot < 1 || isset($seen[$slot])) {
                 throw new \moodle_exception(
                     'invalidgraph',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     'question slot numbers must be unique and at least 1'
                 );

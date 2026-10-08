@@ -15,45 +15,45 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Uninstall steps for mod_mavr.
+ * Uninstall steps for mod_vrroom.
  *
  * Core drops the plugin's tables and its file areas go with the module contexts. What core does
- * not remove is data MAVR keeps in core tables: question usages, question references and xAPI
+ * not remove is data VR room keeps in core tables: question usages, question references and xAPI
  * states, plus the glb file type the plugin registered at install.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 /**
- * Remove MAVR's rows from core tables.
+ * Remove VR room's rows from core tables.
  *
  * @return bool
  */
-function xmldb_mavr_uninstall(): bool {
+function xmldb_vrroom_uninstall(): bool {
     global $CFG, $DB;
     require_once($CFG->dirroot . '/question/engine/lib.php');
 
     // Question usages of every attempt. The ids are read first, so the delete never selects
     // from the table it deletes from.
-    $qubaids = $DB->get_fieldset_select('question_usages', 'id', 'component = :component', ['component' => 'mod_mavr']);
+    $qubaids = $DB->get_fieldset_select('question_usages', 'id', 'component = :component', ['component' => 'mod_vrroom']);
     foreach (array_chunk($qubaids, 500) as $chunk) {
         question_engine::delete_questions_usage_by_activities(new qubaid_list($chunk));
     }
 
     // Slot references; core never deletes a module's references for it.
-    $DB->delete_records('question_references', ['component' => 'mod_mavr']);
+    $DB->delete_records('question_references', ['component' => 'mod_vrroom']);
 
     // Resume positions stored in the core xAPI state store.
     try {
-        \core_xapi\handler::create('mod_mavr')->wipe_states();
+        \core_xapi\handler::create('mod_vrroom')->wipe_states();
     } catch (\Throwable $e) {
-        $DB->delete_records('xapi_states', ['component' => 'mod_mavr']);
+        $DB->delete_records('xapi_states', ['component' => 'mod_vrroom']);
     }
 
     // The glb file type, only when this plugin added it.
-    if (get_config('mod_mavr', 'addedglbtype')) {
+    if (get_config('mod_vrroom', 'addedglbtype')) {
         try {
             \core_filetypes::delete_type('glb');
         } catch (\Throwable $e) {

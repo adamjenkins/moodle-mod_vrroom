@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
- * Serves files embedded in questions shown inside a MAVR attempt.
+ * Serves files embedded in questions shown inside a VR room attempt.
  *
  * Core's question_pluginfile() looks up the usage's owning component and calls
- * mavr_question_pluginfile(), which delegates here. The checks follow
- * quiz_question_pluginfile(): the usage must belong to a MAVR attempt, the user
+ * vrroom_question_pluginfile(), which delegates here. The checks follow
+ * quiz_question_pluginfile(): the usage must belong to a VR room attempt, the user
  * must be allowed into the activity, the attempt owner may fetch files while
  * the attempt is open, anyone else (or a closed attempt) needs the report
  * capability (and, in separate groups, a group shared with the attempt's owner),
  * and the question engine decides whether the file is visible under
  * the display options in force.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -62,11 +62,11 @@ final class files {
         require_once($CFG->dirroot . '/question/engine/lib.php');
         require_once($CFG->libdir . '/filelib.php');
 
-        $attempt = $DB->get_record('mavr_attempts', ['uniqueid' => (int)$qubaid]);
+        $attempt = $DB->get_record('vrroom_attempts', ['uniqueid' => (int)$qubaid]);
         if (!$attempt) {
             send_file_not_found();
         }
-        $cm = get_coursemodule_from_instance('mavr', $attempt->mavrid, 0, false, IGNORE_MISSING);
+        $cm = get_coursemodule_from_instance('vrroom', $attempt->vrroomid, 0, false, IGNORE_MISSING);
         if (!$cm) {
             send_file_not_found();
         }
@@ -77,10 +77,10 @@ final class files {
         $isown = (int)$attempt->userid === (int)$USER->id;
         $isopen = $attempt->state === 'inprogress';
         if ($isown && $isopen) {
-            require_capability('mod/mavr:attempt', $modulecontext);
+            require_capability('mod/vrroom:attempt', $modulecontext);
             $reviewing = false;
         } else {
-            require_capability('mod/mavr:viewreports', $modulecontext);
+            require_capability('mod/vrroom:viewreports', $modulecontext);
             // Separate groups: a reviewer sees only attempts of people in their groups (as report.php).
             if (!$isown && !groups_user_groups_visible($attemptcourse, (int)$attempt->userid, $cm)) {
                 send_file_not_found();
@@ -90,7 +90,7 @@ final class files {
 
         $quba = \question_engine::load_questions_usage_by_activity((int)$qubaid);
         if (
-            $quba->get_owning_component() !== 'mod_mavr'
+            $quba->get_owning_component() !== 'mod_vrroom'
                 || (int)$quba->get_owning_context()->id !== (int)$modulecontext->id
         ) {
             send_file_not_found();

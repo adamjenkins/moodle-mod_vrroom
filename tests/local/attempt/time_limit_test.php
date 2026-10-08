@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\attempt;
+namespace mod_vrroom\local\attempt;
 
 use core_external\external_api;
-use mod_mavr\external\finish_attempt;
-use mod_mavr\external\get_attempt_state;
-use mod_mavr\external\get_question;
-use mod_mavr\local\instance_manager;
-use mod_mavr\task\finish_overdue_attempts;
+use mod_vrroom\external\finish_attempt;
+use mod_vrroom\external\get_attempt_state;
+use mod_vrroom\external\get_question;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\task\finish_overdue_attempts;
 
 /**
  * Tests of the attempt time limit: deadline at start, refusal after it, and the overdue task.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(attempt_manager::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(finish_overdue_attempts::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_mavr\external\helper::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrroom\external\helper::class)]
 #[\PHPUnit\Framework\Attributes\CoversClass(finish_attempt::class)]
 final class time_limit_test extends \advanced_testcase {
     /** @var int The time limit of the escape fixture, in seconds. */
@@ -43,7 +43,7 @@ final class time_limit_test extends \advanced_testcase {
      * A course with an escape chain (time limit LIMIT, a question lock) and two students.
      *
      * @param int $timelimit time limit in seconds (0 = none)
-     * @return \stdClass course, mavr, cm, context, student, other
+     * @return \stdClass course, vrroom, cm, context, student, other
      */
     private function setup_activity(int $timelimit = self::LIMIT): \stdClass {
         global $DB;
@@ -56,7 +56,7 @@ final class time_limit_test extends \advanced_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'escape',
             'puzzletitles' => 'Desk|Safe',
@@ -67,7 +67,7 @@ final class time_limit_test extends \advanced_testcase {
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
         return (object) [
             'course' => $course,
-            'mavr' => $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST),
+            'vrroom' => $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST),
             'cm' => $cm,
             'context' => \context_module::instance($cm->id),
             'student' => $generator->create_and_enrol($course, 'student'),
@@ -84,7 +84,7 @@ final class time_limit_test extends \advanced_testcase {
     private function make_overdue(\stdClass $attempt): int {
         global $DB;
         $deadline = time() - attempt_manager::DEADLINE_GRACE - 30;
-        $DB->set_field('mavr_attempts', 'timedue', $deadline, ['id' => $attempt->id]);
+        $DB->set_field('vrroom_attempts', 'timedue', $deadline, ['id' => $attempt->id]);
         $attempt->timedue = $deadline;
         return $deadline;
     }
@@ -97,7 +97,7 @@ final class time_limit_test extends \advanced_testcase {
      */
     private function completed_result(int $attemptid): ?\stdClass {
         global $DB;
-        $rows = $DB->get_records('mavr_events', ['attemptid' => $attemptid, 'verb' => 'completed',
+        $rows = $DB->get_records('vrroom_events', ['attemptid' => $attemptid, 'verb' => 'completed',
             'objecttype' => 'activity'], 'id ASC');
         return $rows ? json_decode(reset($rows)->resultjson) : null;
     }
@@ -109,10 +109,10 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_timedue_from_graph(): void {
         $fx = $this->setup_activity();
-        $this->assertSame(self::LIMIT, instance_manager::get_graph((int)$fx->mavr->id)['timelimit']);
+        $this->assertSame(self::LIMIT, instance_manager::get_graph((int)$fx->vrroom->id)['timelimit']);
 
         $now = time();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id, $now);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id, $now);
         $this->assertEquals($now + self::LIMIT, $attempt->timedue);
         $this->assertEquals($now + self::LIMIT, attempt_manager::get_attempt((int)$attempt->id)->timedue);
 
@@ -136,12 +136,12 @@ final class time_limit_test extends \advanced_testcase {
         $this->resetAfterTest();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
         $student = $generator->create_and_enrol($course, 'student');
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $cm = get_fast_modinfo($course)->get_cm($module->cmid);
 
-        [$attempt] = attempt_manager::start_or_resume($cm, $mavr, (int)$student->id);
+        [$attempt] = attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
         $this->assertEquals(0, $attempt->timedue);
         $this->assertFalse(attempt_manager::is_overdue($attempt, time() + 10 * YEARSECS));
         $this->assertFalse(attempt_manager::close_if_overdue($attempt, time() + 10 * YEARSECS));
@@ -157,7 +157,7 @@ final class time_limit_test extends \advanced_testcase {
     public function test_services_throw_timeup(): void {
         global $DB;
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $deadline = $this->make_overdue($attempt);
         $this->setUser($fx->student);
 
@@ -172,7 +172,7 @@ final class time_limit_test extends \advanced_testcase {
         $this->assertSame(attempt_manager::STATE_FINISHED, $row->state);
         $this->assertEquals($deadline, $row->timefinish);
         $this->assertTrue($this->completed_result((int)$attempt->id)->timeup);
-        $this->assertEquals(1, $DB->count_records('mavr_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
+        $this->assertEquals(1, $DB->count_records('vrroom_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
             'objecttype' => 'activity']));
 
         // Once finished, it is an ordinary closed attempt.
@@ -191,7 +191,7 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_other_user_cannot_close(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->make_overdue($attempt);
 
         try {
@@ -210,7 +210,7 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_get_attempt_state_reports_finished(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $deadline = $this->make_overdue($attempt);
         $this->setUser($fx->student);
 
@@ -231,7 +231,7 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_finish_attempt_on_overdue_succeeds(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $deadline = $this->make_overdue($attempt);
         $this->setUser($fx->student);
 
@@ -260,7 +260,7 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_finish_attempt_in_time_has_no_timeup(): void {
         $fx = $this->setup_activity();
-        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->setUser($fx->student);
 
         finish_attempt::execute((int)$attempt->id);
@@ -276,11 +276,11 @@ final class time_limit_test extends \advanced_testcase {
      */
     public function test_start_or_resume_replaces_overdue_attempt(): void {
         $fx = $this->setup_activity();
-        [$first] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$first] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->make_overdue($first);
 
         $now = time();
-        [$second, $resumed] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id, $now);
+        [$second, $resumed] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id, $now);
         $this->assertFalse($resumed);
         $this->assertNotEquals($first->id, $second->id);
         $this->assertEquals(2, $second->attempt);
@@ -288,7 +288,7 @@ final class time_limit_test extends \advanced_testcase {
         $this->assertSame(attempt_manager::STATE_FINISHED, attempt_manager::get_attempt((int)$first->id)->state);
 
         // An attempt still within its time is resumed.
-        [$again, $resumed] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$again, $resumed] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->assertTrue($resumed);
         $this->assertEquals($second->id, $again->id);
     }
@@ -301,13 +301,13 @@ final class time_limit_test extends \advanced_testcase {
     public function test_start_or_resume_respects_max_attempts(): void {
         global $DB;
         $fx = $this->setup_activity();
-        $DB->set_field('mavr', 'maxattempts', 1, ['id' => $fx->mavr->id]);
-        $fx->mavr->maxattempts = 1;
-        [$first] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        $DB->set_field('vrroom', 'maxattempts', 1, ['id' => $fx->vrroom->id]);
+        $fx->vrroom->maxattempts = 1;
+        [$first] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $this->make_overdue($first);
 
         try {
-            attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+            attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
             $this->fail('No second attempt is allowed');
         } catch (\moodle_exception $e) {
             $this->assertSame('errornomoreattempts', $e->errorcode);
@@ -327,16 +327,16 @@ final class time_limit_test extends \advanced_testcase {
         $third = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
         $fourth = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
 
-        [$overdue] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->student->id);
+        [$overdue] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
         $deadline = $this->make_overdue($overdue);
-        [$intime] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fx->other->id);
-        [$nolimit] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$third->id);
-        $DB->set_field('mavr_attempts', 'timedue', 0, ['id' => $nolimit->id]);
-        [$grace] = attempt_manager::start_or_resume($fx->cm, $fx->mavr, (int)$fourth->id);
-        $DB->set_field('mavr_attempts', 'timedue', time() - 1, ['id' => $grace->id]);
+        [$intime] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->other->id);
+        [$nolimit] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$third->id);
+        $DB->set_field('vrroom_attempts', 'timedue', 0, ['id' => $nolimit->id]);
+        [$grace] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fourth->id);
+        $DB->set_field('vrroom_attempts', 'timedue', time() - 1, ['id' => $grace->id]);
 
         $task = new finish_overdue_attempts();
-        $this->assertSame(get_string('taskfinishoverdue', 'mod_mavr'), $task->get_name());
+        $this->assertSame(get_string('taskfinishoverdue', 'mod_vrroom'), $task->get_name());
         ob_start();
         $task->execute();
         $output = ob_get_clean();
@@ -354,7 +354,7 @@ final class time_limit_test extends \advanced_testcase {
         ob_start();
         $task->execute();
         $this->assertSame('', ob_get_clean());
-        $this->assertEquals(1, $DB->count_records('mavr_events', ['attemptid' => $overdue->id, 'verb' => 'completed',
+        $this->assertEquals(1, $DB->count_records('vrroom_events', ['attemptid' => $overdue->id, 'verb' => 'completed',
             'objecttype' => 'activity']));
     }
 

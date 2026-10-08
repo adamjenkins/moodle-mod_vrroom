@@ -2,7 +2,7 @@
   "name": "pass_fraction_retry",
   "intent": "pass_fraction 1: answers of 0 and 0.5 are applied but leave the objective available and unlock nothing; the answer with fraction 1 completes it with full points, and only then does the dependent objective unlock.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "q-1",

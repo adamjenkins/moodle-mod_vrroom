@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
 /**
  * Live rooms: presences refreshed by polling, and the connection messages between their browsers.
  *
- * A presence (peer) is one row of mavrruntime_builtin_peers with a random peer id made here. It
+ * A presence (peer) is one row of vrroomruntime_builtin_peers with a random peer id made here. It
  * stays while its browser polls; after STALE_AFTER seconds without a poll it is gone. Signals are
  * only ever stored for a fresh peer of the same activity and the same group room, rebuilt by
  * signal_validator, and deleted when delivered or after SIGNAL_TTL seconds. Every limit is
@@ -28,7 +28,7 @@ namespace mavrruntime_builtin\local\live;
  * The heartbeat that refreshes a presence row and returns the others active in the last few
  * seconds is adapted from mod_gear's sync_session service.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -66,12 +66,12 @@ final class room_manager {
     public const LOCK_TIMEOUT = 5;
 
     /** @var string Presence table. */
-    public const TABLE_PEERS = 'mavrruntime_builtin_peers';
+    public const TABLE_PEERS = 'vrroomruntime_builtin_peers';
     /** @var string Signal table. */
-    public const TABLE_SIGNALS = 'mavrruntime_builtin_signals';
+    public const TABLE_SIGNALS = 'vrroomruntime_builtin_signals';
 
     /** @var string Lock type of the room locks. */
-    private const LOCK_TYPE = 'mavrruntime_builtin_live';
+    private const LOCK_TYPE = 'vrroomruntime_builtin_live';
 
     /** @var int Ids per IN () list when deleting in bulk. */
     private const CHUNK = 500;
@@ -100,7 +100,7 @@ final class room_manager {
      *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param int $userid The user (never from the client).
      * @param string $kind access::KIND_ATTEMPT or access::KIND_PREVIEW.
      * @param int $attemptid The attempt in progress, 0 for a preview.
@@ -112,7 +112,7 @@ final class room_manager {
     public static function join(
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         int $userid,
         string $kind,
         int $attemptid,
@@ -121,34 +121,34 @@ final class room_manager {
     ): array {
         global $DB;
         $now = $now ?? time();
-        $mavrid = (int)$mavr->id;
+        $vrroomid = (int)$vrroom->id;
 
         $factory = \core\lock\lock_config::get_lock_factory(self::LOCK_TYPE);
-        $lock = $factory->get_lock("room_{$mavrid}_{$groupid}", self::LOCK_TIMEOUT);
+        $lock = $factory->get_lock("room_{$vrroomid}_{$groupid}", self::LOCK_TIMEOUT);
         if (!$lock) {
-            throw new \moodle_exception('errorlivebusy', 'mavrruntime_builtin');
+            throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
         }
         try {
-            self::purge_room($mavrid, $groupid, $now);
+            self::purge_room($vrroomid, $groupid, $now);
 
             // One presence per user per activity: a new join (another tab, another group) replaces it.
-            $existing = $DB->get_record(self::TABLE_PEERS, ['mavrid' => $mavrid, 'userid' => $userid]);
+            $existing = $DB->get_record(self::TABLE_PEERS, ['vrroomid' => $vrroomid, 'userid' => $userid]);
             if ($existing) {
                 self::remove_peer($existing);
             }
 
-            $max = access::max_peers($mavr);
+            $max = access::max_peers($vrroom);
             $count = $DB->count_records_select(
                 self::TABLE_PEERS,
-                'mavrid = :mavrid AND groupid = :groupid AND timeseen >= :fresh',
-                ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
+                'vrroomid = :vrroomid AND groupid = :groupid AND timeseen >= :fresh',
+                ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
             );
             if ($count >= $max) {
-                throw new \moodle_exception('errorliveroomfull', 'mavrruntime_builtin', '', $max);
+                throw new \moodle_exception('errorliveroomfull', 'vrroomruntime_builtin', '', $max);
             }
 
             $peer = (object)[
-                'mavrid' => $mavrid,
+                'vrroomid' => $vrroomid,
                 'groupid' => $groupid,
                 'userid' => $userid,
                 'peerid' => self::new_peerid(),
@@ -165,7 +165,7 @@ final class room_manager {
                 $peer->id = (int)$DB->insert_record(self::TABLE_PEERS, $peer);
             } catch (\dml_write_exception $e) {
                 // A simultaneous join of the same user into another group's room won the unique index.
-                throw new \moodle_exception('errorlivebusy', 'mavrruntime_builtin');
+                throw new \moodle_exception('errorlivebusy', 'vrroomruntime_builtin');
             }
         } finally {
             $lock->release();
@@ -205,7 +205,7 @@ final class room_manager {
      * @param \stdClass $peer The caller's own presence (get_own_peer()).
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param bool $refreshice Whether to return new ICE servers.
      * @param int|null $now Current time.
      * @return array{status: string, interval: int, peers: array, signals: array, iceservers: array, iceexpires: int}
@@ -214,7 +214,7 @@ final class room_manager {
         \stdClass $peer,
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         bool $refreshice,
         ?int $now = null
     ): array {
@@ -229,7 +229,7 @@ final class room_manager {
             'iceexpires' => 0,
         ];
 
-        if (!access::still_allowed($peer, $cm, $context, $mavr)) {
+        if (!access::still_allowed($peer, $cm, $context, $vrroom)) {
             self::remove_peer($peer);
             $result['status'] = 'closed';
             return $result;
@@ -240,7 +240,7 @@ final class room_manager {
             $peer->ratewindow = $update->ratewindow = $now;
             $peer->pollcount = $update->pollcount = 0;
             $peer->signalcount = $update->signalcount = 0;
-            self::purge_room((int)$peer->mavrid, (int)$peer->groupid, $now);
+            self::purge_room((int)$peer->vrroomid, (int)$peer->groupid, $now);
         }
         $peer->pollcount = $update->pollcount = (int)$peer->pollcount + 1;
         $peer->timeseen = $update->timeseen = $now;
@@ -302,7 +302,7 @@ final class room_manager {
      * @param \stdClass $peer The caller's own presence (get_own_peer()).
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @param array $signals List of ['to' => string, 'type' => string, 'payload' => string].
      * @param int|null $now Current time.
      * @return array{status: string, results: array}
@@ -311,14 +311,14 @@ final class room_manager {
         \stdClass $peer,
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         array $signals,
         ?int $now = null
     ): array {
         global $DB;
         $now = $now ?? time();
 
-        if (!access::still_allowed($peer, $cm, $context, $mavr)) {
+        if (!access::still_allowed($peer, $cm, $context, $vrroom)) {
             self::remove_peer($peer);
             return ['status' => 'closed', 'results' => []];
         }
@@ -328,7 +328,7 @@ final class room_manager {
             $peer->ratewindow = $update->ratewindow = $now;
             $peer->pollcount = $update->pollcount = 0;
             $peer->signalcount = $update->signalcount = 0;
-            self::purge_room((int)$peer->mavrid, (int)$peer->groupid, $now);
+            self::purge_room((int)$peer->vrroomid, (int)$peer->groupid, $now);
         }
 
         $signalcount = (int)$peer->signalcount;
@@ -355,8 +355,8 @@ final class room_manager {
             if (!array_key_exists($to, $targets)) {
                 $targets[$to] = $DB->record_exists_select(
                     self::TABLE_PEERS,
-                    'peerid = :peerid AND mavrid = :mavrid AND groupid = :groupid AND timeseen >= :fresh AND id <> :self',
-                    ['peerid' => $to, 'mavrid' => (int)$peer->mavrid, 'groupid' => (int)$peer->groupid,
+                    'peerid = :peerid AND vrroomid = :vrroomid AND groupid = :groupid AND timeseen >= :fresh AND id <> :self',
+                    ['peerid' => $to, 'vrroomid' => (int)$peer->vrroomid, 'groupid' => (int)$peer->groupid,
                     'fresh' => $fresh,
                     'self' => (int)$peer->id]
                 );
@@ -387,7 +387,7 @@ final class room_manager {
             }
 
             $DB->insert_record(self::TABLE_SIGNALS, (object)[
-                'mavrid' => (int)$peer->mavrid,
+                'vrroomid' => (int)$peer->vrroomid,
                 'frompeer' => (string)$peer->peerid,
                 'topeer' => $to,
                 'type' => $type,
@@ -444,13 +444,13 @@ final class room_manager {
         $sql = "SELECT p.id, p.peerid, p.kind, p.userid {$userfields->selects}
                   FROM {" . self::TABLE_PEERS . "} p
                   JOIN {user} u ON u.id = p.userid {$userfields->joins}
-                 WHERE p.mavrid = :mavrid
+                 WHERE p.vrroomid = :vrroomid
                    AND p.groupid = :groupid
                    AND p.id <> :self
                    AND p.timeseen >= :fresh
               ORDER BY p.timejoined ASC, p.id ASC";
         $rows = $DB->get_records_sql($sql, array_merge($userfields->params, [
-            'mavrid' => (int)$peer->mavrid,
+            'vrroomid' => (int)$peer->vrroomid,
             'groupid' => (int)$peer->groupid,
             'self' => (int)($peer->id ?? 0),
             'fresh' => $now - self::STALE_AFTER,
@@ -470,7 +470,7 @@ final class room_manager {
     /**
      * Remove a presence and every signal from or to it.
      *
-     * @param \stdClass $peer mavrruntime_builtin_peers row.
+     * @param \stdClass $peer vrroomruntime_builtin_peers row.
      * @return void
      */
     public static function remove_peer(\stdClass $peer): void {
@@ -486,26 +486,26 @@ final class room_manager {
     /**
      * Remove the stale presences of one room and the expired signals of its activity.
      *
-     * @param int $mavrid Activity.
+     * @param int $vrroomid Activity.
      * @param int $groupid Room's group.
      * @param int $now Current time.
      * @return void
      */
-    public static function purge_room(int $mavrid, int $groupid, int $now): void {
+    public static function purge_room(int $vrroomid, int $groupid, int $now): void {
         global $DB;
         $stale = $DB->get_fieldset_select(
             self::TABLE_PEERS,
             'peerid',
-            'mavrid = :mavrid AND groupid = :groupid AND timeseen < :fresh',
-            ['mavrid' => $mavrid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
+            'vrroomid = :vrroomid AND groupid = :groupid AND timeseen < :fresh',
+            ['vrroomid' => $vrroomid, 'groupid' => $groupid, 'fresh' => $now - self::STALE_AFTER]
         );
         if ($stale) {
             self::delete_peers_by_peerid($stale);
         }
         $DB->delete_records_select(
             self::TABLE_SIGNALS,
-            'mavrid = :mavrid AND timecreated < :expired',
-            ['mavrid' => $mavrid, 'expired' => $now - self::SIGNAL_TTL]
+            'vrroomid = :vrroomid AND timecreated < :expired',
+            ['vrroomid' => $vrroomid, 'expired' => $now - self::SIGNAL_TTL]
         );
     }
 
@@ -538,13 +538,13 @@ final class room_manager {
     /**
      * Remove every presence and signal of an activity.
      *
-     * @param int $mavrid Activity.
+     * @param int $vrroomid Activity.
      * @return void
      */
-    public static function purge_activity(int $mavrid): void {
+    public static function purge_activity(int $vrroomid): void {
         global $DB;
-        $DB->delete_records(self::TABLE_SIGNALS, ['mavrid' => $mavrid]);
-        $DB->delete_records(self::TABLE_PEERS, ['mavrid' => $mavrid]);
+        $DB->delete_records(self::TABLE_SIGNALS, ['vrroomid' => $vrroomid]);
+        $DB->delete_records(self::TABLE_PEERS, ['vrroomid' => $vrroomid]);
     }
 
     /**
@@ -555,7 +555,7 @@ final class room_manager {
      */
     public static function purge_course(int $courseid): void {
         global $DB;
-        $select = 'mavrid IN (SELECT m.id FROM {mavr} m WHERE m.course = :courseid)';
+        $select = 'vrroomid IN (SELECT m.id FROM {vrroom} m WHERE m.course = :courseid)';
         $DB->delete_records_select(self::TABLE_SIGNALS, $select, ['courseid' => $courseid]);
         $DB->delete_records_select(self::TABLE_PEERS, $select, ['courseid' => $courseid]);
     }
@@ -564,14 +564,14 @@ final class room_manager {
      * Remove a user's presences (in one activity, or everywhere) with every signal from or to them.
      *
      * @param int $userid User.
-     * @param int $mavrid Activity, 0 for all.
+     * @param int $vrroomid Activity, 0 for all.
      * @return void
      */
-    public static function purge_user(int $userid, int $mavrid = 0): void {
+    public static function purge_user(int $userid, int $vrroomid = 0): void {
         global $DB;
         $conditions = ['userid' => $userid];
-        if ($mavrid > 0) {
-            $conditions['mavrid'] = $mavrid;
+        if ($vrroomid > 0) {
+            $conditions['vrroomid'] = $vrroomid;
         }
         foreach ($DB->get_records(self::TABLE_PEERS, $conditions) as $peer) {
             self::remove_peer($peer);
@@ -598,8 +598,8 @@ final class room_manager {
         }
         $newcomer = $DB->record_exists_select(
             self::TABLE_PEERS,
-            'mavrid = :mavrid AND groupid = :groupid AND id <> :self AND timejoined > :recent AND timeseen >= :fresh',
-            ['mavrid' => (int)$peer->mavrid, 'groupid' => (int)$peer->groupid, 'self' => (int)($peer->id ?? 0),
+            'vrroomid = :vrroomid AND groupid = :groupid AND id <> :self AND timejoined > :recent AND timeseen >= :fresh',
+            ['vrroomid' => (int)$peer->vrroomid, 'groupid' => (int)$peer->groupid, 'self' => (int)($peer->id ?? 0),
             'recent' => $now - self::ACTIVE_WINDOW,
             'fresh' => $now - self::STALE_AFTER]
         );

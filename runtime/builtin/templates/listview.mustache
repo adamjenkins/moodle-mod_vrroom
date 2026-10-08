@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/listview
+    @template vrroomruntime_builtin/listview
 
     The accessible list view: every station of every room as a section that can be opened with
     the keyboard, with its texts, images, audio, video, questions and the objects to use.
@@ -63,38 +63,38 @@
         ]
     }
 }}
-<div class="mavr-listview" data-region="mavr-listview">
+<div class="vrroom-listview" data-region="vrroom-listview">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <h2 class="h4 mb-0">{{#str}}listviewheading, mavrruntime_builtin{{/str}}</h2>
-        {{#canswitch}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="mavr-switch-3d">{{#str}}switchto3d, mavrruntime_builtin{{/str}}</button>{{/canswitch}}
+        <h2 class="h4 mb-0">{{#str}}listviewheading, vrroomruntime_builtin{{/str}}</h2>
+        {{#canswitch}}<button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-switch-3d">{{#str}}switchto3d, vrroomruntime_builtin{{/str}}</button>{{/canswitch}}
     </div>
     <ol class="list-unstyled">
         {{#stations}}
-        <li{{#hidden}} hidden{{/hidden}} data-region="mavr-station-item" data-zone="{{zoneid}}">
-            <section class="mavr-station card mb-3" data-region="mavr-station" data-zone="{{zoneid}}" data-scene="{{sceneid}}" aria-labelledby="mavr-station-{{zoneid}}">
+        <li{{#hidden}} hidden{{/hidden}} data-region="vrroom-station-item" data-zone="{{zoneid}}">
+            <section class="vrroom-station card mb-3" data-region="vrroom-station" data-zone="{{zoneid}}" data-scene="{{sceneid}}" aria-labelledby="vrroom-station-{{zoneid}}">
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <h3 class="h5 mb-0" id="mavr-station-{{zoneid}}">{{name}}</h3>
-                        <span class="badge {{badgeclass}}" data-region="mavr-station-status">{{statuslabel}}</span>
-                        {{#roomlabel}}<span class="badge bg-light text-dark" data-region="mavr-station-room">{{roomlabel}}</span>{{/roomlabel}}
+                        <h3 class="h5 mb-0" id="vrroom-station-{{zoneid}}">{{name}}</h3>
+                        <span class="badge {{badgeclass}}" data-region="vrroom-station-status">{{statuslabel}}</span>
+                        {{#roomlabel}}<span class="badge bg-light text-dark" data-region="vrroom-station-room">{{roomlabel}}</span>{{/roomlabel}}
                     </div>
-                    <button type="button" class="btn btn-secondary btn-sm mt-2" data-action="mavr-open-station" data-zone="{{zoneid}}" aria-expanded="false" aria-controls="mavr-station-body-{{zoneid}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
-                    <p class="text-muted mt-2 mb-0" data-region="mavr-station-locked" hidden>{{#str}}stationlocked, mavrruntime_builtin{{/str}}</p>
-                    <div class="mavr-station-body mt-2" id="mavr-station-body-{{zoneid}}" data-region="mavr-station-body" hidden>
+                    <button type="button" class="btn btn-secondary btn-sm mt-2" data-action="vrroom-open-station" data-zone="{{zoneid}}" aria-expanded="false" aria-controls="vrroom-station-body-{{zoneid}}">{{#str}}openstation, vrroomruntime_builtin{{/str}}</button>
+                    <p class="text-muted mt-2 mb-0" data-region="vrroom-station-locked" hidden>{{#str}}stationlocked, vrroomruntime_builtin{{/str}}</p>
+                    <div class="vrroom-station-body mt-2" id="vrroom-station-body-{{zoneid}}" data-region="vrroom-station-body" hidden>
                         {{#items}}
                         <div class="mb-2" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
                             <h4 class="h6">{{title}}</h4>
                             {{{html}}}
                             {{#text}}<p>{{text}}</p>{{/text}}
                             {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
-                            {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
-                            {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
-                            {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
+                            {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, vrroomruntime_builtin{{/str}}</p>{{/ismodel}}
+                            {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="vrroom-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
+                            {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="vrroom-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
                             {{#portaltext}}<p>{{portaltext}}</p>{{/portaltext}}
-                            {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
+                            {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="vrroom-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
                         </div>
                         {{/items}}
-                        {{#slots}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slots}}
+                        {{#slots}}<div data-region="vrroom-question" data-slot="{{slot}}"></div>{{/slots}}
                     </div>
                 </div>
             </section>
@@ -102,33 +102,33 @@
         {{/stations}}
     </ol>
     {{#hasothers}}
-    <h3 class="h5">{{#str}}otheritems, mavrruntime_builtin{{/str}}</h3>
+    <h3 class="h5">{{#str}}otheritems, vrroomruntime_builtin{{/str}}</h3>
     <ul class="list-unstyled">
         {{#others}}
-        <li class="mavr-otheritem card mb-3" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
+        <li class="vrroom-otheritem card mb-3" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
             <div class="card-body">
                 <div class="d-flex flex-wrap align-items-center gap-2">
-                    <h4 class="h6 mb-0" id="mavr-item-{{id}}">{{title}}</h4>
-                    {{#roomlabel}}<span class="badge bg-light text-dark" data-region="mavr-station-room">{{roomlabel}}</span>{{/roomlabel}}
+                    <h4 class="h6 mb-0" id="vrroom-item-{{id}}">{{title}}</h4>
+                    {{#roomlabel}}<span class="badge bg-light text-dark" data-region="vrroom-station-room">{{roomlabel}}</span>{{/roomlabel}}
                 </div>
                 <div class="d-flex flex-wrap gap-2 mt-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-action="mavr-open-item" data-item="{{id}}" aria-expanded="false" aria-controls="mavr-item-body-{{id}}" aria-describedby="mavr-item-{{id}}">{{#str}}openstation, mavrruntime_builtin{{/str}}</button>
-                    {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="mavr-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="vrroom-open-item" data-item="{{id}}" aria-expanded="false" aria-controls="vrroom-item-body-{{id}}" aria-describedby="vrroom-item-{{id}}">{{#str}}openstation, vrroomruntime_builtin{{/str}}</button>
+                    {{#uselabel}}<button type="button" class="btn btn-outline-primary btn-sm" data-action="vrroom-use-item" data-item="{{id}}" data-scene="{{sceneid}}">{{uselabel}}</button>{{/uselabel}}
                 </div>
                 {{#portaltext}}<p class="mt-2 mb-0">{{portaltext}}</p>{{/portaltext}}
-                <div class="mt-2" id="mavr-item-body-{{id}}" data-region="mavr-item-body" hidden>
+                <div class="mt-2" id="vrroom-item-body-{{id}}" data-region="vrroom-item-body" hidden>
                     {{{html}}}
                     {{#text}}<p>{{text}}</p>{{/text}}
                     {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
-                    {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, mavrruntime_builtin{{/str}}</p>{{/ismodel}}
-                    {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
-                    {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="mavr-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
-                    {{#slot}}<div data-region="mavr-question" data-slot="{{slot}}"></div>{{/slot}}
+                    {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, vrroomruntime_builtin{{/str}}</p>{{/ismodel}}
+                    {{#isaudio}}<audio controls preload="none" src="{{mediaurl}}" aria-label="{{title}}" data-region="vrroom-media" data-item="{{id}}" data-scene="{{sceneid}}"></audio>{{/isaudio}}
+                    {{#isvideo}}<video controls preload="none" class="w-100" src="{{mediaurl}}" aria-label="{{title}}" data-region="vrroom-media" data-item="{{id}}" data-scene="{{sceneid}}"></video>{{/isvideo}}
+                    {{#slot}}<div data-region="vrroom-question" data-slot="{{slot}}"></div>{{/slot}}
                 </div>
             </div>
         </li>
         {{/others}}
     </ul>
     {{/hasothers}}
-    <div data-region="mavr-list-progress"></div>
+    <div data-region="vrroom-list-progress"></div>
 </div>

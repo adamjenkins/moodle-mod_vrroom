@@ -19,7 +19,7 @@
 # AMD module like any other file in amd/src.
 #
 # XRControllerModelFactory is deliberately NOT bundled: it downloads controller models from a CDN
-# by default, and MAVR makes no external calls. Controllers are drawn procedurally and hands use
+# by default, and VR room makes no external calls. Controllers are drawn procedurally and hands use
 # XRHandModelFactory's 'spheres' profile, which fetches nothing.
 #
 # Usage: runtime/builtin/tools/build-three.sh
@@ -38,7 +38,7 @@ ESBUILD_VERSION="0.28.2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="$(cd "${SCRIPT_DIR}/.." && pwd)/amd/src/three.js"
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/mavr-three-build.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/vrroom-three-build.XXXXXX")"
 cleanup() {
     rm -rf "${WORK}"
 }

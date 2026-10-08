@@ -15,10 +15,10 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/shell
+    @template vrroomruntime_builtin/shell
 
     The frame of the built-in viewer: launch buttons, message region, live room panel (filled by
-    mavrruntime_builtin/liveroom when live mode is on), 3D stage (with the VR, AR and mixed reality
+    vrroomruntime_builtin/liveroom when live mode is on), 3D stage (with the VR, AR and mixed reality
     buttons, which stay hidden until the device is known to support them), list view, progress
     panel and the live region for screen readers.
 
@@ -42,38 +42,38 @@
         "nolaunch": false
     }
 }}
-<div class="mavr-shell" data-region="mavr-shell">
-    <div class="mavr-launchbar d-flex flex-wrap gap-2 mb-3" data-region="mavr-launchbar">
+<div class="vrroom-shell" data-region="vrroom-shell">
+    <div class="vrroom-launchbar d-flex flex-wrap gap-2 mb-3" data-region="vrroom-launchbar">
         {{#canstart}}
-        <button type="button" class="btn btn-primary" data-action="mavr-enter-3d">{{#str}}enter3d, mavrruntime_builtin{{/str}}</button>
-        <button type="button" class="btn btn-secondary" data-action="mavr-enter-list">{{#str}}enterlist, mavrruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-primary" data-action="vrroom-enter-3d">{{#str}}enter3d, vrroomruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-secondary" data-action="vrroom-enter-list">{{#str}}enterlist, vrroomruntime_builtin{{/str}}</button>
         {{/canstart}}
         {{#canpreview}}
-        <button type="button" class="btn btn-outline-secondary" data-action="mavr-preview-3d">{{#str}}preview3d, mavrruntime_builtin{{/str}}</button>
-        <button type="button" class="btn btn-outline-secondary" data-action="mavr-preview-list">{{#str}}previewlist, mavrruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary" data-action="vrroom-preview-3d">{{#str}}preview3d, vrroomruntime_builtin{{/str}}</button>
+        <button type="button" class="btn btn-outline-secondary" data-action="vrroom-preview-list">{{#str}}previewlist, vrroomruntime_builtin{{/str}}</button>
         {{/canpreview}}
     </div>
-    <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="mavr-message" role="status">{{#nolaunch}}{{#str}}nolaunch, mavrruntime_builtin{{/str}}{{/nolaunch}}</div>
-    <section class="mavr-liveroom d-none mb-3" data-region="mavr-liveroom" aria-label="{{#str}}liveroom, mavrruntime_builtin{{/str}}"></section>
-    <div class="mavr-stage d-none" data-region="mavr-stage">
-        <canvas class="mavr-canvas" data-region="mavr-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, mavrruntime_builtin{{/str}}" aria-describedby="mavr-controlshelp-{{cmid}}"></canvas>
-        <p class="visually-hidden" id="mavr-controlshelp-{{cmid}}">{{#str}}controlshelp, mavrruntime_builtin{{/str}}</p>
-        <div class="mavr-hud" data-region="mavr-hud">
-            <span class="mavr-crosshair" aria-hidden="true"></span>
-            <div class="mavr-stick" data-region="mavr-stick" aria-hidden="true"><span class="mavr-stick-knob" data-region="mavr-stick-knob"></span></div>
-            <div class="mavr-hud-buttons d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-light btn-sm" data-action="mavr-toggle-progress" aria-expanded="false" aria-controls="mavr-progress-{{cmid}}">{{#str}}progress, mavrruntime_builtin{{/str}}</button>
-                <button type="button" class="btn btn-light btn-sm" data-action="mavr-switch-list">{{#str}}switchtolist, mavrruntime_builtin{{/str}}</button>
-                <button type="button" class="btn btn-primary btn-sm d-none" data-action="mavr-enter-vr">{{#str}}entervr, mavrruntime_builtin{{/str}}</button>
-                <button type="button" class="btn btn-primary btn-sm d-none" data-action="mavr-enter-ar">{{#str}}enterar, mavrruntime_builtin{{/str}}</button>
-                <button type="button" class="btn btn-danger btn-sm d-none" data-action="mavr-exit-xr">{{#str}}exitxr, mavrruntime_builtin{{/str}}</button>
+    <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="vrroom-message" role="status">{{#nolaunch}}{{#str}}nolaunch, vrroomruntime_builtin{{/str}}{{/nolaunch}}</div>
+    <section class="vrroom-liveroom d-none mb-3" data-region="vrroom-liveroom" aria-label="{{#str}}liveroom, vrroomruntime_builtin{{/str}}"></section>
+    <div class="vrroom-stage d-none" data-region="vrroom-stage">
+        <canvas class="vrroom-canvas" data-region="vrroom-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, vrroomruntime_builtin{{/str}}" aria-describedby="vrroom-controlshelp-{{cmid}}"></canvas>
+        <p class="visually-hidden" id="vrroom-controlshelp-{{cmid}}">{{#str}}controlshelp, vrroomruntime_builtin{{/str}}</p>
+        <div class="vrroom-hud" data-region="vrroom-hud">
+            <span class="vrroom-crosshair" aria-hidden="true"></span>
+            <div class="vrroom-stick" data-region="vrroom-stick" aria-hidden="true"><span class="vrroom-stick-knob" data-region="vrroom-stick-knob"></span></div>
+            <div class="vrroom-hud-buttons d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-light btn-sm" data-action="vrroom-toggle-progress" aria-expanded="false" aria-controls="vrroom-progress-{{cmid}}">{{#str}}progress, vrroomruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-light btn-sm" data-action="vrroom-switch-list">{{#str}}switchtolist, vrroomruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-vr">{{#str}}entervr, vrroomruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-ar">{{#str}}enterar, vrroomruntime_builtin{{/str}}</button>
+                <button type="button" class="btn btn-danger btn-sm d-none" data-action="vrroom-exit-xr">{{#str}}exitxr, vrroomruntime_builtin{{/str}}</button>
             </div>
-            <div class="mavr-xr-status alert alert-info d-none" data-region="mavr-xr-status" role="status"></div>
-            <p class="mavr-xr-note small text-muted d-none" data-region="mavr-xr-note"></p>
+            <div class="vrroom-xr-status alert alert-info d-none" data-region="vrroom-xr-status" role="status"></div>
+            <p class="vrroom-xr-note small text-muted d-none" data-region="vrroom-xr-note"></p>
         </div>
-        <div class="mavr-overlay" data-region="mavr-overlay"></div>
+        <div class="vrroom-overlay" data-region="vrroom-overlay"></div>
     </div>
-    <div class="mavr-list d-none" data-region="mavr-list"></div>
-    <aside class="mavr-progress d-none" id="mavr-progress-{{cmid}}" data-region="mavr-progress"></aside>
-    <div class="visually-hidden" aria-live="polite" aria-atomic="true" data-region="mavr-live"></div>
+    <div class="vrroom-list d-none" data-region="vrroom-list"></div>
+    <aside class="vrroom-progress d-none" id="vrroom-progress-{{cmid}}" data-region="vrroom-progress"></aside>
+    <div class="visually-hidden" aria-live="polite" aria-atomic="true" data-region="vrroom-live"></div>
 </div>

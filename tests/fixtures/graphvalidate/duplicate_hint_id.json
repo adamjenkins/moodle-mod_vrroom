@@ -2,7 +2,7 @@
   "name": "duplicate_hint_id",
   "intent": "Hint ids are unique across all objectives of the graph.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "x-1",

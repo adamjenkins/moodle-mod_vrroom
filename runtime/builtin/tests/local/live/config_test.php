@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
 /**
  * Tests for the live mode site settings, ICE servers and TURN credentials.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(config::class)]
-#[\PHPUnit\Framework\Attributes\CoversClass(\mavrruntime_builtin\admin\setting_iceurls::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\vrroomruntime_builtin\admin\setting_iceurls::class)]
 final class config_test extends \advanced_testcase {
     /** @var string A peer id for the tests. */
     private const PEERID = '0123456789abcdef0123456789abcdef';
@@ -34,11 +34,11 @@ final class config_test extends \advanced_testcase {
      */
     public function test_is_enabled(): void {
         $this->resetAfterTest();
-        unset_config('liveenabled', 'mavrruntime_builtin');
+        unset_config('liveenabled', 'vrroomruntime_builtin');
         $this->assertTrue(config::is_enabled());
-        set_config('liveenabled', 0, 'mavrruntime_builtin');
+        set_config('liveenabled', 0, 'vrroomruntime_builtin');
         $this->assertFalse(config::is_enabled());
-        set_config('liveenabled', 1, 'mavrruntime_builtin');
+        set_config('liveenabled', 1, 'vrroomruntime_builtin');
         $this->assertTrue(config::is_enabled());
     }
 
@@ -62,8 +62,8 @@ final class config_test extends \advanced_testcase {
      */
     public function test_validate_urls_invalid(): void {
         $this->resetAfterTest();
-        $stunerror = fn(int $line) => get_string('errorinvalidstunurl', 'mavrruntime_builtin', $line);
-        $turnerror = fn(int $line) => get_string('errorinvalidturnurl', 'mavrruntime_builtin', $line);
+        $stunerror = fn(int $line) => get_string('errorinvalidstunurl', 'vrroomruntime_builtin', $line);
+        $turnerror = fn(int $line) => get_string('errorinvalidturnurl', 'vrroomruntime_builtin', $line);
 
         $this->assertSame($stunerror(2), config::validate_urls("stun:ok.example.org\nturn:turn.example.org", ['stun', 'stuns']));
         $this->assertSame($stunerror(1), config::validate_urls('stun:stun.example.org?transport=udp', ['stun', 'stuns']));
@@ -92,7 +92,7 @@ final class config_test extends \advanced_testcase {
         }
         $text = implode("\n", $lines);
         $this->assertSame(
-            get_string('errortoomanyiceurls', 'mavrruntime_builtin'),
+            get_string('errortoomanyiceurls', 'vrroomruntime_builtin'),
             config::validate_urls($text, ['stun', 'stuns'])
         );
         $this->assertTrue(config::validate_urls(implode("\n", array_slice($lines, 0, 10)), ['stun', 'stuns']));
@@ -117,7 +117,7 @@ final class config_test extends \advanced_testcase {
      */
     public function test_ice_servers_stun_only(): void {
         $this->resetAfterTest();
-        set_config('livestunurls', "stun:stun.example.org:3478\nstuns:stun.example.org:5349", 'mavrruntime_builtin');
+        set_config('livestunurls', "stun:stun.example.org:3478\nstuns:stun.example.org:5349", 'vrroomruntime_builtin');
         $ice = config::ice_servers(self::PEERID, 1000);
         $this->assertSame(0, $ice['expires']);
         $this->assertSame([['urls' => ['stun:stun.example.org:3478', 'stuns:stun.example.org:5349']]], $ice['servers']);
@@ -129,10 +129,10 @@ final class config_test extends \advanced_testcase {
     public function test_ice_servers_turn_with_secret(): void {
         $this->resetAfterTest();
         $secret = 'very-secret-value-123';
-        set_config('livestunurls', 'stun:stun.example.org', 'mavrruntime_builtin');
-        set_config('liveturnurls', 'turn:turn.example.org:3478?transport=udp', 'mavrruntime_builtin');
-        set_config('liveturnsecret', $secret, 'mavrruntime_builtin');
-        set_config('liveturnttl', 3600, 'mavrruntime_builtin');
+        set_config('livestunurls', 'stun:stun.example.org', 'vrroomruntime_builtin');
+        set_config('liveturnurls', 'turn:turn.example.org:3478?transport=udp', 'vrroomruntime_builtin');
+        set_config('liveturnsecret', $secret, 'vrroomruntime_builtin');
+        set_config('liveturnttl', 3600, 'vrroomruntime_builtin');
 
         $now = 1700000000;
         $ice = config::ice_servers(self::PEERID, $now);
@@ -149,7 +149,7 @@ final class config_test extends \advanced_testcase {
         $this->assertStringNotContainsString($secret, json_encode($ice));
 
         // A lifetime below a minute is raised to a minute.
-        set_config('liveturnttl', 5, 'mavrruntime_builtin');
+        set_config('liveturnttl', 5, 'vrroomruntime_builtin');
         $this->assertSame($now + 60, config::ice_servers(self::PEERID, $now)['expires']);
     }
 
@@ -158,8 +158,8 @@ final class config_test extends \advanced_testcase {
      */
     public function test_ice_servers_turn_without_secret(): void {
         $this->resetAfterTest();
-        set_config('liveturnurls', 'turn:turn.example.org:3478', 'mavrruntime_builtin');
-        set_config('liveturnsecret', '', 'mavrruntime_builtin');
+        set_config('liveturnurls', 'turn:turn.example.org:3478', 'vrroomruntime_builtin');
+        set_config('liveturnsecret', '', 'vrroomruntime_builtin');
         $this->assertSame(['servers' => [], 'expires' => 0], config::ice_servers(self::PEERID, 1000));
     }
 
@@ -172,7 +172,7 @@ final class config_test extends \advanced_testcase {
     }
 
     /**
-     * The settings page exists in the MAVR category and renders; the URL setting validates.
+     * The settings page exists in the VR room category and renders; the URL setting validates.
      */
     public function test_settings_page(): void {
         global $CFG;
@@ -181,21 +181,21 @@ final class config_test extends \advanced_testcase {
         $this->setAdminUser();
 
         $root = admin_get_root(true, true);
-        $this->assertNotNull($root->locate('modmavrfolder'));
-        $this->assertNotNull($root->locate('modsettingmavr'));
-        $page = $root->locate('mavrruntimesettingbuiltin');
+        $this->assertNotNull($root->locate('modvrroomfolder'));
+        $this->assertNotNull($root->locate('modsettingvrroom'));
+        $page = $root->locate('vrroomruntimesettingbuiltin');
         $this->assertNotNull($page);
         $html = $page->output_html();
         $this->assertStringContainsString('livestunurls', $html);
         $this->assertStringContainsString('liveturnsecret', $html);
 
-        $setting = new \mavrruntime_builtin\admin\setting_iceurls(
-            'mavrruntime_builtin/livestunurls',
-            new \lang_string('livestunurls', 'mavrruntime_builtin'),
-            new \lang_string('livestunurls_desc', 'mavrruntime_builtin'),
+        $setting = new \vrroomruntime_builtin\admin\setting_iceurls(
+            'vrroomruntime_builtin/livestunurls',
+            new \lang_string('livestunurls', 'vrroomruntime_builtin'),
+            new \lang_string('livestunurls_desc', 'vrroomruntime_builtin'),
             ['stun', 'stuns']
         );
         $this->assertTrue($setting->validate('stun:stun.example.org'));
-        $this->assertSame(get_string('errorinvalidstunurl', 'mavrruntime_builtin', 1), $setting->validate('nonsense'));
+        $this->assertSame(get_string('errorinvalidstunurl', 'vrroomruntime_builtin', 1), $setting->validate('nonsense'));
     }
 }

@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\launch;
+namespace mod_vrroom\local\launch;
 
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\attempt\hint_manager;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\xapi\iri;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\attempt\hint_manager;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\xapi\iri;
 
 /**
- * Builds the mavr-launch/1 configuration a client run mode starts from.
+ * Builds the vrroom-launch/1 configuration a client run mode starts from.
  *
  * Every piece of teacher content leaves the server formatted: hotspot text as format_text()
  * HTML, names and titles through format_string() (tags stripped, entities decoded, because the
@@ -32,16 +32,16 @@ use mod_mavr\local\xapi\iri;
  * never travel inside the graph: only the hints already requested in the attempt are sent, in
  * the separate `hints` key.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class config_builder {
     /** @var string Launch config schema. */
-    public const SCHEMA = 'mavr-launch/1';
+    public const SCHEMA = 'vrroom-launch/1';
 
     /** @var string xAPI state id of the resume position. */
-    public const RESUME_STATEID = 'mavr-resume';
+    public const RESUME_STATEID = 'vrroom-resume';
 
     /** @var string[] File areas a scene may reference. */
     private const FILE_AREAS = ['models', 'media', 'environment', 'assets'];
@@ -51,7 +51,7 @@ final class config_builder {
      *
      * @param \cm_info $cm course module
      * @param \context_module $context module context
-     * @param \stdClass $mavr mavr row
+     * @param \stdClass $vrroom vrroom row
      * @param \stdClass|null $attempt attempt row, or null for a teacher preview
      * @param \stdClass $user the user launching
      * @return array
@@ -59,18 +59,18 @@ final class config_builder {
     public static function build(
         \cm_info $cm,
         \context_module $context,
-        \stdClass $mavr,
+        \stdClass $vrroom,
         ?\stdClass $attempt,
         \stdClass $user
     ): array {
         global $CFG;
 
         $preview = $attempt === null;
-        $graphversion = $preview ? (int)$mavr->graphversion : (int)$attempt->graphversion;
-        $graph = instance_manager::get_graph((int)$mavr->id, $graphversion);
+        $graphversion = $preview ? (int)$vrroom->graphversion : (int)$attempt->graphversion;
+        $graph = instance_manager::get_graph((int)$vrroom->id, $graphversion);
 
         $scenes = [];
-        foreach (instance_manager::get_scenes((int)$mavr->id) as $scene) {
+        foreach (instance_manager::get_scenes((int)$vrroom->id) as $scene) {
             $scenes[] = self::prepare_scene($scene, $context);
         }
 
@@ -134,7 +134,7 @@ final class config_builder {
                 'activityid' => \core_xapi\iri::generate((string)$context->id, 'activity'),
                 'stateid' => self::RESUME_STATEID,
             ],
-            'finishurl' => (new \moodle_url('/mod/mavr/view.php', ['id' => $cm->id]))->out(false),
+            'finishurl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
         ];
     }
 
@@ -144,14 +144,14 @@ final class config_builder {
      * @return int
      */
     public static function get_maxbatch(): int {
-        $max = (int)get_config('mod_mavr', 'maxbatch');
+        $max = (int)get_config('mod_vrroom', 'maxbatch');
         return $max > 0 ? $max : 50;
     }
 
     /**
      * Format a stored scene for the client.
      *
-     * @param array $scene decoded mavr-scene/1 document
+     * @param array $scene decoded vrroom-scene/1 document
      * @param \context_module $context module context
      * @return array
      */
@@ -216,7 +216,7 @@ final class config_builder {
     }
 
     /**
-     * Add a pluginfile URL to a file reference (only for MAVR's own areas).
+     * Add a pluginfile URL to a file reference (only for VR room's own areas).
      *
      * @param array $ref ['area', 'itemid', 'filepath', 'filename']
      * @param \context_module $context module context
@@ -231,7 +231,7 @@ final class config_builder {
         $filepath = (string)($ref['filepath'] ?? '/');
         $ref['url'] = \moodle_url::make_pluginfile_url(
             $context->id,
-            'mod_mavr',
+            'mod_vrroom',
             $area,
             (int)($ref['itemid'] ?? 0),
             $filepath === '' ? '/' : $filepath,

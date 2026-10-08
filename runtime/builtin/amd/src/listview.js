@@ -20,7 +20,7 @@
  * Objects the tasks ask for (keys, things to use, objects to pick up) get a button, audio and
  * video play in the page, and portals say where they lead.
  *
- * @module     mavrruntime_builtin/listview
+ * @module     vrroomruntime_builtin/listview
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -29,9 +29,9 @@ import Notification from 'core/notification';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
-import {createProgress} from 'mavrruntime_builtin/panels';
-import {renderQuestion} from 'mavrruntime_builtin/question';
-import {BADGES, region, plainText, announce, showMessage, clearMessage, startScene} from 'mavrruntime_builtin/util';
+import {createProgress} from 'vrroomruntime_builtin/panels';
+import {renderQuestion} from 'vrroomruntime_builtin/question';
+import {BADGES, region, plainText, announce, showMessage, clearMessage, startScene} from 'vrroomruntime_builtin/util';
 
 /**
  * Ids the tasks ask the student to use: interact targets and collect targets.
@@ -141,12 +141,12 @@ const fillLabels = (items, scenenames) => {
     const targets = [];
     items.forEach((item) => {
         if (item.usebutton) {
-            requests.push({key: item.kind === 'grabbable' ? 'pickup' : 'useitem', component: 'mavrruntime_builtin',
+            requests.push({key: item.kind === 'grabbable' ? 'pickup' : 'useitem', component: 'vrroomruntime_builtin',
                 param: item.name || item.title});
             targets.push([item, 'uselabel']);
         }
         if (item.portaltarget && scenenames.has(item.portaltarget)) {
-            requests.push({key: 'leadsto', component: 'mavrruntime_builtin', param: scenenames.get(item.portaltarget)});
+            requests.push({key: 'leadsto', component: 'vrroomruntime_builtin', param: scenenames.get(item.portaltarget)});
             targets.push([item, 'portaltext']);
         }
     });
@@ -165,12 +165,12 @@ const fillLabels = (items, scenenames) => {
 /**
  * Announce an objective status change to screen readers.
  *
- * @param {HTMLElement} root The MAVR root element.
+ * @param {HTMLElement} root The VR room root element.
  * @param {string} title Objective title.
  * @param {string} status Status label.
  */
 const announceStatus = (root, title, status) => {
-    getString('objectivestatuschanged', 'mavrruntime_builtin', {title, status})
+    getString('objectivestatuschanged', 'vrroomruntime_builtin', {title, status})
         .then((text) => announce(root, text))
         .catch(() => null);
 };
@@ -187,18 +187,18 @@ const playMedia = (media) => {
 /**
  * Start the list view.
  *
- * @param {HTMLElement} root The MAVR root element (holding the shell).
+ * @param {HTMLElement} root The VR room root element (holding the shell).
  * @param {Object} session The session.
  * @param {Object} config Launch config; config.canswitch3d shows the switch button,
  *     config.onFinish finishes the attempt, config.onSwitch3d switches to the 3D room.
  * @returns {Promise<Object>} {stop()}
  */
 export const start = (root, session, config) => {
-    const pending = new Pending('mavrruntime_builtin/listview:start');
+    const pending = new Pending('vrroomruntime_builtin/listview:start');
     const startscene = startScene(config);
     const scenes = orderedScenes(config);
     const multiroom = scenes.length > 1;
-    const host = region(root, 'mavr-list');
+    const host = region(root, 'vrroom-list');
     let stopped = false;
     let progress = null;
     let unsubscribe = () => null;
@@ -207,13 +207,13 @@ export const start = (root, session, config) => {
     let wire = null;
 
     const stringrequests = [
-        {key: 'objectivestatus_locked', component: 'mavrruntime_builtin'},
-        {key: 'objectivestatus_available', component: 'mavrruntime_builtin'},
-        {key: 'objectivestatus_completed', component: 'mavrruntime_builtin'},
-        {key: 'stationlocked', component: 'mavrruntime_builtin'},
+        {key: 'objectivestatus_locked', component: 'vrroomruntime_builtin'},
+        {key: 'objectivestatus_available', component: 'vrroomruntime_builtin'},
+        {key: 'objectivestatus_completed', component: 'vrroomruntime_builtin'},
+        {key: 'stationlocked', component: 'vrroomruntime_builtin'},
     ];
     scenes.forEach((scene) => {
-        stringrequests.push({key: 'roomlabel', component: 'mavrruntime_builtin', param: plainText(scene.name || '')});
+        stringrequests.push({key: 'roomlabel', component: 'vrroomruntime_builtin', param: plainText(scene.name || '')});
     });
 
     return getStrings(stringrequests).then((strings) => {
@@ -284,7 +284,7 @@ export const start = (root, session, config) => {
             host.classList.remove('d-none');
 
             const showLocked = (station) => {
-                const note = station ? station.querySelector('[data-region="mavr-station-locked"]') : null;
+                const note = station ? station.querySelector('[data-region="vrroom-station-locked"]') : null;
                 if (note) {
                     note.hidden = false;
                 }
@@ -297,8 +297,8 @@ export const start = (root, session, config) => {
             };
 
             const renderQuestions = (container) => {
-                container.querySelectorAll('[data-region="mavr-question"]').forEach((qhost) => {
-                    const qstate = qhost.dataset.mavrQuestionState;
+                container.querySelectorAll('[data-region="vrroom-question"]').forEach((qhost) => {
+                    const qstate = qhost.dataset.vrroomQuestionState;
                     if (!qstate || (qstate === 'locked' && session.isSlotAvailable(qhost.dataset.slot))) {
                         renderQuestion(qhost, session, qhost.dataset.slot);
                     }
@@ -306,10 +306,10 @@ export const start = (root, session, config) => {
             };
 
             const openStation = (button, quiet) => {
-                const station = button.closest('[data-region="mavr-station"]');
+                const station = button.closest('[data-region="vrroom-station"]');
                 const zoneid = button.dataset.zone;
                 const sceneid = station.dataset.scene;
-                const body = station.querySelector('[data-region="mavr-station-body"]');
+                const body = station.querySelector('[data-region="vrroom-station-body"]');
                 if (button.getAttribute('aria-expanded') === 'true') {
                     if (!quiet) {
                         body.hidden = true;
@@ -321,7 +321,7 @@ export const start = (root, session, config) => {
                     showLocked(station);
                     return;
                 }
-                station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
+                station.querySelector('[data-region="vrroom-station-locked"]').hidden = true;
                 // Expand first: recording may run graph effects that look at the expanded state.
                 body.hidden = false;
                 button.setAttribute('aria-expanded', 'true');
@@ -338,7 +338,7 @@ export const start = (root, session, config) => {
 
             const openItem = (button) => {
                 const card = button.closest('[data-interactable]');
-                const body = card.querySelector('[data-region="mavr-item-body"]');
+                const body = card.querySelector('[data-region="vrroom-item-body"]');
                 if (button.getAttribute('aria-expanded') === 'true') {
                     body.hidden = true;
                     button.setAttribute('aria-expanded', 'false');
@@ -358,34 +358,34 @@ export const start = (root, session, config) => {
             const useItem = (button) => {
                 const itemid = button.dataset.item;
                 if (session.isObjectLocked(itemid)) {
-                    showLocked(button.closest('[data-region="mavr-station"]'));
+                    showLocked(button.closest('[data-region="vrroom-station"]'));
                     return;
                 }
                 session.setScene(button.dataset.scene);
                 session.record('interacted', 'object', itemid, button.dataset.scene);
             };
 
-            const listview = region(root, 'mavr-listview');
+            const listview = region(root, 'vrroom-listview');
             listview.addEventListener('click', (e) => {
-                const stationbutton = e.target.closest('[data-action="mavr-open-station"]');
+                const stationbutton = e.target.closest('[data-action="vrroom-open-station"]');
                 if (stationbutton) {
                     e.preventDefault();
                     openStation(stationbutton, false);
                     return;
                 }
-                const itembutton = e.target.closest('[data-action="mavr-open-item"]');
+                const itembutton = e.target.closest('[data-action="vrroom-open-item"]');
                 if (itembutton) {
                     e.preventDefault();
                     openItem(itembutton);
                     return;
                 }
-                const usebutton = e.target.closest('[data-action="mavr-use-item"]');
+                const usebutton = e.target.closest('[data-action="vrroom-use-item"]');
                 if (usebutton) {
                     e.preventDefault();
                     useItem(usebutton);
                     return;
                 }
-                const switchbutton = e.target.closest('[data-action="mavr-switch-3d"]');
+                const switchbutton = e.target.closest('[data-action="vrroom-switch-3d"]');
                 if (switchbutton && config.onSwitch3d) {
                     e.preventDefault();
                     config.onSwitch3d();
@@ -394,7 +394,7 @@ export const start = (root, session, config) => {
 
             // The first play of an audio or video counts as interacting with it.
             const played = new Set();
-            listview.querySelectorAll('[data-region="mavr-media"]').forEach((media) => {
+            listview.querySelectorAll('[data-region="vrroom-media"]').forEach((media) => {
                 media.addEventListener('play', () => {
                     const itemid = media.dataset.item;
                     if (stopped || played.has(itemid)) {
@@ -409,19 +409,19 @@ export const start = (root, session, config) => {
             // Keep badges, hidden items and questions in step with the state.
             const update = (message) => {
                 const current = message.state;
-                listview.querySelectorAll('[data-region="mavr-station"]').forEach((station) => {
+                listview.querySelectorAll('[data-region="vrroom-station"]').forEach((station) => {
                     const zoneid = station.dataset.zone;
                     const status = zoneStatus(zoneid);
-                    const badge = station.querySelector('[data-region="mavr-station-status"]');
+                    const badge = station.querySelector('[data-region="vrroom-station-status"]');
                     if (badge.dataset.status !== status) {
                         badge.dataset.status = status;
                         badge.className = `badge ${BADGES[status]}`;
                         badge.textContent = labels[status];
                     }
                     if (status !== 'locked') {
-                        station.querySelector('[data-region="mavr-station-locked"]').hidden = true;
+                        station.querySelector('[data-region="vrroom-station-locked"]').hidden = true;
                     }
-                    const item = station.closest('[data-region="mavr-station-item"]');
+                    const item = station.closest('[data-region="vrroom-station-item"]');
                     if (item) {
                         item.hidden = current.hidden.has(zoneid);
                     }
@@ -429,15 +429,15 @@ export const start = (root, session, config) => {
                 listview.querySelectorAll('[data-interactable]').forEach((el) => {
                     el.hidden = current.hidden.has(el.dataset.interactable);
                 });
-                listview.querySelectorAll('[data-region="mavr-station-body"]:not([hidden]),' +
-                    '[data-region="mavr-item-body"]:not([hidden])').forEach((body) => renderQuestions(body));
+                listview.querySelectorAll('[data-region="vrroom-station-body"]:not([hidden]),' +
+                    '[data-region="vrroom-item-body"]:not([hidden])').forEach((body) => renderQuestions(body));
                 message.completed.concat(message.unlocked).forEach((objective) => {
                     announceStatus(root, objective.title, labels[objective.status]);
                 });
                 message.effects.forEach((effect) => {
                     if (effect.do === 'play_media') {
                         const media = listview.querySelector(
-                            `[data-region="mavr-media"][data-item="${CSS.escape(String(effect.target))}"]`);
+                            `[data-region="vrroom-media"][data-item="${CSS.escape(String(effect.target))}"]`);
                         if (media) {
                             playMedia(media);
                         }
@@ -447,12 +447,12 @@ export const start = (root, session, config) => {
                         return;
                     }
                     const qhost = listview.querySelector(
-                        `[data-region="mavr-question"][data-slot="${Number(effect.target)}"]`);
+                        `[data-region="vrroom-question"][data-slot="${Number(effect.target)}"]`);
                     if (!qhost) {
                         return;
                     }
-                    const station = qhost.closest('[data-region="mavr-station"]');
-                    const button = station ? station.querySelector('[data-action="mavr-open-station"]') : null;
+                    const station = qhost.closest('[data-region="vrroom-station"]');
+                    const button = station ? station.querySelector('[data-action="vrroom-open-station"]') : null;
                     if (button && button.getAttribute('aria-expanded') !== 'true') {
                         openStation(button, true);
                     } else {
@@ -468,17 +468,17 @@ export const start = (root, session, config) => {
 
             session.start('builtin-list', startscene ? startscene.id : null);
 
-            return createProgress(region(root, 'mavr-list-progress'), session, {
+            return createProgress(region(root, 'vrroom-list-progress'), session, {
                 root: root,
                 onFinish: config.onFinish,
             });
         };
         return fillLabels(allitems, scenenames);
-    }).then(() => Templates.renderForPromise('mavrruntime_builtin/listview', listcontext))
+    }).then(() => Templates.renderForPromise('vrroomruntime_builtin/listview', listcontext))
     .then((rendered) => wire(rendered))
     .then((created) => {
         progress = created;
-        root.dataset.mavrReady = 'list';
+        root.dataset.vrroomReady = 'list';
         const heading = host.querySelector('h2');
         if (heading) {
             heading.setAttribute('tabindex', '-1');
@@ -503,7 +503,7 @@ export const start = (root, session, config) => {
                 session.stop();
                 host.replaceChildren();
                 host.classList.add('d-none');
-                delete root.dataset.mavrReady;
+                delete root.dataset.vrroomReady;
             },
         };
     }).catch((error) => {

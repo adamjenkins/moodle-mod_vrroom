@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
- * Tests of mod_mavr_request_hint.
+ * Tests of mod_vrroom_request_hint.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -43,7 +43,7 @@ final class request_hint_test extends \advanced_testcase {
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'gallery',
             'stations' => [
@@ -51,12 +51,12 @@ final class request_hint_test extends \advanced_testcase {
                     'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $context = \context_module::instance((int)$module->cmid);
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $zone = (string)$scene['zones'][0]['id'];
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'v-1', 'type' => 'visit_zone', 'title' => 'Visit', 'zone' => $zone, 'points' => 1,
                     'required' => true, 'hints' => [
@@ -66,7 +66,7 @@ final class request_hint_test extends \advanced_testcase {
             ],
             'rules' => [],
         ];
-        instance_manager::apply_compiled($mavr, $context, new compiled_activity([$scene], $graph, []));
+        instance_manager::apply_compiled($vrroom, $context, new compiled_activity([$scene], $graph, []));
 
         $student = $generator->create_and_enrol($course, 'student');
         $this->setUser($student);
@@ -102,7 +102,7 @@ final class request_hint_test extends \advanced_testcase {
         $this->assertSame(1, $result['state']['objectives'][0]['hintsused']);
         $this->assertArrayHasKey('timedue', $result['state']);
         $this->assertTrue($DB->record_exists(
-            'mavr_events',
+            'vrroom_events',
             ['attemptid' => $fx->attemptid, 'verb' => 'requested', 'objecttype' => 'hint', 'objectid' => 'hn-1']
         ));
 
@@ -149,15 +149,15 @@ final class request_hint_test extends \advanced_testcase {
     }
 
     /**
-     * Without mod/mavr:attempt the hint is refused and nothing is recorded.
+     * Without mod/vrroom:attempt the hint is refused and nothing is recorded.
      */
     public function test_capability(): void {
         global $DB;
         $fx = $this->setup_attempt();
         $roleid = (int)$DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
-        assign_capability('mod/mavr:attempt', CAP_PROHIBIT, $roleid, $fx->context->id, true);
+        assign_capability('mod/vrroom:attempt', CAP_PROHIBIT, $roleid, $fx->context->id, true);
         accesslib_clear_all_caches_for_unit_testing();
-        $this->assertFalse(has_capability('mod/mavr:attempt', $fx->context, $fx->student));
+        $this->assertFalse(has_capability('mod/vrroom:attempt', $fx->context, $fx->student));
 
         try {
             request_hint::execute($fx->attemptid, 'v-1');
@@ -165,6 +165,6 @@ final class request_hint_test extends \advanced_testcase {
         } catch (\required_capability_exception $e) {
             $this->assertSame('nopermissions', $e->errorcode);
         }
-        $this->assertFalse($DB->record_exists('mavr_events', ['attemptid' => $fx->attemptid, 'verb' => 'requested']));
+        $this->assertFalse($DB->record_exists('vrroom_events', ['attemptid' => $fx->attemptid, 'verb' => 'requested']));
     }
 }

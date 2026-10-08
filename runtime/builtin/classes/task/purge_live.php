@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\task;
+namespace vrroomruntime_builtin\task;
 
-use mavrruntime_builtin\local\live\room_manager;
+use vrroomruntime_builtin\local\live\room_manager;
 
 /**
  * Remove stale live room presences and expired connection messages (every minute).
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -32,7 +32,7 @@ class purge_live extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('taskpurgelive', 'mavrruntime_builtin');
+        return get_string('taskpurgelive', 'vrroomruntime_builtin');
     }
 
     /**

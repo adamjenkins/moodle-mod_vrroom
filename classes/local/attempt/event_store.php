@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\attempt;
+namespace mod_vrroom\local\attempt;
 
-use mod_mavr\local\graph\evaluator;
+use mod_vrroom\local\graph\evaluator;
 
 /**
- * Storage of accepted statements (the mavr_events table).
+ * Storage of accepted statements (the vrroom_events table).
  *
  * The tracking-table shape (one row per recorded action of an attempt, with a JSON payload and
  * server time) is adapted from mod_gear's gear_tracking table.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -41,7 +41,7 @@ final class event_store {
      */
     public static function exists(string $statementid): bool {
         global $DB;
-        return $DB->record_exists('mavr_events', ['statementid' => strtolower($statementid)]);
+        return $DB->record_exists('vrroom_events', ['statementid' => strtolower($statementid)]);
     }
 
     /**
@@ -52,7 +52,7 @@ final class event_store {
      */
     public static function count(int $attemptid): int {
         global $DB;
-        return $DB->count_records('mavr_events', ['attemptid' => $attemptid]);
+        return $DB->count_records('vrroom_events', ['attemptid' => $attemptid]);
     }
 
     /**
@@ -97,13 +97,13 @@ final class event_store {
             'timestamp' => $timestamp,
             'timecreated' => time(),
         ];
-        return (int)$DB->insert_record('mavr_events', $record);
+        return (int)$DB->insert_record('vrroom_events', $record);
     }
 
     /**
      * Record a server-asserted statement with a fresh statement id.
      *
-     * @param \stdClass $attempt mavr_attempts row
+     * @param \stdClass $attempt vrroom_attempts row
      * @param string $verb short verb
      * @param string $type object type
      * @param string|null $sceneid scene id
@@ -160,7 +160,7 @@ final class event_store {
      */
     public static function get_rows(int $attemptid): array {
         global $DB;
-        return array_values($DB->get_records('mavr_events', ['attemptid' => $attemptid], 'id ASC'));
+        return array_values($DB->get_records('vrroom_events', ['attemptid' => $attemptid], 'id ASC'));
     }
 
     /**
@@ -177,7 +177,7 @@ final class event_store {
         }
         foreach (array_chunk($attemptids, 500) as $chunk) {
             [$insql, $params] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED);
-            $DB->delete_records_select('mavr_events', "attemptid $insql", $params);
+            $DB->delete_records_select('vrroom_events', "attemptid $insql", $params);
         }
     }
 }

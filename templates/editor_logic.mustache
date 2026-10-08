@@ -15,16 +15,16 @@
     along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/editor_logic
+    @template mod_vrroom/editor_logic
 
     The logic editor on the Tasks tab of the room editor: settings, objectives and rules.
-    mod_mavr/editor_logic renders it again after every change of the document.
+    mod_vrroom/editor_logic renders it again after every change of the document.
 
     Classes required for JS:
     * none
 
     Data attributes required for JS:
-    * data-region="mavr-logic", data-field, data-action, data-objective-index, data-rule-index,
+    * data-region="vrroom-logic", data-field, data-action, data-objective-index, data-rule-index,
       data-hint-index, data-step-index, data-action-index
 
     Context variables required for this template:
@@ -32,8 +32,8 @@
     * hasproblems, problems - list of {text} (plain text) the editor found
     * timelimit - time limit in minutes
     * hiddengroups - option groups {label, options: [{value, label, selected}]} for the hidden items
-    * objectives - see mod_mavr/editor_logic_objective
-    * rules - see mod_mavr/editor_logic_rule
+    * objectives - see mod_vrroom/editor_logic_objective
+    * rules - see mod_vrroom/editor_logic_rule
     * hasobjectives, hasrules
 
     Example context (json):
@@ -49,24 +49,24 @@
         "rules": []
     }
 }}
-<div class="mavr-logic" data-region="mavr-logic">
-    <div class="alert alert-warning{{^hasproblems}} d-none{{/hasproblems}}" data-region="mavr-logic-problems" role="status">
+<div class="vrroom-logic" data-region="vrroom-logic">
+    <div class="alert alert-warning{{^hasproblems}} d-none{{/hasproblems}}" data-region="vrroom-logic-problems" role="status">
         <ul class="mb-0">
             {{#problems}}<li>{{text}}</li>{{/problems}}
         </ul>
     </div>
 
-    <section class="mb-4" aria-labelledby="mavr-logic-{{uid}}-settings">
-        <h3 class="h5" id="mavr-logic-{{uid}}-settings">{{#str}}logicsettings, mod_mavr{{/str}}</h3>
+    <section class="mb-4" aria-labelledby="vrroom-logic-{{uid}}-settings">
+        <h3 class="h5" id="vrroom-logic-{{uid}}-settings">{{#str}}logicsettings, mod_vrroom{{/str}}</h3>
         <div class="row g-3">
             <div class="col-12 col-md-4">
-                <label class="form-label" for="mavr-logic-{{uid}}-timelimit">{{#str}}logictimelimit, mod_mavr{{/str}}</label>
-                <input type="number" class="form-control" id="mavr-logic-{{uid}}-timelimit" min="0" max="10080" step="1"
+                <label class="form-label" for="vrroom-logic-{{uid}}-timelimit">{{#str}}logictimelimit, mod_vrroom{{/str}}</label>
+                <input type="number" class="form-control" id="vrroom-logic-{{uid}}-timelimit" min="0" max="10080" step="1"
                        value="{{timelimit}}" data-field="timelimit">
             </div>
             <div class="col-12 col-md-8">
-                <label class="form-label" for="mavr-logic-{{uid}}-hidden">{{#str}}logichidden, mod_mavr{{/str}}</label>
-                <select class="form-select" id="mavr-logic-{{uid}}-hidden" multiple size="5" data-field="hidden">
+                <label class="form-label" for="vrroom-logic-{{uid}}-hidden">{{#str}}logichidden, mod_vrroom{{/str}}</label>
+                <select class="form-select" id="vrroom-logic-{{uid}}-hidden" multiple size="5" data-field="hidden">
                     {{#hiddengroups}}
                     {{#label}}<optgroup label="{{label}}">{{/label}}
                     {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}
@@ -77,23 +77,23 @@
         </div>
     </section>
 
-    <section class="mb-4" aria-labelledby="mavr-logic-{{uid}}-objectives">
-        <h3 class="h5" id="mavr-logic-{{uid}}-objectives">{{#str}}logicobjectives, mod_mavr{{/str}}</h3>
-        <div role="list" data-region="mavr-logic-objectives">
+    <section class="mb-4" aria-labelledby="vrroom-logic-{{uid}}-objectives">
+        <h3 class="h5" id="vrroom-logic-{{uid}}-objectives">{{#str}}logicobjectives, mod_vrroom{{/str}}</h3>
+        <div role="list" data-region="vrroom-logic-objectives">
             {{#objectives}}
-            <div role="listitem">{{> mod_mavr/editor_logic_objective}}</div>
+            <div role="listitem">{{> mod_vrroom/editor_logic_objective}}</div>
             {{/objectives}}
         </div>
-        <button type="button" class="btn btn-secondary" data-action="mavr-logic-add-objective">{{#str}}logicaddobjective, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-secondary" data-action="vrroom-logic-add-objective">{{#str}}logicaddobjective, mod_vrroom{{/str}}</button>
     </section>
 
-    <section class="mb-4" aria-labelledby="mavr-logic-{{uid}}-rules">
-        <h3 class="h5" id="mavr-logic-{{uid}}-rules">{{#str}}logicrules, mod_mavr{{/str}}</h3>
-        <div role="list" data-region="mavr-logic-rules">
+    <section class="mb-4" aria-labelledby="vrroom-logic-{{uid}}-rules">
+        <h3 class="h5" id="vrroom-logic-{{uid}}-rules">{{#str}}logicrules, mod_vrroom{{/str}}</h3>
+        <div role="list" data-region="vrroom-logic-rules">
             {{#rules}}
-            <div role="listitem">{{> mod_mavr/editor_logic_rule}}</div>
+            <div role="listitem">{{> mod_vrroom/editor_logic_rule}}</div>
             {{/rules}}
         </div>
-        <button type="button" class="btn btn-secondary" data-action="mavr-logic-add-rule">{{#str}}logicaddrule, mod_mavr{{/str}}</button>
+        <button type="button" class="btn btn-secondary" data-action="vrroom-logic-add-rule">{{#str}}logicaddrule, mod_vrroom{{/str}}</button>
     </section>
 </div>

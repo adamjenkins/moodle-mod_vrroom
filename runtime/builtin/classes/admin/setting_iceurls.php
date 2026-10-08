@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\admin;
+namespace vrroomruntime_builtin\admin;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->libdir . '/adminlib.php');
 
-use mavrruntime_builtin\local\live\config;
+use vrroomruntime_builtin\local\live\config;
 
 /**
  * A text area of STUN or TURN URLs, one per line, checked against the allowed schemes.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -37,7 +37,7 @@ class setting_iceurls extends \admin_setting_configtextarea {
     /**
      * Constructor.
      *
-     * @param string $name Setting name, 'mavrruntime_builtin/<name>'.
+     * @param string $name Setting name, 'vrroomruntime_builtin/<name>'.
      * @param \lang_string $visiblename Label.
      * @param \lang_string $description Description.
      * @param string[] $schemes Allowed schemes, ['stun', 'stuns'] or ['turn', 'turns'].

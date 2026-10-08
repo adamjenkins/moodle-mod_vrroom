@@ -15,17 +15,17 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/liveparticipant
+    @template vrroomruntime_builtin/liveparticipant
 
     One person in the live room list: name, teacher badge, where they are, their microphone state,
     a speaking indicator and, for the others, "Mute for me".
 
     Classes required for JS:
-    * mavr-live-speaking - the speaking indicator, switched with mavr-live-speaking-on
+    * vrroom-live-speaking - the speaking indicator, switched with vrroom-live-speaking-on
 
     Data attributes required for JS:
     * data-peerid - the presence the line is for
-    * data-action mavr-live-mutepeer - mute or unmute that person for me
+    * data-action vrroom-live-mutepeer - mute or unmute that person for me
 
     Context variables required for this template:
     * peerid - peer id (hex)
@@ -49,13 +49,13 @@
         "mutelabel": "Mute Alex Learner for me"
     }
 }}
-<div class="mavr-live-participant d-flex flex-wrap align-items-center gap-2 py-1" data-peerid="{{peerid}}">
-    <span class="mavr-live-speaking" aria-hidden="true"></span>
+<div class="vrroom-live-participant d-flex flex-wrap align-items-center gap-2 py-1" data-peerid="{{peerid}}">
+    <span class="vrroom-live-speaking" aria-hidden="true"></span>
     <span class="fw-bold">{{name}}</span>
-    {{#kindpreview}}<span class="badge bg-secondary">{{#str}}livekindpreview, mavrruntime_builtin{{/str}}</span>{{/kindpreview}}
+    {{#kindpreview}}<span class="badge bg-secondary">{{#str}}livekindpreview, vrroomruntime_builtin{{/str}}</span>{{/kindpreview}}
     <span class="small text-muted">{{where}}</span>
     {{#micstate}}<span class="small">{{micstate}}</span>{{/micstate}}
     {{^isself}}
-    <button type="button" class="btn btn-link btn-sm p-0" data-action="mavr-live-mutepeer" aria-pressed="{{#mutedforme}}true{{/mutedforme}}{{^mutedforme}}false{{/mutedforme}}">{{mutelabel}}</button>
+    <button type="button" class="btn btn-link btn-sm p-0" data-action="vrroom-live-mutepeer" aria-pressed="{{#mutedforme}}true{{/mutedforme}}{{^mutedforme}}false{{/mutedforme}}">{{mutelabel}}</button>
     {{/isself}}
 </div>

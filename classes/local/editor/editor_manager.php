@@ -14,30 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\editor;
+namespace mod_vrroom\local\editor;
 
-use mod_mavr\local\graph\graph_validator;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\questions\bank;
-use mod_mavr\local\questions\slots;
-use mod_mavr\local\scene\presets;
-use mod_mavr\local\scene\scene_validator;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\bank;
+use mod_vrroom\local\questions\slots;
+use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\scene\scene_validator;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * The room editor's document: loading it, and validating and saving it as one unit.
  *
  * The editor saves rooms, tasks and question bindings together. The save is a trust boundary
- * (mod/mavr:manage carries RISK_XSS): everything the browser sends is validated again here,
+ * (mod/vrroom:manage carries RISK_XSS): everything the browser sends is validated again here,
  * whatever the editor's own checks said.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class editor_manager {
     /** @var string Schema of the editor document. */
-    public const DOC_SCHEMA = 'mavr-editdoc/1';
+    public const DOC_SCHEMA = 'vrroom-editdoc/1';
 
     /** @var int Largest editor document the save accepts, in bytes. */
     public const MAX_DOCUMENT_BYTES = 2097152;
@@ -73,20 +73,20 @@ final class editor_manager {
      *
      * @param \cm_info $cm The course module.
      * @param \context_module $context The module context.
-     * @param \stdClass $mavr The mavr row.
+     * @param \stdClass $vrroom The vrroom row.
      * @return array ['documentjson', 'assetsjson', 'presetsjson', 'questionsjson', 'infojson'] as JSON strings.
      */
-    public static function load(\cm_info $cm, \context_module $context, \stdClass $mavr): array {
+    public static function load(\cm_info $cm, \context_module $context, \stdClass $vrroom): array {
         global $DB;
 
         // Scenes and the graph are decoded as objects, so that empty JSON objects stay objects.
         $scenes = [];
-        foreach ($DB->get_records('mavr_scenes', ['mavrid' => $mavr->id], 'sortorder ASC, id ASC') as $row) {
+        foreach ($DB->get_records('vrroom_scenes', ['vrroomid' => $vrroom->id], 'sortorder ASC, id ASC') as $row) {
             $scenes[] = json_decode((string)$row->scenejson, false, 512, JSON_THROW_ON_ERROR);
         }
         $graph = null;
-        if ((string)$mavr->graphjson !== '') {
-            $graph = json_decode((string)$mavr->graphjson, false, 512, JSON_THROW_ON_ERROR);
+        if ((string)$vrroom->graphjson !== '') {
+            $graph = json_decode((string)$vrroom->graphjson, false, 512, JSON_THROW_ON_ERROR);
         }
         if (!$graph instanceof \stdClass) {
             $graph = (object)['schema' => graph_validator::SCHEMA, 'hidden' => [], 'objectives' => [], 'rules' => []];
@@ -94,7 +94,7 @@ final class editor_manager {
 
         $bindings = [];
         $boundids = [];
-        foreach (slots::get_slots((int)$mavr->id, $context) as $slot) {
+        foreach (slots::get_slots((int)$vrroom->id, $context) as $slot) {
             $bindings[] = [
                 'slot' => (int)$slot->slot,
                 'questionbankentryid' => (int)$slot->questionbankentryid,
@@ -107,10 +107,10 @@ final class editor_manager {
 
         $document = [
             'schema' => self::DOC_SCHEMA,
-            'revision' => self::revision($mavr, $context),
-            'template' => (string)$mavr->template,
-            'customised' => (int)($mavr->customised ?? 0),
-            'hasattempts' => $DB->record_exists('mavr_attempts', ['mavrid' => $mavr->id]),
+            'revision' => self::revision($vrroom, $context),
+            'template' => (string)$vrroom->template,
+            'customised' => (int)($vrroom->customised ?? 0),
+            'hasattempts' => $DB->record_exists('vrroom_attempts', ['vrroomid' => $vrroom->id]),
             'scenes' => $scenes,
             'graph' => $graph,
             'bindings' => $bindings,
@@ -118,7 +118,7 @@ final class editor_manager {
 
         $presets = [];
         foreach (presets::get_all() as $id => $preset) {
-            $preset['name'] = get_string($preset['string'], 'mod_mavr');
+            $preset['name'] = get_string($preset['string'], 'mod_vrroom');
             $presets[$id] = $preset;
         }
 
@@ -130,7 +130,7 @@ final class editor_manager {
         foreach (array_keys($boundids) as $qbeid) {
             $questions[] = [
                 'id' => (int)$qbeid,
-                'label' => self::plain_label(get_string('questionmissing', 'mod_mavr')),
+                'label' => self::plain_label(get_string('questionmissing', 'mod_vrroom')),
                 'available' => false,
             ];
         }
@@ -139,7 +139,7 @@ final class editor_manager {
             'cmid' => (int)$cm->id,
             'courseid' => (int)$cm->course,
             'contextid' => (int)$context->id,
-            'viewurl' => (new \moodle_url('/mod/mavr/view.php', ['id' => $cm->id]))->out(false),
+            'viewurl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
             'maxdocumentbytes' => self::MAX_DOCUMENT_BYTES,
             'maxscenes' => scene_validator::MAX_SCENES,
             'maxinteractables' => scene_validator::MAX_INTERACTABLES,
@@ -160,18 +160,18 @@ final class editor_manager {
     /**
      * The optimistic-lock revision of what is stored: a sha1 of the rooms, the graph and the bindings.
      *
-     * @param \stdClass $mavr The mavr row (graphjson is read from it).
+     * @param \stdClass $vrroom The vrroom row (graphjson is read from it).
      * @param \context_module $context The module context.
      * @return string 40 hex characters.
      */
-    public static function revision(\stdClass $mavr, \context_module $context): string {
+    public static function revision(\stdClass $vrroom, \context_module $context): string {
         global $DB;
 
         $rows = [];
         foreach (
             $DB->get_records(
-                'mavr_scenes',
-                ['mavrid' => $mavr->id],
+                'vrroom_scenes',
+                ['vrroomid' => $vrroom->id],
                 'sortorder ASC, id ASC',
                 'id, idnumber, sortorder, scenejson'
             ) as $row
@@ -179,10 +179,10 @@ final class editor_manager {
             $rows[] = [(string)$row->idnumber, (int)$row->sortorder, (string)$row->scenejson];
         }
         $bindings = [];
-        foreach (slots::get_slots((int)$mavr->id, $context) as $slot) {
+        foreach (slots::get_slots((int)$vrroom->id, $context) as $slot) {
             $bindings[] = [(int)$slot->slot, (int)$slot->questionbankentryid, round((float)$slot->maxmark, 7)];
         }
-        return sha1(json_encode([$rows, (string)$mavr->graphjson, $bindings], instance_manager::JSON_FLAGS));
+        return sha1(json_encode([$rows, (string)$vrroom->graphjson, $bindings], instance_manager::JSON_FLAGS));
     }
 
     /**
@@ -192,38 +192,38 @@ final class editor_manager {
      *
      * @param \cm_info $cm The course module.
      * @param \context_module $context The module context.
-     * @param \stdClass $mavr The mavr row, as currently stored.
-     * @param string $documentjson The mavr-editdoc/1 document from the editor.
+     * @param \stdClass $vrroom The vrroom row, as currently stored.
+     * @param string $documentjson The vrroom-editdoc/1 document from the editor.
      * @return array ['revision' => string, 'graphversion' => int, 'scenesupdated' => bool, 'graphupdated' => bool,
      *     'customised' => int]
      * @throws \moodle_exception erroreditortoolarge, erroreditorinvalid, erroreditorconflict, erroreditorasset,
      *     errorquestionduplicate
      */
-    public static function save(\cm_info $cm, \context_module $context, \stdClass $mavr, string $documentjson): array {
+    public static function save(\cm_info $cm, \context_module $context, \stdClass $vrroom, string $documentjson): array {
         global $DB;
 
         // 1. Size and shape.
         if (strlen($documentjson) > self::MAX_DOCUMENT_BYTES) {
-            throw new \moodle_exception('erroreditortoolarge', 'mod_mavr');
+            throw new \moodle_exception('erroreditortoolarge', 'mod_vrroom');
         }
         try {
             $document = json_decode($documentjson, true, 64, JSON_THROW_ON_ERROR);
         } catch (\JsonException $e) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', 'document');
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', 'document');
         }
         if (!is_array($document) || array_is_list($document) || ($document['schema'] ?? null) !== self::DOC_SCHEMA) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', 'document');
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', 'document');
         }
 
         // 2. Nobody saved since this document was loaded.
-        if (!is_string($document['revision'] ?? null) || !hash_equals(self::revision($mavr, $context), $document['revision'])) {
-            throw new \moodle_exception('erroreditorconflict', 'mod_mavr');
+        if (!is_string($document['revision'] ?? null) || !hash_equals(self::revision($vrroom, $context), $document['revision'])) {
+            throw new \moodle_exception('erroreditorconflict', 'mod_vrroom');
         }
 
         // 3. Rooms.
         $scenes = $document['scenes'] ?? null;
         if (!is_array($scenes) || !array_is_list($scenes)) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', 'scenes must be a list');
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', 'scenes must be a list');
         }
         foreach ($scenes as $i => $scene) {
             if (is_array($scene)) {
@@ -232,20 +232,20 @@ final class editor_manager {
         }
         $errors = scene_validator::validate_set($scenes);
         if ($errors) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', self::message(reset($errors)));
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', self::message(reset($errors)));
         }
         $fs = get_file_storage();
         foreach (self::file_refs($scenes) as $ref) {
             $file = $fs->get_file(
                 $context->id,
-                'mod_mavr',
+                'mod_vrroom',
                 (string)$ref['area'],
                 (int)$ref['itemid'],
                 (string)$ref['filepath'],
                 (string)$ref['filename']
             );
             if (!$file || $file->is_directory()) {
-                throw new \moodle_exception('erroreditorasset', 'mod_mavr', '', s((string)$ref['filename']));
+                throw new \moodle_exception('erroreditorasset', 'mod_vrroom', '', s((string)$ref['filename']));
             }
         }
         foreach ($scenes as $i => $scene) {
@@ -259,7 +259,7 @@ final class editor_manager {
                 if (!in_array($item['content']['textformat'], self::TEXT_FORMATS, true)) {
                     throw new \moodle_exception(
                         'erroreditorinvalid',
-                        'mod_mavr',
+                        'mod_vrroom',
                         '',
                         "scenes[{$i}].interactables[{$j}].content.textformat is not a known text format"
                     );
@@ -270,7 +270,7 @@ final class editor_manager {
         // 4. Tasks.
         $graph = $document['graph'] ?? null;
         if (!is_array($graph) || ($graph !== [] && array_is_list($graph))) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', 'graph must be an object');
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', 'graph must be an object');
         }
         // PHP decodes an empty JSON object ({}) as []. An empty 'unlock' means "no condition", so it
         // is dropped; stored as [] it would fail the client-side validator (graph.js isObject).
@@ -283,13 +283,13 @@ final class editor_manager {
         }
         $errors = graph_validator::validate($graph);
         if ($errors) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', self::message(reset($errors)));
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', self::message(reset($errors)));
         }
 
         // 5. Question bindings.
         $bindings = self::clean_bindings($document['bindings'] ?? null, $graph);
         $keep = [];
-        foreach (slots::get_slots((int)$mavr->id, $context) as $slot) {
+        foreach (slots::get_slots((int)$vrroom->id, $context) as $slot) {
             if ((int)$slot->questionbankentryid > 0) {
                 $keep[] = (int)$slot->questionbankentryid;
             }
@@ -298,62 +298,62 @@ final class editor_manager {
         foreach ($bindings as $binding) {
             $qbeid = $binding['questionbankentryid'];
             if (isset($used[$qbeid])) {
-                throw new \moodle_exception('errorquestionduplicate', 'mod_mavr');
+                throw new \moodle_exception('errorquestionduplicate', 'mod_vrroom');
             }
             $used[$qbeid] = true;
             $key = bank::validate_entry($qbeid, (int)$cm->course, $keep);
             if ($key !== null) {
-                throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', get_string($key, 'mod_mavr'));
+                throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', get_string($key, 'mod_vrroom'));
             }
         }
 
         // 6. Rooms and tasks agree.
         $errors = self::cross_check($scenes, $graph, $bindings);
         if ($errors) {
-            throw new \moodle_exception('erroreditorinvalid', 'mod_mavr', '', self::message(reset($errors)));
+            throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', self::message(reset($errors)));
         }
 
         // 7. Store.
-        $scenesbefore = self::scene_signature((int)$mavr->id);
-        $versionbefore = (int)$mavr->graphversion;
+        $scenesbefore = self::scene_signature((int)$vrroom->id);
+        $versionbefore = (int)$vrroom->graphversion;
         $now = time();
-        $customised = (int)($mavr->customised ?? 0) > 0 ? (int)$mavr->customised : $now;
+        $customised = (int)($vrroom->customised ?? 0) > 0 ? (int)$vrroom->customised : $now;
 
         $transaction = $DB->start_delegated_transaction();
         try {
-            $version = instance_manager::apply_compiled($mavr, $context, new compiled_activity($scenes, $graph, $bindings));
-            $DB->set_field('mavr', 'customised', $customised, ['id' => $mavr->id]);
-            $DB->set_field('mavr', 'timemodified', $now, ['id' => $mavr->id]);
+            $version = instance_manager::apply_compiled($vrroom, $context, new compiled_activity($scenes, $graph, $bindings));
+            $DB->set_field('vrroom', 'customised', $customised, ['id' => $vrroom->id]);
+            $DB->set_field('vrroom', 'timemodified', $now, ['id' => $vrroom->id]);
             $transaction->allow_commit();
         } catch (\Throwable $e) {
             $transaction->rollback($e);
         }
-        $mavr->customised = $customised;
-        $mavr->timemodified = $now;
+        $vrroom->customised = $customised;
+        $vrroom->timemodified = $now;
 
         // Files are not part of the transaction, so unreferenced uploads go only once the rows are safe.
         self::prune_assets($context, $scenes);
 
         // 8. Events.
-        $scenesupdated = self::scene_signature((int)$mavr->id) !== $scenesbefore;
+        $scenesupdated = self::scene_signature((int)$vrroom->id) !== $scenesbefore;
         $graphupdated = $version !== $versionbefore;
         if ($scenesupdated) {
-            \mod_mavr\event\scene_updated::create([
-                'objectid' => $mavr->id,
+            \mod_vrroom\event\scene_updated::create([
+                'objectid' => $vrroom->id,
                 'context' => $context,
                 'other' => ['scenecount' => count($scenes)],
             ])->trigger();
         }
         if ($graphupdated) {
-            $graphid = (int)$DB->get_field('mavr_graphs', 'id', ['mavrid' => $mavr->id, 'version' => $version], MUST_EXIST);
-            \mod_mavr\event\graph_updated::create([
+            $graphid = (int)$DB->get_field('vrroom_graphs', 'id', ['vrroomid' => $vrroom->id, 'version' => $version], MUST_EXIST);
+            \mod_vrroom\event\graph_updated::create([
                 'objectid' => $graphid,
                 'context' => $context,
-                'other' => ['mavrid' => (int)$mavr->id, 'version' => $version],
+                'other' => ['vrroomid' => (int)$vrroom->id, 'version' => $version],
             ])->trigger();
         }
 
-        $fresh = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $fresh = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         return [
             'revision' => self::revision($fresh, $context),
             'graphversion' => $version,
@@ -538,7 +538,7 @@ final class editor_manager {
         $fs = get_file_storage();
         $assets = [];
         foreach (self::AREAS as $area) {
-            foreach ($fs->get_area_files($context->id, 'mod_mavr', $area, false, 'itemid, filepath, filename', false) as $file) {
+            foreach ($fs->get_area_files($context->id, 'mod_vrroom', $area, false, 'itemid, filepath, filename', false) as $file) {
                 $assets[] = self::asset_entry($file);
             }
         }
@@ -559,7 +559,7 @@ final class editor_manager {
             'filename' => $file->get_filename(),
             'url' => \moodle_url::make_pluginfile_url(
                 $file->get_contextid(),
-                'mod_mavr',
+                'mod_vrroom',
                 $file->get_filearea(),
                 $file->get_itemid(),
                 $file->get_filepath(),
@@ -597,7 +597,7 @@ final class editor_manager {
         global $DB;
         $max = $DB->get_field_sql(
             'SELECT MAX(itemid) FROM {files} WHERE contextid = :contextid AND component = :component AND filearea = :filearea',
-            ['contextid' => $context->id, 'component' => 'mod_mavr', 'filearea' => self::ASSET_AREA]
+            ['contextid' => $context->id, 'component' => 'mod_vrroom', 'filearea' => self::ASSET_AREA]
         );
         return max(0, (int)$max) + 1;
     }
@@ -617,12 +617,12 @@ final class editor_manager {
         }
         $fs = get_file_storage();
         $itemids = [];
-        foreach ($fs->get_area_files($context->id, 'mod_mavr', self::ASSET_AREA, false, 'itemid', true) as $file) {
+        foreach ($fs->get_area_files($context->id, 'mod_vrroom', self::ASSET_AREA, false, 'itemid', true) as $file) {
             $itemids[(int)$file->get_itemid()] = true;
         }
         foreach (array_keys($itemids) as $itemid) {
             if (!isset($referenced[$itemid])) {
-                $fs->delete_area_files($context->id, 'mod_mavr', self::ASSET_AREA, $itemid);
+                $fs->delete_area_files($context->id, 'mod_vrroom', self::ASSET_AREA, $itemid);
             }
         }
     }
@@ -660,12 +660,12 @@ final class editor_manager {
     }
 
     /**
-     * Largest editor upload in bytes, from the mod_mavr maxmodelsize setting (MB, default 20).
+     * Largest editor upload in bytes, from the mod_vrroom maxmodelsize setting (MB, default 20).
      *
      * @return int
      */
     public static function get_max_bytes(): int {
-        $mb = (int)get_config('mod_mavr', 'maxmodelsize');
+        $mb = (int)get_config('mod_vrroom', 'maxmodelsize');
         return ($mb > 0 ? $mb : 20) * 1048576;
     }
 
@@ -719,7 +719,7 @@ final class editor_manager {
         if (!is_array($bindings) || !array_is_list($bindings) || count($bindings) > self::MAX_BINDINGS) {
             throw new \moodle_exception(
                 'erroreditorinvalid',
-                'mod_mavr',
+                'mod_vrroom',
                 '',
                 'bindings must be a list of at most ' . self::MAX_BINDINGS . ' questions'
             );
@@ -739,7 +739,7 @@ final class editor_manager {
             if (!is_int($slot) || $slot < 1 || isset($seen[$slot])) {
                 throw new \moodle_exception(
                     'erroreditorinvalid',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     "bindings[{$k}].slot must be a unique integer of at least 1"
                 );
@@ -747,7 +747,7 @@ final class editor_manager {
             if (!is_int($qbeid) || $qbeid <= 0) {
                 throw new \moodle_exception(
                     'erroreditorinvalid',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     "bindings[{$k}].questionbankentryid must be a question"
                 );
@@ -758,7 +758,7 @@ final class editor_manager {
             ) {
                 throw new \moodle_exception(
                     'erroreditorinvalid',
-                    'mod_mavr',
+                    'mod_vrroom',
                     '',
                     "bindings[{$k}].maxmark must be a number greater than 0 and at most 1000"
                 );
@@ -778,16 +778,16 @@ final class editor_manager {
     /**
      * The stored rooms as a comparable list of [idnumber, scenejson].
      *
-     * @param int $mavrid The mavr id.
+     * @param int $vrroomid The vrroom id.
      * @return array
      */
-    private static function scene_signature(int $mavrid): array {
+    private static function scene_signature(int $vrroomid): array {
         global $DB;
         $signature = [];
         foreach (
             $DB->get_records(
-                'mavr_scenes',
-                ['mavrid' => $mavrid],
+                'vrroom_scenes',
+                ['vrroomid' => $vrroomid],
                 'sortorder ASC, id ASC',
                 'id, idnumber, scenejson'
             ) as $row

@@ -14,27 +14,27 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_blank;
+namespace vrroomtemplate_blank;
 
-use mod_mavr\local\scene\presets;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\scene\presets;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * Empty room template: one room from a bundled environment and no tasks, built on in the room editor.
  *
- * The form has one field (the surroundings), stored as a mavrtemplate_blank/1 config and compiled
- * into one mavr-scene/1 room without zones, props or interactables, and an empty mavr-graph/1.
+ * The form has one field (the surroundings), stored as a vrroomtemplate_blank/1 config and compiled
+ * into one vrroom-scene/1 room without zones, props or interactables, and an empty vrroom-graph/1.
  *
- * @package    mavrtemplate_blank
+ * @package    vrroomtemplate_blank
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class template extends \mod_mavr\local\template\base {
+class template extends \mod_vrroom\local\template\base {
     /** @var string Frankenstyle component of this template (string lookups). */
-    public const COMPONENT = 'mavrtemplate_blank';
+    public const COMPONENT = 'vrroomtemplate_blank';
 
     /** @var string Schema identifier written into the stored config. */
-    public const SCHEMA = 'mavrtemplate_blank/1';
+    public const SCHEMA = 'vrroomtemplate_blank/1';
 
     /** @var string Environment preset chosen by default. */
     public const DEFAULT_ENVIRONMENT = 'gallery-hall';
@@ -100,7 +100,7 @@ class template extends \mod_mavr\local\template\base {
     }
 
     /**
-     * Turn submitted form data into the stored mavrtemplate_blank/1 config.
+     * Turn submitted form data into the stored vrroomtemplate_blank/1 config.
      *
      * The scene id of an existing activity is kept, so a rebuild keeps the room's id.
      *
@@ -138,7 +138,7 @@ class template extends \mod_mavr\local\template\base {
     /**
      * Compile a stored config into one empty room and an empty task graph.
      *
-     * @param \stdClass $config mavrtemplate_blank/1 config
+     * @param \stdClass $config vrroomtemplate_blank/1 config
      * @param \context_module $context module context (unused: no files)
      * @return compiled_activity
      */
@@ -146,7 +146,7 @@ class template extends \mod_mavr\local\template\base {
         $environmentid = self::clean_environment($config->environment ?? null);
         $preset = presets::get($environmentid);
         if ($preset === null) {
-            throw new \moodle_exception('invalidscene', 'mod_mavr', '', 'Unknown environment preset.');
+            throw new \moodle_exception('invalidscene', 'mod_vrroom', '', 'Unknown environment preset.');
         }
         $sceneid = (is_string($config->sceneid ?? null) && self::is_uuid($config->sceneid))
             ? $config->sceneid : strtolower(\core\uuid::generate());
@@ -157,7 +157,7 @@ class template extends \mod_mavr\local\template\base {
         }
 
         $scene = [
-            'schema' => 'mavr-scene/1',
+            'schema' => 'vrroom-scene/1',
             'id' => $sceneid,
             'name' => get_string('scenename', self::COMPONENT),
             'environment' => [
@@ -178,7 +178,7 @@ class template extends \mod_mavr\local\template\base {
             'interactables' => [],
         ];
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'hidden' => [],
             'objectives' => [],
             'rules' => [],
@@ -217,12 +217,12 @@ class template extends \mod_mavr\local\template\base {
     /**
      * Load and decode the stored config of an activity.
      *
-     * @param int $mavrid activity instance id
+     * @param int $vrroomid activity instance id
      * @return \stdClass|null null when absent or not an empty room config
      */
-    private static function load_stored_config(int $mavrid): ?\stdClass {
+    private static function load_stored_config(int $vrroomid): ?\stdClass {
         global $DB;
-        $json = $DB->get_field('mavr', 'templateconfig', ['id' => $mavrid, 'template' => 'blank']);
+        $json = $DB->get_field('vrroom', 'templateconfig', ['id' => $vrroomid, 'template' => 'blank']);
         if (!is_string($json) || $json === '') {
             return null;
         }

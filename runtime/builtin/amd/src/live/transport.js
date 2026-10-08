@@ -17,7 +17,7 @@
  * The live-room transport interface.
  *
  * Avatars, voice, the participant panel and the live controller talk only to this interface.
- * Phase 3 implements it as a browser-to-browser mesh (mavrruntime_builtin/live/mesh); a later
+ * Phase 3 implements it as a browser-to-browser mesh (vrroomruntime_builtin/live/mesh); a later
  * companion service implements the same interface, so nothing above it changes.
  *
  * Events (detail objects):
@@ -35,7 +35,7 @@
  *
  * Dependency-free ES module (no imports) so that both grunt (AMD build) and node --test load it.
  *
- * @module     mavrruntime_builtin/live/transport
+ * @module     vrroomruntime_builtin/live/transport
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

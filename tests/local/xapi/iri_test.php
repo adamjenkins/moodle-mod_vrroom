@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\xapi;
+namespace mod_vrroom\local\xapi;
 
 /**
  * Tests of the IRI helper.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -64,7 +64,7 @@ final class iri_test extends \advanced_testcase {
         global $CFG;
         $this->resetAfterTest();
         $built = iri::for_object(12, $type, $sceneid, $id);
-        $this->assertStringStartsWith($CFG->wwwroot . '/mod/mavr/xapi/12', $built);
+        $this->assertStringStartsWith($CFG->wwwroot . '/mod/vrroom/xapi/12', $built);
         $this->assertSame(['cmid' => 12, 'type' => $type, 'sceneid' => $expectscene, 'id' => $expectid], iri::parse($built));
     }
 
@@ -75,7 +75,7 @@ final class iri_test extends \advanced_testcase {
      */
     public function test_shapes(): void {
         global $CFG;
-        $act = $CFG->wwwroot . '/mod/mavr/xapi/7';
+        $act = $CFG->wwwroot . '/mod/vrroom/xapi/7';
         $this->assertSame($act, iri::activity(7));
         $this->assertSame($act . '/scene/s/zone/z', iri::for_object(7, 'zone', 's', 'z'));
         $this->assertSame($act . '/scene/s/object/o', iri::for_object(7, 'object', 's', 'o'));
@@ -92,9 +92,9 @@ final class iri_test extends \advanced_testcase {
      */
     public function test_parse_rejects(): void {
         global $CFG;
-        $act = $CFG->wwwroot . '/mod/mavr/xapi/';
+        $act = $CFG->wwwroot . '/mod/vrroom/xapi/';
         $bad = [
-            'http://elsewhere.example/mod/mavr/xapi/12',
+            'http://elsewhere.example/mod/vrroom/xapi/12',
             $act,
             $act . 'abc',
             $act . '012',
@@ -143,8 +143,8 @@ final class iri_test extends \advanced_testcase {
      */
     public function test_verbs(): void {
         $this->assertCount(11, iri::VERBS);
-        $this->assertSame('https://wisecat.net/xapi/mavr/verbs/requested', iri::verb_iri('requested'));
-        $this->assertSame('requested', iri::verb_short('https://wisecat.net/xapi/mavr/verbs/requested'));
+        $this->assertSame('https://wisecat.net/xapi/vrroom/verbs/requested', iri::verb_iri('requested'));
+        $this->assertSame('requested', iri::verb_short('https://wisecat.net/xapi/vrroom/verbs/requested'));
         foreach (iri::VERBS as $short => $verbiri) {
             $this->assertSame($verbiri, iri::verb_iri($short));
             $this->assertSame($short, iri::verb_short($verbiri));

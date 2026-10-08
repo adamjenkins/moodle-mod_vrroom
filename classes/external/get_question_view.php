@@ -14,25 +14,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\questions\bridge;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\questions\bridge;
 
 /**
  * Plain-text view of a true/false or multiple-choice question of the current user's open attempt,
  * for the in-world panels of immersive VR.
  *
- * The same checks as mod_mavr_get_question apply: the attempt must be the user's own open attempt
+ * The same checks as mod_vrroom_get_question apply: the attempt must be the user's own open attempt
  * (within its time limit), and the question's objective must be unlocked.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -69,7 +69,7 @@ class get_question_view extends external_api {
 
         [$status] = helper::question_status($attempt, $slot);
         if ($status !== evaluator::OBJECTIVE_AVAILABLE && $status !== evaluator::OBJECTIVE_COMPLETED) {
-            throw new \moodle_exception('errorquestionlocked', 'mod_mavr');
+            throw new \moodle_exception('errorquestionlocked', 'mod_vrroom');
         }
 
         return bridge::get_view($attempt, $slot, $context, $status === evaluator::OBJECTIVE_COMPLETED);

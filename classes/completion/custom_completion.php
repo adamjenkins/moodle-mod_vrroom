@@ -16,14 +16,14 @@
 
 declare(strict_types=1);
 
-namespace mod_mavr\completion;
+namespace mod_vrroom\completion;
 
 use core_completion\activity_custom_completion;
 
 /**
- * Custom completion rules of MAVR activities.
+ * Custom completion rules of VR room activities.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -39,8 +39,8 @@ class custom_completion extends activity_custom_completion {
     public function get_state(string $rule): int {
         global $DB;
         $this->validate_rule($rule);
-        $done = $DB->record_exists('mavr_attempts', [
-            'mavrid' => $this->cm->instance,
+        $done = $DB->record_exists('vrroom_attempts', [
+            'vrroomid' => $this->cm->instance,
             'userid' => $this->userid,
             'state' => 'finished',
             'requireddone' => 1,
@@ -63,7 +63,7 @@ class custom_completion extends activity_custom_completion {
      * @return array
      */
     public function get_custom_rule_descriptions(): array {
-        return ['completionobjectives' => get_string('completiondetail:objectives', 'mod_mavr')];
+        return ['completionobjectives' => get_string('completiondetail:objectives', 'mod_vrroom')];
     }
 
     /**

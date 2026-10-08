@@ -2,7 +2,7 @@
   "name": "digit_objective_id",
   "intent": "An all-digit objective id is rejected and not entered into the id table, so a reference to it is unknown.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "123",

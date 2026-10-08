@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\editor;
+namespace mod_vrroom\local\editor;
 
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\questions\slots;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\slots;
 
 /**
  * Tests for the room editor's document: load, revision, validation and save.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -32,32 +32,32 @@ final class editor_manager_test extends \advanced_testcase {
     /**
      * A course with a two-station gallery, as the admin.
      *
-     * @return \stdClass course, cm (cm_info), context, mavrid
+     * @return \stdClass course, cm (cm_info), context, vrroomid
      */
     private function setup_activity(): \stdClass {
         $this->resetAfterTest();
         $this->setAdminUser();
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
-        $module = $generator->create_module('mavr', ['course' => $course->id, 'stationtitles' => 'Vase|Portrait']);
-        [, $cm] = get_course_and_cm_from_cmid($module->cmid, 'mavr');
+        $module = $generator->create_module('vrroom', ['course' => $course->id, 'stationtitles' => 'Vase|Portrait']);
+        [, $cm] = get_course_and_cm_from_cmid($module->cmid, 'vrroom');
         return (object)[
             'course' => $course,
             'cm' => $cm,
             'context' => \context_module::instance($cm->id),
-            'mavrid' => (int)$module->id,
+            'vrroomid' => (int)$module->id,
         ];
     }
 
     /**
-     * The stored mavr row.
+     * The stored vrroom row.
      *
      * @param \stdClass $fx fixture
      * @return \stdClass
      */
-    private function mavr(\stdClass $fx): \stdClass {
+    private function vrroom(\stdClass $fx): \stdClass {
         global $DB;
-        return $DB->get_record('mavr', ['id' => $fx->mavrid], '*', MUST_EXIST);
+        return $DB->get_record('vrroom', ['id' => $fx->vrroomid], '*', MUST_EXIST);
     }
 
     /**
@@ -67,7 +67,7 @@ final class editor_manager_test extends \advanced_testcase {
      * @return array
      */
     private function load_document(\stdClass $fx): array {
-        $loaded = editor_manager::load($fx->cm, $fx->context, $this->mavr($fx));
+        $loaded = editor_manager::load($fx->cm, $fx->context, $this->vrroom($fx));
         return json_decode($loaded['documentjson'], true, 512, JSON_THROW_ON_ERROR);
     }
 
@@ -86,7 +86,7 @@ final class editor_manager_test extends \advanced_testcase {
             'graph' => $document['graph'],
             'bindings' => $document['bindings'],
         ];
-        return editor_manager::save($fx->cm, $fx->context, $this->mavr($fx), json_encode($payload, JSON_THROW_ON_ERROR));
+        return editor_manager::save($fx->cm, $fx->context, $this->vrroom($fx), json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -94,7 +94,7 @@ final class editor_manager_test extends \advanced_testcase {
      *
      * @param \stdClass $fx fixture
      * @param array $document document
-     * @param string $errorcode expected mod_mavr error code
+     * @param string $errorcode expected mod_vrroom error code
      * @param string|null $contains text the message must contain
      */
     private function assert_save_fails(\stdClass $fx, array $document, string $errorcode, ?string $contains = null): void {
@@ -124,7 +124,7 @@ final class editor_manager_test extends \advanced_testcase {
         string $area,
         int $itemid,
         string $filename,
-        string $component = 'mod_mavr'
+        string $component = 'mod_vrroom'
     ): \stored_file {
         return get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
@@ -146,7 +146,7 @@ final class editor_manager_test extends \advanced_testcase {
      */
     private static function second_room(array $first, string $id, string $spawnid): array {
         return [
-            'schema' => 'mavr-scene/1',
+            'schema' => 'vrroom-scene/1',
             'id' => $id,
             'name' => 'Cellar',
             'environment' => $first['environment'],
@@ -162,26 +162,26 @@ final class editor_manager_test extends \advanced_testcase {
      */
     public function test_load_shape_and_revision(): void {
         $fx = $this->setup_activity();
-        $mavr = $this->mavr($fx);
-        $loaded = editor_manager::load($fx->cm, $fx->context, $mavr);
+        $vrroom = $this->vrroom($fx);
+        $loaded = editor_manager::load($fx->cm, $fx->context, $vrroom);
         $this->assertSame(['documentjson', 'assetsjson', 'presetsjson', 'questionsjson', 'infojson'], array_keys($loaded));
 
         $document = json_decode($loaded['documentjson'], true);
         $this->assertSame(editor_manager::DOC_SCHEMA, $document['schema']);
         $this->assertMatchesRegularExpression('/^[0-9a-f]{40}$/', $document['revision']);
-        $this->assertSame(editor_manager::revision($mavr, $fx->context), $document['revision']);
+        $this->assertSame(editor_manager::revision($vrroom, $fx->context), $document['revision']);
         $this->assertSame('gallery', $document['template']);
         $this->assertSame(0, $document['customised']);
         $this->assertFalse($document['hasattempts']);
         $this->assertCount(1, $document['scenes']);
-        $this->assertSame(instance_manager::get_scenes($fx->mavrid), $document['scenes']);
-        $this->assertSame(instance_manager::get_graph($fx->mavrid), $document['graph']);
+        $this->assertSame(instance_manager::get_scenes($fx->vrroomid), $document['scenes']);
+        $this->assertSame(instance_manager::get_graph($fx->vrroomid), $document['graph']);
         $this->assertSame([], $document['bindings']);
 
         $this->assertSame([], json_decode($loaded['assetsjson'], true));
         $presets = json_decode($loaded['presetsjson'], true);
         $this->assertArrayHasKey('gallery-hall', $presets);
-        $this->assertSame(get_string('preset_galleryhall', 'mod_mavr'), $presets['gallery-hall']['name']);
+        $this->assertSame(get_string('preset_galleryhall', 'mod_vrroom'), $presets['gallery-hall']['name']);
         $this->assertIsArray(json_decode($loaded['questionsjson'], true));
 
         $info = json_decode($loaded['infojson'], true);
@@ -199,7 +199,7 @@ final class editor_manager_test extends \advanced_testcase {
     public function test_save_unchanged_round_trip(): void {
         global $DB;
         $fx = $this->setup_activity();
-        $before = $this->mavr($fx);
+        $before = $this->vrroom($fx);
         $document = $this->load_document($fx);
 
         $sink = $this->redirectEvents();
@@ -211,12 +211,12 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertFalse($result['graphupdated']);
         $this->assertSame((int)$before->graphversion, $result['graphversion']);
         $this->assertGreaterThan(0, $result['customised']);
-        $this->assertSame(editor_manager::revision($this->mavr($fx), $fx->context), $result['revision']);
-        $this->assertSame($result['customised'], (int)$DB->get_field('mavr', 'customised', ['id' => $fx->mavrid]));
-        $this->assertSame(1, $DB->count_records('mavr_graphs', ['mavrid' => $fx->mavrid]));
+        $this->assertSame(editor_manager::revision($this->vrroom($fx), $fx->context), $result['revision']);
+        $this->assertSame($result['customised'], (int)$DB->get_field('vrroom', 'customised', ['id' => $fx->vrroomid]));
+        $this->assertSame(1, $DB->count_records('vrroom_graphs', ['vrroomid' => $fx->vrroomid]));
         foreach ($events as $event) {
-            $this->assertNotInstanceOf(\mod_mavr\event\scene_updated::class, $event);
-            $this->assertNotInstanceOf(\mod_mavr\event\graph_updated::class, $event);
+            $this->assertNotInstanceOf(\mod_vrroom\event\scene_updated::class, $event);
+            $this->assertNotInstanceOf(\mod_vrroom\event\graph_updated::class, $event);
         }
     }
 
@@ -237,24 +237,24 @@ final class editor_manager_test extends \advanced_testcase {
 
         $this->assertTrue($result['scenesupdated']);
         $this->assertFalse($result['graphupdated']);
-        $scenes = instance_manager::get_scenes($fx->mavrid);
+        $scenes = instance_manager::get_scenes($fx->vrroomid);
         $this->assertSame($zoneid, $scenes[0]['zones'][0]['id']);
         $this->assertEquals([2.5, 1.5, 9.0], $scenes[0]['zones'][0]['center']);
 
-        $sceneevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_mavr\event\scene_updated));
-        $graphevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_mavr\event\graph_updated));
+        $sceneevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_vrroom\event\scene_updated));
+        $graphevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_vrroom\event\graph_updated));
         $this->assertCount(1, $sceneevents);
         $this->assertCount(0, $graphevents);
-        $this->assertSame($fx->mavrid, (int)$sceneevents[0]->objectid);
+        $this->assertSame($fx->vrroomid, (int)$sceneevents[0]->objectid);
         $this->assertSame(1, $sceneevents[0]->other['scenecount']);
 
         // The first save's time stays.
-        $DB->set_field('mavr', 'customised', 12345, ['id' => $fx->mavrid]);
+        $DB->set_field('vrroom', 'customised', 12345, ['id' => $fx->vrroomid]);
         $document = $this->load_document($fx);
         $document['scenes'][0]['zones'][0]['center'] = [3.0, 1.5, 9.0];
         $result = $this->save_document($fx, $document);
         $this->assertSame(12345, $result['customised']);
-        $this->assertEquals(12345, $DB->get_field('mavr', 'customised', ['id' => $fx->mavrid]));
+        $this->assertEquals(12345, $DB->get_field('vrroom', 'customised', ['id' => $fx->vrroomid]));
     }
 
     /**
@@ -273,13 +273,13 @@ final class editor_manager_test extends \advanced_testcase {
 
         $this->assertTrue($result['graphupdated']);
         $this->assertSame(2, $result['graphversion']);
-        $this->assertSame('Find the vase', instance_manager::get_graph($fx->mavrid)['objectives'][0]['title']);
-        $graphevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_mavr\event\graph_updated));
+        $this->assertSame('Find the vase', instance_manager::get_graph($fx->vrroomid)['objectives'][0]['title']);
+        $graphevents = array_values(array_filter($events, fn($e) => $e instanceof \mod_vrroom\event\graph_updated));
         $this->assertCount(1, $graphevents);
-        $graphid = (int)$DB->get_field('mavr_graphs', 'id', ['mavrid' => $fx->mavrid, 'version' => 2]);
+        $graphid = (int)$DB->get_field('vrroom_graphs', 'id', ['vrroomid' => $fx->vrroomid, 'version' => 2]);
         $this->assertSame($graphid, (int)$graphevents[0]->objectid);
         $this->assertSame(2, $graphevents[0]->other['version']);
-        $this->assertSame($fx->mavrid, $graphevents[0]->other['mavrid']);
+        $this->assertSame($fx->vrroomid, $graphevents[0]->other['vrroomid']);
 
         // The same graph again, with whole numbers as a browser sends them: no new version.
         $document = $this->load_document($fx);
@@ -303,7 +303,7 @@ final class editor_manager_test extends \advanced_testcase {
 
         $stale['scenes'][0]['zones'][0]['center'] = [-1.0, 1.5, 9.0];
         $this->assert_save_fails($fx, $stale, 'erroreditorconflict');
-        $this->assertEquals([1.0, 1.5, 9.0], instance_manager::get_scenes($fx->mavrid)[0]['zones'][0]['center']);
+        $this->assertEquals([1.0, 1.5, 9.0], instance_manager::get_scenes($fx->vrroomid)[0]['zones'][0]['center']);
     }
 
     /**
@@ -311,17 +311,17 @@ final class editor_manager_test extends \advanced_testcase {
      */
     public function test_too_large_and_bad_json(): void {
         $fx = $this->setup_activity();
-        $mavr = $this->mavr($fx);
+        $vrroom = $this->vrroom($fx);
 
         try {
-            editor_manager::save($fx->cm, $fx->context, $mavr, str_repeat(' ', editor_manager::MAX_DOCUMENT_BYTES + 1));
+            editor_manager::save($fx->cm, $fx->context, $vrroom, str_repeat(' ', editor_manager::MAX_DOCUMENT_BYTES + 1));
             $this->fail('An oversized document was accepted.');
         } catch (\moodle_exception $e) {
             $this->assertSame('erroreditortoolarge', $e->errorcode);
         }
-        foreach (['not json', '[]', '{"schema": "mavr-editdoc/2"}', '"text"'] as $json) {
+        foreach (['not json', '[]', '{"schema": "vrroom-editdoc/2"}', '"text"'] as $json) {
             try {
-                editor_manager::save($fx->cm, $fx->context, $mavr, $json);
+                editor_manager::save($fx->cm, $fx->context, $vrroom, $json);
                 $this->fail("The document {$json} was accepted.");
             } catch (\moodle_exception $e) {
                 $this->assertSame('erroreditorinvalid', $e->errorcode);
@@ -360,7 +360,7 @@ final class editor_manager_test extends \advanced_testcase {
         $broken['scenes'][] = self::second_room($first, '1f5e7c2a-9b3d-4e8f-a1c6-5d2e0b7f3a99', 's-cellar');
         $result = $this->save_document($fx, $broken);
         $this->assertTrue($result['scenesupdated']);
-        $this->assertCount(2, instance_manager::get_scenes($fx->mavrid));
+        $this->assertCount(2, instance_manager::get_scenes($fx->vrroomid));
 
         $document = $this->load_document($fx);
         $document['scenes'][0]['interactables'][0]['content']['textformat'] = '9';
@@ -383,7 +383,7 @@ final class editor_manager_test extends \advanced_testcase {
 
         // A file of another activity does not count.
         $course2 = $this->getDataGenerator()->create_course();
-        $other = $this->getDataGenerator()->create_module('mavr', ['course' => $course2->id]);
+        $other = $this->getDataGenerator()->create_module('vrroom', ['course' => $course2->id]);
         self::store_file(\context_module::instance($other->cmid), 'assets', 1, 'skull.glb');
         $this->assert_save_fails($fx, $broken, 'erroreditorasset');
 
@@ -395,20 +395,20 @@ final class editor_manager_test extends \advanced_testcase {
             'https://example.com/evil.glb';
         $this->save_document($fx, $broken);
 
-        $stored = instance_manager::get_scenes($fx->mavrid)[0]['interactables'];
+        $stored = instance_manager::get_scenes($fx->vrroomid)[0]['interactables'];
         $skull = array_values(array_filter($stored, fn($i) => $i['id'] === 'm-skull'))[0];
         $this->assertArrayNotHasKey('url', $skull['file']);
 
         $fs = get_file_storage();
-        $this->assertTrue($fs->file_exists($fx->context->id, 'mod_mavr', 'assets', 1, '/', 'skull.glb'));
-        $this->assertFalse($fs->file_exists($fx->context->id, 'mod_mavr', 'assets', 2, '/', 'unused.png'));
+        $this->assertTrue($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 1, '/', 'skull.glb'));
+        $this->assertFalse($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 2, '/', 'unused.png'));
         $this->assertSame(2, editor_manager::next_asset_itemid($fx->context));
 
         $assets = editor_manager::list_assets($fx->context);
         $this->assertCount(1, $assets);
         $this->assertSame('model', $assets[0]['kind']);
         $this->assertSame('skull.glb', $assets[0]['filename']);
-        $this->assertStringContainsString('/mod_mavr/assets/1/skull.glb', $assets[0]['url']);
+        $this->assertStringContainsString('/mod_vrroom/assets/1/skull.glb', $assets[0]['url']);
     }
 
     /**
@@ -440,7 +440,7 @@ final class editor_manager_test extends \advanced_testcase {
             ['slot' => 1, 'questionbankentryid' => 999999, 'maxmark' => 2],
             ['slot' => 2, 'questionbankentryid' => (int)$q2->questionbankentryid, 'maxmark' => 1],
         ];
-        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', get_string('errorquestionnotfound', 'mod_mavr'));
+        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', get_string('errorquestionnotfound', 'mod_vrroom'));
 
         // The same question twice.
         $broken['bindings'][0]['questionbankentryid'] = (int)$q2->questionbankentryid;
@@ -459,13 +459,13 @@ final class editor_manager_test extends \advanced_testcase {
         ];
         $result = $this->save_document($fx, $document);
         $this->assertTrue($result['graphupdated']);
-        $slots = slots::get_slots($fx->mavrid, $fx->context);
+        $slots = slots::get_slots($fx->vrroomid, $fx->context);
         $this->assertSame('q-safe', $slots[1]->objectiveid);
         $this->assertSame((int)$q1->questionbankentryid, $slots[1]->questionbankentryid);
         $this->assertEquals(2.0, $slots[1]->maxmark);
         $this->assertSame('q-box', $slots[2]->objectiveid);
         $this->assertSame(2, $DB->count_records('question_references', ['usingcontextid' => $fx->context->id,
-            'component' => 'mod_mavr', 'questionarea' => 'slot']));
+            'component' => 'mod_vrroom', 'questionarea' => 'slot']));
 
         // The loaded bindings show what is stored.
         $loaded = $this->load_document($fx);
@@ -491,7 +491,7 @@ final class editor_manager_test extends \advanced_testcase {
             ],
         ];
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'hidden' => ['p-1', 'nothing'],
             'objectives' => [
                 ['id' => 'v-1', 'type' => 'visit_zone', 'zone' => 'z-9'],
@@ -531,7 +531,7 @@ final class editor_manager_test extends \advanced_testcase {
             'scenes[0].interactables[0].content.question names slot 3, which no objective answers',
         ], $errors);
 
-        $graph = ['schema' => 'mavr-graph/1', 'hidden' => ['g-1'], 'objectives' => [
+        $graph = ['schema' => 'vrroom-graph/1', 'hidden' => ['g-1'], 'objectives' => [
             ['id' => 'v-1', 'type' => 'visit_zone', 'zone' => 'z-1', 'scene' => 'room-1'],
             ['id' => 'q-3', 'type' => 'answer_question', 'slot' => 3],
         ], 'rules' => [['id' => 'r-1', 'on' => ['on' => 'start'], 'actions' => [['do' => 'play_media', 'target' => 'a-1']]]]];

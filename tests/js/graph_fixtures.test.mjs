@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Runs the golden graph fixtures against the client evaluator (mavrruntime_builtin/graph).
+ * Runs the golden graph fixtures against the client evaluator (vrroomruntime_builtin/graph).
  *
  * The same fixtures are run against the PHP evaluator by tests/local/graph/evaluator_test.php.
  * Run from the repository root: node --test tests/js/graph_fixtures.test.mjs
@@ -136,7 +136,7 @@ for (const file of files) {
 
 test('classify and constants', () => {
     const graph = {
-        schema: 'mavr-graph/1',
+        schema: 'vrroom-graph/1',
         objectives: [
             {id: 'v1', type: 'visit_zone', title: 'Visit', zone: 'z1', required: true},
             {id: 'q1', type: 'answer_question', title: 'Answer', slot: 1, points: 2, unlock: {after: ['v1']}},
@@ -158,7 +158,7 @@ test('classify and constants', () => {
 
 test('validator messages match the PHP validator', () => {
     const cycle = {
-        schema: 'mavr-graph/1',
+        schema: 'vrroom-graph/1',
         objectives: [
             {id: 'a', type: 'visit_zone', title: 'A', zone: 'z-a', unlock: {after: ['c']}},
             {id: 'b', type: 'visit_zone', title: 'B', zone: 'z-b', unlock: {after: ['a']}},
@@ -169,7 +169,7 @@ test('validator messages match the PHP validator', () => {
     assert.deepEqual(validate(cycle), ['unlock.after cycle: "b" waits for "a"']);
 
     const bad = {
-        schema: 'mavr-graph/2',
+        schema: 'vrroom-graph/2',
         hidden: ['has space'],
         objectives: [
             {id: 'v-1', type: 'visit_zone', title: 'Visit', zone: 'z-1'},
@@ -185,7 +185,7 @@ test('validator messages match the PHP validator', () => {
         ],
     };
     assert.deepEqual(validate(bad), [
-        'schema must be "mavr-graph/1"',
+        'schema must be "vrroom-graph/1"',
         'hidden[0] is not a valid id',
         'duplicate objective id "v-1"',
         'objectives[1].type is unknown',

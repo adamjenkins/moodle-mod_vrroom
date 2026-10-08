@@ -2,7 +2,7 @@
   "name": "answer_while_locked",
   "intent": "An answered event before the visit is locked and earns nothing.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

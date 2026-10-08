@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 /**
- * The rooms of a MAVR activity were changed in the room editor.
+ * The rooms of a VR room activity were changed in the room editor.
  *
  * @property-read array $other {
  *      - int scenecount: the number of rooms after the change.
  * }
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -34,7 +34,7 @@ class scene_updated extends \core\event\base {
      * @return void
      */
     protected function init() {
-        $this->data['objecttable'] = 'mavr';
+        $this->data['objecttable'] = 'vrroom';
         $this->data['crud'] = 'u';
         $this->data['edulevel'] = self::LEVEL_TEACHING;
     }
@@ -45,7 +45,7 @@ class scene_updated extends \core\event\base {
      * @return string
      */
     public static function get_name() {
-        return get_string('eventsceneupdated', 'mod_mavr');
+        return get_string('eventsceneupdated', 'mod_vrroom');
     }
 
     /**
@@ -55,7 +55,7 @@ class scene_updated extends \core\event\base {
      */
     public function get_description() {
         $count = (int)($this->other['scenecount'] ?? 0);
-        return "The user with id '$this->userid' changed the rooms of the MAVR activity with course module id " .
+        return "The user with id '$this->userid' changed the rooms of the VR room activity with course module id " .
             "'$this->contextinstanceid' in the room editor; it now has $count room(s).";
     }
 
@@ -65,7 +65,7 @@ class scene_updated extends \core\event\base {
      * @return \moodle_url
      */
     public function get_url() {
-        return new \moodle_url('/mod/mavr/edit.php', ['id' => $this->contextinstanceid]);
+        return new \moodle_url('/mod/vrroom/edit.php', ['id' => $this->contextinstanceid]);
     }
 
     /**
@@ -90,7 +90,7 @@ class scene_updated extends \core\event\base {
      * @return array
      */
     public static function get_objectid_mapping() {
-        return ['db' => 'mavr', 'restore' => 'mavr'];
+        return ['db' => 'vrroom', 'restore' => 'vrroom'];
     }
 
     /**

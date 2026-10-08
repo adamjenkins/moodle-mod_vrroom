@@ -18,16 +18,16 @@
  * true/false and multiple-choice questions, hints and short messages.
  *
  * A panel is a plane with a canvas texture (text drawn with fillText, so no markup is ever
- * interpreted); every button is a separate plane in front of it whose userData.mavrPanelAction
+ * interpreted); every button is a separate plane in front of it whose userData.vrroomPanelAction
  * names its action (close, question, choice:<i>, submit, retry, hint). The XR input module
  * raycasts against getTargets() and passes a hit to select().
  *
- * Questions come from mod_mavr_get_question_view (plain text, field names and values, never the
+ * Questions come from mod_vrroom_get_question_view (plain text, field names and values, never the
  * right answer) and are answered through session.submitResponses(), so the question engine grades
  * them exactly as in the HTML panel. Question types the view does not support show a card that
  * asks the student to leave VR to answer.
  *
- * @module     mavrruntime_builtin/xrpanel
+ * @module     vrroomruntime_builtin/xrpanel
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -35,7 +35,7 @@
 import Ajax from 'core/ajax';
 import Log from 'core/log';
 import {getStrings} from 'core/str';
-import {plainText, startScene} from 'mavrruntime_builtin/util';
+import {plainText, startScene} from 'vrroomruntime_builtin/util';
 
 /** Canvas width of a panel in pixels. */
 const CANVAS_WIDTH = 1024;
@@ -96,7 +96,7 @@ const LOOKS = {
 /** Line height factor. */
 const LINE = 1.3;
 
-/** Strings the panels use, all from mavrruntime_builtin. */
+/** Strings the panels use, all from vrroomruntime_builtin. */
 const STRINGKEYS = [
     'xropenquestion', 'xrsubmit', 'xrclose', 'xrexittoanswer', 'xrcorrect', 'xrpartiallycorrect',
     'xrincorrect', 'xrchooseone', 'xrchoosemany', 'xrloading', 'xranswered', 'gethint', 'tryagain',
@@ -304,9 +304,9 @@ class XrPanels {
         this.session = options.session;
         this.strings = strings;
         this.group = new THREE.Group();
-        this.group.name = 'mavr-xr-panel';
+        this.group.name = 'vrroom-xr-panel';
         this.group.visible = false;
-        this.group.userData.mavrPanel = true;
+        this.group.userData.vrroomPanel = true;
         this.parent.add(this.group);
         this.meshes = [];
         this.targets = [];
@@ -435,8 +435,8 @@ class XrPanels {
         let action = null;
         let inside = false;
         while (node) {
-            if (action === null && node.userData && typeof node.userData.mavrPanelAction === 'string') {
-                action = node.userData.mavrPanelAction;
+            if (action === null && node.userData && typeof node.userData.vrroomPanelAction === 'string') {
+                action = node.userData.vrroomPanelAction;
             }
             if (node === this.group) {
                 inside = true;
@@ -538,7 +538,7 @@ class XrPanels {
         const config = this.session.getConfig();
         return Promise.resolve(this.session.flush())
             .then(() => Ajax.call([{
-                methodname: 'mod_mavr_get_question_view',
+                methodname: 'mod_vrroom_get_question_view',
                 args: {attemptid: Number(config.attemptid), slot: slot},
             }])[0])
             .then((view) => {
@@ -967,7 +967,7 @@ class XrPanels {
             });
         });
         const mesh = this.planeMesh(canvas, CANVAS_WIDTH, height, 1000);
-        mesh.userData.mavrPanelAction = 'panel';
+        mesh.userData.vrroomPanelAction = 'panel';
         this.group.add(mesh);
         this.meshes.push(mesh);
         this.targets.push(mesh);
@@ -1015,8 +1015,8 @@ class XrPanels {
             (height / 2 - (rect.y + rect.h / 2)) * PX,
             0.004
         );
-        mesh.userData.mavrPanelAction = rect.button.action;
-        mesh.name = `mavr-xr-panel-${rect.button.action}`;
+        mesh.userData.vrroomPanelAction = rect.button.action;
+        mesh.name = `vrroom-xr-panel-${rect.button.action}`;
         this.group.add(mesh);
         this.meshes.push(mesh);
         this.targets.push(mesh);
@@ -1076,7 +1076,7 @@ class XrPanels {
  * @returns {Promise<XrPanels>}
  */
 export const createXrPanels = (THREE, options) => Promise.resolve(
-    getStrings(STRINGKEYS.map((key) => ({key: key, component: 'mavrruntime_builtin'})))
+    getStrings(STRINGKEYS.map((key) => ({key: key, component: 'vrroomruntime_builtin'})))
 ).then((values) => {
     const strings = {};
     STRINGKEYS.forEach((key, index) => {

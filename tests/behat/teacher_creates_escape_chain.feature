@@ -1,8 +1,8 @@
-@mod @mod_mavr @javascript
+@mod @mod_vrroom @javascript
 Feature: A teacher builds an escape chain
   In order to give students a chain of puzzles to solve
   As a teacher
-  I need to create a MAVR escape chain from its activity chooser entry and its form
+  I need to create a VR room escape chain from its activity chooser entry and its form
 
   Background:
     Given the following "users" exist:
@@ -26,7 +26,7 @@ Feature: A teacher builds an escape chain
 
   Scenario: Create an escape chain with a key puzzle and a question lock
     Given I log in as "teacher1"
-    When I add a MAVR activity using the "escape" template to course "Course 1" section "1"
+    When I add a VR room activity using the "escape" template to course "Course 1" section "1"
     And I set the following fields to these values:
       | Name               | Lab escape                                   |
       | escape_title[0]    | Desk                                         |
@@ -38,16 +38,16 @@ Feature: A teacher builds an escape chain
     And I set the field "Question" in the "#fitem_id_escape_question_1" "css_element" to "Q1"
     And I press "Save and return to course"
     Then I should see "Lab escape"
-    And I am on the "Lab escape" "mavr activity" page
+    And I am on the "Lab escape" "vrroom activity" page
     And I press "Preview the list view"
-    And the MAVR room is ready
-    And I should see "Desk" in the "[data-region='mavr-listview']" "css_element"
-    And I should see "Safe" in the "[data-region='mavr-listview']" "css_element"
+    And the VR room room is ready
+    And I should see "Desk" in the "[data-region='vrroom-listview']" "css_element"
+    And I should see "Safe" in the "[data-region='vrroom-listview']" "css_element"
 
   Scenario: The activity chooser entry opens the escape chain form only
     Given I log in as "teacher1"
     And I am on "Course 1" course homepage with editing mode on
-    When I add a "MAVR: Escape chain" to section "1" using the activity chooser
+    When I add a "VR room: Escape chain" to section "1" using the activity chooser
     Then I should see "Escape chain"
     And "escape_title[0]" "field" should exist
     And "gallery_title[0]" "field" should not exist

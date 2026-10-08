@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin;
+namespace vrroomruntime_builtin;
 
 /**
  * Run-mode conformance test for the built-in viewer.
  *
- * The scripted reference session lives in the abstract test case of mod_mavr.
+ * The scripted reference session lives in the abstract test case of mod_vrroom.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(runtime::class)]
-final class conformance_test extends \mod_mavr\tests\runtime_conformance_testcase {
+final class conformance_test extends \mod_vrroom\tests\runtime_conformance_testcase {
     /**
      * The run mode under test.
      *
@@ -42,6 +42,6 @@ final class conformance_test extends \mod_mavr\tests\runtime_conformance_testcas
      * @return void
      */
     public function test_registry_resolves_runtime(): void {
-        $this->assertInstanceOf(runtime::class, \mod_mavr\local\runtime\registry::get($this->get_runtime_name()));
+        $this->assertInstanceOf(runtime::class, \mod_vrroom\local\runtime\registry::get($this->get_runtime_name()));
     }
 }

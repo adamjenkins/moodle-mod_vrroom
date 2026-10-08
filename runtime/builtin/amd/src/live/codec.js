@@ -28,7 +28,7 @@
  *
  * Dependency-free ES module (no imports) so that both grunt (AMD build) and node --test load it.
  *
- * @module     mavrruntime_builtin/live/codec
+ * @module     vrroomruntime_builtin/live/codec
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -110,7 +110,7 @@ const byteLength = (text) => {
 
 /**
  * Whether a value is a scene id: 1..36 characters of [A-Za-z0-9_-] (the id rule of
- * mod_mavr's scene_validator::ID_PATTERN, capped at its MAX_SCENE_ID_LENGTH of 36).
+ * mod_vrroom's scene_validator::ID_PATTERN, capped at its MAX_SCENE_ID_LENGTH of 36).
  *
  * @param {*} value
  * @returns {boolean}

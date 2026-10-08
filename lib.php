@@ -15,19 +15,19 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Library of functions for mod_mavr.
+ * Library of functions for mod_vrroom.
  *
  * The grade callbacks follow the flow of mod_gear's lib.php (update_grades → grade_item_update).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use mod_mavr\local\grading\grader;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\reset;
+use mod_vrroom\local\grading\grader;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\reset;
 
 /**
  * Whether the module supports a feature.
@@ -35,7 +35,7 @@ use mod_mavr\local\reset;
  * @param string $feature FEATURE_xx constant.
  * @return mixed True or a value if supported, false if not, null if unknown.
  */
-function mavr_supports(string $feature) {
+function vrroom_supports(string $feature) {
     return match ($feature) {
         FEATURE_MOD_INTRO => true,
         FEATURE_BACKUP_MOODLE2 => true,
@@ -56,10 +56,10 @@ function mavr_supports(string $feature) {
  * Add a new activity.
  *
  * @param stdClass $data Form data.
- * @param mod_mavr_mod_form|null $mform The form.
- * @return int The new mavr id.
+ * @param mod_vrroom_mod_form|null $mform The form.
+ * @return int The new vrroom id.
  */
-function mavr_add_instance(stdClass $data, ?mod_mavr_mod_form $mform = null): int {
+function vrroom_add_instance(stdClass $data, ?mod_vrroom_mod_form $mform = null): int {
     return instance_manager::add_instance($data, $mform);
 }
 
@@ -67,20 +67,20 @@ function mavr_add_instance(stdClass $data, ?mod_mavr_mod_form $mform = null): in
  * Update an activity.
  *
  * @param stdClass $data Form data.
- * @param mod_mavr_mod_form|null $mform The form.
+ * @param mod_vrroom_mod_form|null $mform The form.
  * @return bool
  */
-function mavr_update_instance(stdClass $data, ?mod_mavr_mod_form $mform = null): bool {
+function vrroom_update_instance(stdClass $data, ?mod_vrroom_mod_form $mform = null): bool {
     return instance_manager::update_instance($data, $mform);
 }
 
 /**
  * Delete an activity.
  *
- * @param int $id The mavr id.
+ * @param int $id The vrroom id.
  * @return bool
  */
-function mavr_delete_instance(int $id): bool {
+function vrroom_delete_instance(int $id): bool {
     return instance_manager::delete_instance($id);
 }
 
@@ -90,26 +90,26 @@ function mavr_delete_instance(int $id): bool {
  * @param stdClass $coursemodule The course_modules row (with showdescription and completion).
  * @return cached_cm_info|false
  */
-function mavr_get_coursemodule_info(stdClass $coursemodule) {
+function vrroom_get_coursemodule_info(stdClass $coursemodule) {
     global $DB;
 
-    $mavr = $DB->get_record(
-        'mavr',
+    $vrroom = $DB->get_record(
+        'vrroom',
         ['id' => $coursemodule->instance],
         'id, name, intro, introformat, completionobjectives'
     );
-    if (!$mavr) {
+    if (!$vrroom) {
         return false;
     }
 
     $result = new cached_cm_info();
-    $result->name = $mavr->name;
+    $result->name = $vrroom->name;
     if ($coursemodule->showdescription) {
         // Filters run at display time, so the cached copy is not filtered.
-        $result->content = format_module_intro('mavr', $mavr, $coursemodule->id, false);
+        $result->content = format_module_intro('vrroom', $vrroom, $coursemodule->id, false);
     }
     if ($coursemodule->completion == COMPLETION_TRACKING_AUTOMATIC) {
-        $result->customdata['customcompletionrules']['completionobjectives'] = (int)$mavr->completionobjectives;
+        $result->customdata['customcompletionrules']['completionobjectives'] = (int)$vrroom->completionobjectives;
     }
     return $result;
 }
@@ -120,14 +120,14 @@ function mavr_get_coursemodule_info(stdClass $coursemodule) {
  * @param cm_info|stdClass $cm Object with ->completion and ->customdata['customcompletionrules'].
  * @return string[]
  */
-function mod_mavr_get_completion_active_rule_descriptions($cm): array {
+function mod_vrroom_get_completion_active_rule_descriptions($cm): array {
     if (empty($cm->customdata['customcompletionrules']) || $cm->completion != COMPLETION_TRACKING_AUTOMATIC) {
         return [];
     }
     $descriptions = [];
     foreach ($cm->customdata['customcompletionrules'] as $key => $value) {
         if ($key === 'completionobjectives' && !empty($value)) {
-            $descriptions[] = get_string('completiondetail:objectives', 'mavr');
+            $descriptions[] = get_string('completiondetail:objectives', 'vrroom');
         }
     }
     return $descriptions;
@@ -136,21 +136,21 @@ function mod_mavr_get_completion_active_rule_descriptions($cm): array {
 /**
  * Log the view and mark the activity viewed for completion.
  *
- * @param stdClass $mavr The mavr row.
+ * @param stdClass $vrroom The vrroom row.
  * @param stdClass $course The course.
  * @param cm_info $cm The course module.
  * @param context_module $context The module context.
  */
-function mavr_view(stdClass $mavr, stdClass $course, cm_info $cm, context_module $context): void {
+function vrroom_view(stdClass $vrroom, stdClass $course, cm_info $cm, context_module $context): void {
     global $CFG;
     require_once($CFG->libdir . '/completionlib.php');
 
-    $event = \mod_mavr\event\course_module_viewed::create([
-        'objectid' => $mavr->id,
+    $event = \mod_vrroom\event\course_module_viewed::create([
+        'objectid' => $vrroom->id,
         'context' => $context,
     ]);
     $event->add_record_snapshot('course', $course);
-    $event->add_record_snapshot('mavr', $mavr);
+    $event->add_record_snapshot('vrroom', $vrroom);
     $event->trigger();
 
     $completion = new completion_info($course);
@@ -160,64 +160,64 @@ function mavr_view(stdClass $mavr, stdClass $course, cm_info $cm, context_module
 /**
  * Grades of one or all users.
  *
- * @param stdClass $mavr The mavr row.
+ * @param stdClass $vrroom The vrroom row.
  * @param int $userid One user, or 0 for all.
  * @return array userid => grade object
  */
-function mavr_get_user_grades(stdClass $mavr, int $userid = 0): array {
-    return grader::get_user_grades($mavr, $userid);
+function vrroom_get_user_grades(stdClass $vrroom, int $userid = 0): array {
+    return grader::get_user_grades($vrroom, $userid);
 }
 
 /**
  * Create or update the grade item, optionally with grades.
  *
- * @param stdClass $mavr The mavr row.
+ * @param stdClass $vrroom The vrroom row.
  * @param mixed $grades Grades, or 'reset' to reset the gradebook.
  * @return int 0 when OK, an error code otherwise.
  */
-function mavr_grade_item_update(stdClass $mavr, $grades = null): int {
-    return grader::grade_item_update($mavr, $grades);
+function vrroom_grade_item_update(stdClass $vrroom, $grades = null): int {
+    return grader::grade_item_update($vrroom, $grades);
 }
 
 /**
  * Delete the grade item.
  *
- * @param stdClass $mavr The mavr row.
+ * @param stdClass $vrroom The vrroom row.
  * @return int 0 when OK, an error code otherwise.
  */
-function mavr_grade_item_delete(stdClass $mavr): int {
-    return grader::grade_item_delete($mavr);
+function vrroom_grade_item_delete(stdClass $vrroom): int {
+    return grader::grade_item_delete($vrroom);
 }
 
 /**
  * Push grades to the gradebook.
  *
- * @param stdClass $mavr The mavr row.
+ * @param stdClass $vrroom The vrroom row.
  * @param int $userid One user, or 0 for all.
  * @param bool $nullifnone Send a null grade when the user has none.
  */
-function mavr_update_grades(stdClass $mavr, int $userid = 0, bool $nullifnone = true): void {
-    grader::update_grades($mavr, $userid, $nullifnone);
+function vrroom_update_grades(stdClass $vrroom, int $userid = 0, bool $nullifnone = true): void {
+    grader::update_grades($vrroom, $userid, $nullifnone);
 }
 
 /**
- * Whether a scale is used by an activity. MAVR uses point grades only.
+ * Whether a scale is used by an activity. VR room uses point grades only.
  *
- * @param int $mavrid The mavr id.
+ * @param int $vrroomid The vrroom id.
  * @param int $scaleid The scale id.
  * @return bool
  */
-function mavr_scale_used(int $mavrid, int $scaleid): bool {
+function vrroom_scale_used(int $vrroomid, int $scaleid): bool {
     return false;
 }
 
 /**
- * Whether a scale is used by any MAVR activity. MAVR uses point grades only.
+ * Whether a scale is used by any VR room activity. VR room uses point grades only.
  *
  * @param int $scaleid The scale id.
  * @return bool
  */
-function mavr_scale_used_anywhere(int $scaleid): bool {
+function vrroom_scale_used_anywhere(int $scaleid): bool {
     return false;
 }
 
@@ -226,7 +226,7 @@ function mavr_scale_used_anywhere(int $scaleid): bool {
  *
  * @param MoodleQuickForm $mform The reset form.
  */
-function mavr_reset_course_form_definition(&$mform): void {
+function vrroom_reset_course_form_definition(&$mform): void {
     reset::course_form_definition($mform);
 }
 
@@ -236,17 +236,17 @@ function mavr_reset_course_form_definition(&$mform): void {
  * @param stdClass $course The course.
  * @return array
  */
-function mavr_reset_course_form_defaults(stdClass $course): array {
+function vrroom_reset_course_form_defaults(stdClass $course): array {
     return reset::course_form_defaults($course);
 }
 
 /**
- * Reset the grades of every MAVR activity in a course.
+ * Reset the grades of every VR room activity in a course.
  *
  * @param int $courseid The course.
- * @param string $type Unused (all MAVR activities have one grade item).
+ * @param string $type Unused (all VR room activities have one grade item).
  */
-function mavr_reset_gradebook(int $courseid, string $type = ''): void {
+function vrroom_reset_gradebook(int $courseid, string $type = ''): void {
     reset::reset_gradebook($courseid);
 }
 
@@ -256,7 +256,7 @@ function mavr_reset_gradebook(int $courseid, string $type = ''): void {
  * @param stdClass $data The reset form data.
  * @return array Status rows.
  */
-function mavr_reset_userdata(stdClass $data): array {
+function vrroom_reset_userdata(stdClass $data): array {
     return reset::reset_userdata($data);
 }
 
@@ -275,13 +275,13 @@ function mavr_reset_userdata(stdClass $data): array {
  * @param array $options Extra options for send_stored_file().
  * @return bool False when the file is not found.
  */
-function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
+function vrroom_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
     if ($context->contextlevel != CONTEXT_MODULE) {
         return false;
     }
 
     require_login($course, true, $cm);
-    require_capability('mod/mavr:view', $context);
+    require_capability('mod/vrroom:view', $context);
 
     if (!in_array($filearea, ['models', 'media', 'environment', 'assets'], true)) {
         return false;
@@ -295,7 +295,7 @@ function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownloa
     }
 
     $fs = get_file_storage();
-    $file = $fs->get_file($context->id, 'mod_mavr', $filearea, $itemid, $filepath, $filename);
+    $file = $fs->get_file($context->id, 'mod_vrroom', $filearea, $itemid, $filepath, $filename);
     if (!$file || $file->is_directory()) {
         return false;
     }
@@ -306,7 +306,7 @@ function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownloa
 }
 
 /**
- * Serve files that belong to questions in a MAVR attempt.
+ * Serve files that belong to questions in a VR room attempt.
  *
  * @param stdClass $course The course.
  * @param context $context The context.
@@ -318,7 +318,7 @@ function mavr_pluginfile($course, $cm, $context, $filearea, $args, $forcedownloa
  * @param bool $forcedownload Whether to force download.
  * @param array $options Extra options for send_stored_file().
  */
-function mavr_question_pluginfile(
+function vrroom_question_pluginfile(
     $course,
     $context,
     $component,
@@ -329,7 +329,7 @@ function mavr_question_pluginfile(
     $forcedownload,
     array $options = []
 ) {
-    \mod_mavr\local\questions\files::serve_question_file(
+    \mod_vrroom\local\questions\files::serve_question_file(
         $course,
         $context,
         $component,
@@ -348,30 +348,30 @@ function mavr_question_pluginfile(
  * @param settings_navigation $settings The settings navigation.
  * @param navigation_node $node The activity's node.
  */
-function mavr_extend_settings_navigation(settings_navigation $settings, navigation_node $node): void {
+function vrroom_extend_settings_navigation(settings_navigation $settings, navigation_node $node): void {
     $cm = $settings->get_page()->cm;
     if (!$cm) {
         return;
     }
-    if (has_capability('mod/mavr:manage', $cm->context)) {
-        $url = new moodle_url('/mod/mavr/edit.php', ['id' => $cm->id]);
+    if (has_capability('mod/vrroom:manage', $cm->context)) {
+        $url = new moodle_url('/mod/vrroom/edit.php', ['id' => $cm->id]);
         $node->add_node(navigation_node::create(
-            get_string('editor', 'mavr'),
+            get_string('editor', 'vrroom'),
             $url,
             navigation_node::TYPE_SETTING,
             null,
-            'mod_mavr_editor',
+            'mod_vrroom_editor',
             new pix_icon('t/edit', '')
         ));
     }
-    if (has_capability('mod/mavr:viewreports', $cm->context)) {
-        $url = new moodle_url('/mod/mavr/report.php', ['id' => $cm->id]);
+    if (has_capability('mod/vrroom:viewreports', $cm->context)) {
+        $url = new moodle_url('/mod/vrroom/report.php', ['id' => $cm->id]);
         $node->add_node(navigation_node::create(
-            get_string('reports', 'mavr'),
+            get_string('reports', 'vrroom'),
             $url,
             navigation_node::TYPE_SETTING,
             null,
-            'mod_mavr_reports',
+            'mod_vrroom_reports',
             new pix_icon('i/report', '')
         ));
     }
@@ -385,12 +385,12 @@ function mavr_extend_settings_navigation(settings_navigation $settings, navigati
  * @param context $context The context.
  * @return array area => name
  */
-function mavr_get_file_areas($course, $cm, $context): array {
+function vrroom_get_file_areas($course, $cm, $context): array {
     return [
-        'models' => get_string('area_models', 'mavr'),
-        'media' => get_string('area_media', 'mavr'),
-        'environment' => get_string('area_environment', 'mavr'),
-        'assets' => get_string('area_assets', 'mavr'),
+        'models' => get_string('area_models', 'vrroom'),
+        'media' => get_string('area_media', 'vrroom'),
+        'environment' => get_string('area_environment', 'vrroom'),
+        'assets' => get_string('area_assets', 'vrroom'),
     ];
 }
 
@@ -402,12 +402,12 @@ function mavr_get_file_areas($course, $cm, $context): array {
  * @param \stdClass $course The course.
  * @return \core_course\local\entity\content_item[]
  */
-function mod_mavr_get_course_content_items(
+function mod_vrroom_get_course_content_items(
     \core_course\local\entity\content_item $defaultmodulecontentitem,
     \stdClass $user,
     \stdClass $course
 ): array {
-    return \mod_mavr\local\template\chooser::content_items($defaultmodulecontentitem);
+    return \mod_vrroom\local\template\chooser::content_items($defaultmodulecontentitem);
 }
 
 /**
@@ -416,6 +416,6 @@ function mod_mavr_get_course_content_items(
  * @param \core_course\local\entity\content_item $defaultmodulecontentitem The module's default item.
  * @return \core_course\local\entity\content_item[]
  */
-function mod_mavr_get_all_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem): array {
-    return \mod_mavr\local\template\chooser::content_items($defaultmodulecontentitem);
+function mod_vrroom_get_all_content_items(\core_course\local\entity\content_item $defaultmodulecontentitem): array {
+    return \mod_vrroom\local\template\chooser::content_items($defaultmodulecontentitem);
 }

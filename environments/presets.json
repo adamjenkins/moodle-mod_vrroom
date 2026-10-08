@@ -1,5 +1,5 @@
 {
-  "schema": "mavr-presets/1",
+  "schema": "vrroom-presets/1",
   "presets": {
     "gallery-hall": {
       "string": "preset_galleryhall",

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Capability definitions for mod_mavr.
+ * Capability definitions for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
 
-    'mod/mavr:addinstance' => [
+    'mod/vrroom:addinstance' => [
         'riskbitmask' => RISK_XSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_COURSE,
@@ -37,7 +37,7 @@ $capabilities = [
         'clonepermissionsfrom' => 'moodle/course:manageactivities',
     ],
 
-    'mod/mavr:view' => [
+    'mod/vrroom:view' => [
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -51,7 +51,7 @@ $capabilities = [
 
     // Attempting creates graded records of the user's own, so it is separate from viewing:
     // a teacher looking at the room must not accrue attempts.
-    'mod/mavr:attempt' => [
+    'mod/vrroom:attempt' => [
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -59,7 +59,7 @@ $capabilities = [
         ],
     ],
 
-    'mod/mavr:viewreports' => [
+    'mod/vrroom:viewreports' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,
@@ -70,7 +70,7 @@ $capabilities = [
         ],
     ],
 
-    'mod/mavr:deleteattempts' => [
+    'mod/vrroom:deleteattempts' => [
         'riskbitmask' => RISK_DATALOSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
@@ -80,7 +80,7 @@ $capabilities = [
         ],
     ],
 
-    'mod/mavr:manage' => [
+    'mod/vrroom:manage' => [
         'riskbitmask' => RISK_XSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,

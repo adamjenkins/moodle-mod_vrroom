@@ -15,22 +15,22 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Immutable result of evaluating a mavr-graph/1 task graph against an event list.
+ * Immutable result of evaluating a vrroom-graph/1 task graph against an event list.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace mod_mavr\local\graph;
+namespace mod_vrroom\local\graph;
 
 /**
- * Immutable result of evaluating a mavr-graph/1 task graph against an event list.
+ * Immutable result of evaluating a vrroom-graph/1 task graph against an event list.
  *
  * The shape returned by {@see self::to_array()} is identical to the value returned by the
- * client evaluator's evaluate() in mavrruntime_builtin/graph.
+ * client evaluator's evaluate() in vrroomruntime_builtin/graph.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */

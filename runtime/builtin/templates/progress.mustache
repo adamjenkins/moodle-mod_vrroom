@@ -15,7 +15,7 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mavrruntime_builtin/progress
+    @template vrroomruntime_builtin/progress
 
     Objectives with their hints, points, the time left and the finish button. The time left is
     filled in by JavaScript every second (the paragraph stays hidden without a time limit).
@@ -41,18 +41,18 @@
         "preview": false
     }
 }}
-<h2 class="h6">{{#str}}progress, mavrruntime_builtin{{/str}}</h2>
-<p class="fw-bold" data-region="mavr-timer" hidden></p>
-<p data-region="mavr-score">{{scoretext}}</p>
-<ul class="list-unstyled" data-region="mavr-objectives">
+<h2 class="h6">{{#str}}progress, vrroomruntime_builtin{{/str}}</h2>
+<p class="fw-bold" data-region="vrroom-timer" hidden></p>
+<p data-region="vrroom-score">{{scoretext}}</p>
+<ul class="list-unstyled" data-region="vrroom-objectives">
     {{#objectives}}
     <li data-objective="{{id}}" data-status="{{status}}">
-        <span class="badge {{badgeclass}} me-2">{{statuslabel}}</span><span id="mavr-objective-title-{{id}}">{{title}}</span>
+        <span class="badge {{badgeclass}} me-2">{{statuslabel}}</span><span id="vrroom-objective-title-{{id}}">{{title}}</span>
         {{#hashints}}
-        <div class="mavr-objective-hints ms-2 mb-2">
-            {{#canhint}}<button type="button" class="btn btn-link btn-sm px-0" data-action="mavr-get-hint" data-objective="{{id}}" aria-describedby="mavr-objective-title-{{id}}">{{#str}}gethint, mavrruntime_builtin{{/str}}</button>{{/canhint}}
+        <div class="vrroom-objective-hints ms-2 mb-2">
+            {{#canhint}}<button type="button" class="btn btn-link btn-sm px-0" data-action="vrroom-get-hint" data-objective="{{id}}" aria-describedby="vrroom-objective-title-{{id}}">{{#str}}gethint, vrroomruntime_builtin{{/str}}</button>{{/canhint}}
             <p class="small text-muted mb-1">{{hintsusedtext}}{{#hintcosttext}} {{hintcosttext}}{{/hintcosttext}}</p>
-            <ul class="mavr-hints" data-region="mavr-hints" data-objective="{{id}}">
+            <ul class="vrroom-hints" data-region="vrroom-hints" data-objective="{{id}}">
                 {{#hints}}<li>{{text}}</li>{{/hints}}
             </ul>
         </div>
@@ -60,5 +60,5 @@
     </li>
     {{/objectives}}
 </ul>
-{{#preview}}<p class="text-muted small">{{#str}}previewnotice, mavrruntime_builtin{{/str}}</p>{{/preview}}
-{{#canfinish}}<button type="button" class="btn btn-primary" data-action="mavr-finish-attempt">{{#str}}finishattempt, mavrruntime_builtin{{/str}}</button>{{/canfinish}}
+{{#preview}}<p class="text-muted small">{{#str}}previewnotice, vrroomruntime_builtin{{/str}}</p>{{/preview}}
+{{#canfinish}}<button type="button" class="btn btn-primary" data-action="vrroom-finish-attempt">{{#str}}finishattempt, vrroomruntime_builtin{{/str}}</button>{{/canfinish}}

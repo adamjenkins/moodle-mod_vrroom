@@ -15,21 +15,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Restore task for mod_mavr.
+ * Restore task for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->dirroot . '/mod/mavr/backup/moodle2/restore_mavr_stepslib.php');
+require_once($CFG->dirroot . '/mod/vrroom/backup/moodle2/restore_vrroom_stepslib.php');
 
 /**
- * Provides the steps to restore one MAVR activity.
+ * Provides the steps to restore one VR room activity.
  */
-class restore_mavr_activity_task extends restore_activity_task {
+class restore_vrroom_activity_task extends restore_activity_task {
     /**
      * No specific settings for this activity.
      *
@@ -44,7 +44,7 @@ class restore_mavr_activity_task extends restore_activity_task {
      * @return void
      */
     protected function define_my_steps() {
-        $this->add_step(new restore_mavr_activity_structure_step('mavr_structure', 'mavr.xml'));
+        $this->add_step(new restore_vrroom_activity_structure_step('vrroom_structure', 'vrroom.xml'));
     }
 
     /**
@@ -57,9 +57,9 @@ class restore_mavr_activity_task extends restore_activity_task {
      */
     public static function define_decode_contents() {
         return [
-            new restore_decode_content('mavr', ['intro', 'templateconfig', 'graphjson'], 'mavr'),
-            new restore_decode_content('mavr_scenes', ['scenejson'], 'mavr_scene'),
-            new restore_decode_content('mavr_graphs', ['graphjson'], 'mavr_graph'),
+            new restore_decode_content('vrroom', ['intro', 'templateconfig', 'graphjson'], 'vrroom'),
+            new restore_decode_content('vrroom_scenes', ['scenejson'], 'vrroom_scene'),
+            new restore_decode_content('vrroom_graphs', ['graphjson'], 'vrroom_graph'),
         ];
     }
 
@@ -70,8 +70,8 @@ class restore_mavr_activity_task extends restore_activity_task {
      */
     public static function define_decode_rules() {
         return [
-            new restore_decode_rule('MAVRVIEWBYID', '/mod/mavr/view.php?id=$1', 'course_module'),
-            new restore_decode_rule('MAVRINDEX', '/mod/mavr/index.php?id=$1', 'course'),
+            new restore_decode_rule('VR roomVIEWBYID', '/mod/vrroom/view.php?id=$1', 'course_module'),
+            new restore_decode_rule('VR roomINDEX', '/mod/vrroom/index.php?id=$1', 'course'),
         ];
     }
 
@@ -82,9 +82,9 @@ class restore_mavr_activity_task extends restore_activity_task {
      */
     public static function define_restore_log_rules() {
         return [
-            new restore_log_rule('mavr', 'add', 'view.php?id={course_module}', '{mavr}'),
-            new restore_log_rule('mavr', 'update', 'view.php?id={course_module}', '{mavr}'),
-            new restore_log_rule('mavr', 'view', 'view.php?id={course_module}', '{mavr}'),
+            new restore_log_rule('vrroom', 'add', 'view.php?id={course_module}', '{vrroom}'),
+            new restore_log_rule('vrroom', 'update', 'view.php?id={course_module}', '{vrroom}'),
+            new restore_log_rule('vrroom', 'view', 'view.php?id={course_module}', '{vrroom}'),
         ];
     }
 
@@ -95,7 +95,7 @@ class restore_mavr_activity_task extends restore_activity_task {
      */
     public static function define_restore_log_rules_for_course() {
         return [
-            new restore_log_rule('mavr', 'view all', 'index.php?id={course}', null),
+            new restore_log_rule('vrroom', 'view all', 'index.php?id={course}', null),
         ];
     }
 }

@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\external;
+namespace vrroomruntime_builtin\external;
 
 use core_external\external_api;
-use mavrruntime_builtin\local\live\room_manager;
+use vrroomruntime_builtin\local\live\room_manager;
 
 /**
  * Tests of the live room web services.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -46,15 +46,15 @@ final class live_services_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->configure_ice();
-        [$cmid, $course, $mavr] = $this->create_activity();
-        [$a, $attempta] = $this->learner($course, $mavr);
-        [$b, $attemptb] = $this->learner($course, $mavr);
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
 
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
         $this->assertTrue(room_manager::is_peerid($joina['peerid']));
         $this->assertSame(0, $joina['groupid']);
-        $this->assertSame(format_string($mavr->name), $joina['roomname']);
+        $this->assertSame(format_string($vrroom->name), $joina['roomname']);
         $this->assertSame(6, $joina['maxpeers']);
         $this->assertSame(room_manager::INTERVAL_ACTIVE, $joina['interval']);
         $this->assertSame([], $joina['peers']);
@@ -90,7 +90,7 @@ final class live_services_test extends \advanced_testcase {
 
         $left = external_api::clean_returnvalue(live_leave::execute_returns(), live_leave::execute($joina['peerid']));
         $this->assertSame(['status' => 'ok'], $left);
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $joina['peerid']]));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $joina['peerid']]));
 
         // Leaving twice is fine; polling afterwards says gone.
         $this->assertSame(['status' => 'ok'], live_leave::execute($joina['peerid']));
@@ -114,9 +114,9 @@ final class live_services_test extends \advanced_testcase {
      */
     public function test_student_without_attempt(): void {
         $this->resetAfterTest();
-        [$cmid, $course, $mavr] = $this->create_activity();
+        [$cmid, $course, $vrroom] = $this->create_activity();
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        [, $otherattempt] = $this->learner($course, $mavr);
+        [, $otherattempt] = $this->learner($course, $vrroom);
         $this->setUser($student);
 
         try {
@@ -126,7 +126,7 @@ final class live_services_test extends \advanced_testcase {
             $this->assertSame('errorlivenotallowed', $e->errorcode);
         }
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('errornotyourattempt', 'mod_mavr'));
+        $this->expectExceptionMessage(get_string('errornotyourattempt', 'mod_vrroom'));
         live_join::execute($cmid, (int)$otherattempt->id, 0);
     }
 
@@ -136,21 +136,21 @@ final class live_services_test extends \advanced_testcase {
     public function test_disabled(): void {
         global $DB;
         $this->resetAfterTest();
-        [$cmid, $course, $mavr] = $this->create_activity();
-        [$a, $attempta] = $this->learner($course, $mavr);
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        [$a, $attempta] = $this->learner($course, $vrroom);
         $this->setUser($a);
 
-        set_config('liveenabled', 0, 'mavrruntime_builtin');
+        set_config('liveenabled', 0, 'vrroomruntime_builtin');
         try {
             live_join::execute($cmid, (int)$attempta->id, 0);
             $this->fail('Joined with live mode off for the site.');
         } catch (\moodle_exception $e) {
             $this->assertSame('errorlivedisabled', $e->errorcode);
         }
-        set_config('liveenabled', 1, 'mavrruntime_builtin');
-        $DB->set_field('mavr', 'livemode', 0, ['id' => $mavr->id]);
+        set_config('liveenabled', 1, 'vrroomruntime_builtin');
+        $DB->set_field('vrroom', 'livemode', 0, ['id' => $vrroom->id]);
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('errorlivedisabled', 'mavrruntime_builtin'));
+        $this->expectExceptionMessage(get_string('errorlivedisabled', 'vrroomruntime_builtin'));
         live_join::execute($cmid, (int)$attempta->id, 0);
     }
 
@@ -160,15 +160,15 @@ final class live_services_test extends \advanced_testcase {
     public function test_foreign_peerid(): void {
         global $DB;
         $this->resetAfterTest();
-        [$cmid, $course, $mavr] = $this->create_activity();
-        [$a, $attempta] = $this->learner($course, $mavr);
-        [$b, $attemptb] = $this->learner($course, $mavr);
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
 
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
         $this->setUser($b);
         $joinb = $this->join($cmid, (int)$attemptb->id);
-        $before = $DB->get_record('mavrruntime_builtin_peers', ['peerid' => $joina['peerid']]);
+        $before = $DB->get_record('vrroomruntime_builtin_peers', ['peerid' => $joina['peerid']]);
 
         $poll = external_api::clean_returnvalue(live_poll::execute_returns(), live_poll::execute($joina['peerid'], true));
         $this->assertSame(['status' => 'gone', 'interval' => room_manager::INTERVAL_IDLE, 'peers' => [], 'signals' => [],
@@ -177,10 +177,10 @@ final class live_services_test extends \advanced_testcase {
             ['to' => $joinb['peerid'], 'type' => 'candidates', 'payload' => self::CANDIDATES],
         ]));
         $this->assertSame(['status' => 'gone', 'results' => []], $send);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
 
         live_leave::execute($joina['peerid']);
-        $this->assertEquals($before, $DB->get_record('mavrruntime_builtin_peers', ['peerid' => $joina['peerid']]));
+        $this->assertEquals($before, $DB->get_record('vrroomruntime_builtin_peers', ['peerid' => $joina['peerid']]));
     }
 
     /**
@@ -188,8 +188,8 @@ final class live_services_test extends \advanced_testcase {
      */
     public function test_too_many_signals(): void {
         $this->resetAfterTest();
-        [$cmid, $course, $mavr] = $this->create_activity();
-        [$a, $attempta] = $this->learner($course, $mavr);
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        [$a, $attempta] = $this->learner($course, $vrroom);
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
 
@@ -208,11 +208,11 @@ final class live_services_test extends \advanced_testcase {
     public function test_preview_and_full_room(): void {
         global $DB;
         $this->resetAfterTest();
-        [$cmid, $course, $mavr] = $this->create_activity();
-        $DB->set_field('mavr', 'livemaxusers', 2, ['id' => $mavr->id]);
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        $DB->set_field('vrroom', 'livemaxusers', 2, ['id' => $vrroom->id]);
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
-        [$a, $attempta] = $this->learner($course, $mavr);
-        [$b, $attemptb] = $this->learner($course, $mavr);
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
 
         $this->setUser($teacher);
         $jointeacher = $this->join($cmid, 0);
@@ -226,7 +226,7 @@ final class live_services_test extends \advanced_testcase {
 
         $this->setUser($b);
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('errorliveroomfull', 'mavrruntime_builtin', 2));
+        $this->expectExceptionMessage(get_string('errorliveroomfull', 'vrroomruntime_builtin', 2));
         live_join::execute($cmid, (int)$attemptb->id, 0);
     }
 
@@ -245,35 +245,35 @@ final class live_services_test extends \advanced_testcase {
      * Set a STUN server and a TURN server with a secret.
      */
     private function configure_ice(): void {
-        set_config('livestunurls', 'stun:stun.example.org:3478', 'mavrruntime_builtin');
-        set_config('liveturnurls', 'turn:turn.example.org:3478?transport=udp', 'mavrruntime_builtin');
-        set_config('liveturnsecret', self::SECRET, 'mavrruntime_builtin');
+        set_config('livestunurls', 'stun:stun.example.org:3478', 'vrroomruntime_builtin');
+        set_config('liveturnurls', 'turn:turn.example.org:3478?transport=udp', 'vrroomruntime_builtin');
+        set_config('liveturnsecret', self::SECRET, 'vrroomruntime_builtin');
     }
 
     /**
      * A learner with an attempt in progress.
      *
      * @param \stdClass $course Course.
-     * @param \stdClass $mavr mavr row.
+     * @param \stdClass $vrroom vrroom row.
      * @return array [user, attempt]
      */
-    private function learner(\stdClass $course, \stdClass $mavr): array {
+    private function learner(\stdClass $course, \stdClass $vrroom): array {
         $user = $this->getDataGenerator()->create_and_enrol($course, 'student');
-        /** @var \mod_mavr_generator $generator */
-        $generator = $this->getDataGenerator()->get_plugin_generator('mod_mavr');
-        return [$user, $generator->create_attempt((int)$mavr->id, (int)$user->id)];
+        /** @var \mod_vrroom_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrroom');
+        return [$user, $generator->create_attempt((int)$vrroom->id, (int)$user->id)];
     }
 
     /**
      * Create an activity with live mode on.
      *
-     * @return array [cmid, course, mavr row]
+     * @return array [cmid, course, vrroom row]
      */
     private function create_activity(): array {
         global $DB;
         $course = $this->getDataGenerator()->create_course();
-        $record = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id]);
-        $DB->update_record('mavr', (object)['id' => $record->id, 'livemode' => 1, 'livemaxusers' => 6]);
-        return [(int)$record->cmid, $course, $DB->get_record('mavr', ['id' => $record->id], '*', MUST_EXIST)];
+        $record = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id]);
+        $DB->update_record('vrroom', (object)['id' => $record->id, 'livemode' => 1, 'livemaxusers' => 6]);
+        return [(int)$record->cmid, $course, $DB->get_record('vrroom', ['id' => $record->id], '*', MUST_EXIST)];
     }
 }

@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Scheduled tasks of mod_mavr.
+ * Scheduled tasks of mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $tasks = [
     [
-        'classname' => 'mod_mavr\task\finish_overdue_attempts',
+        'classname' => 'mod_vrroom\task\finish_overdue_attempts',
         'blocking' => 0,
         'minute' => '*',
         'hour' => '*',

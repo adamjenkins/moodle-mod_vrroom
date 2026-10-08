@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr;
+namespace mod_vrroom;
 
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Tests for the mod_mavr data generator.
+ * Tests for the mod_vrroom data generator.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[\PHPUnit\Framework\Attributes\CoversClass(\mod_mavr_generator::class)]
+#[\PHPUnit\Framework\Attributes\CoversClass(\mod_vrroom_generator::class)]
 final class generator_test extends \advanced_testcase {
     /**
      * The default activity has two text-only stations and a compiled scene and graph.
@@ -35,25 +35,25 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
 
-        $this->assertSame(0, $DB->count_records('mavr'));
-        $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id]);
+        $this->assertSame(0, $DB->count_records('vrroom'));
+        $vrroom = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id]);
 
-        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $record = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         $this->assertSame('builtin', $record->runtime);
         $this->assertSame('gallery', $record->template);
         $this->assertEquals(100, $record->grade);
         $this->assertEquals(1, $record->graphversion);
-        $this->assertNotEmpty($mavr->cmid);
+        $this->assertNotEmpty($vrroom->cmid);
 
         $config = json_decode($record->templateconfig);
         $this->assertCount(2, $config->stations);
         $this->assertSame('Station 1', $config->stations[0]->title);
         $this->assertSame('gallery-hall', $config->environment);
 
-        $scenes = instance_manager::get_scenes((int)$mavr->id);
+        $scenes = instance_manager::get_scenes((int)$vrroom->id);
         $this->assertCount(1, $scenes);
         $this->assertSame(['Station 1', 'Station 2'], array_column($scenes[0]['zones'], 'name'));
-        $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+        $this->assertSame(0, $DB->count_records('vrroom_slots', ['vrroomid' => $vrroom->id]));
         $this->assertEquals(0, $record->livemode);
         $this->assertEquals(6, $record->livemaxusers);
     }
@@ -66,12 +66,12 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
 
-        $mavr = $this->getDataGenerator()->create_module(
-            'mavr',
+        $vrroom = $this->getDataGenerator()->create_module(
+            'vrroom',
             ['course' => $course->id, 'livemode' => 1, 'livemaxusers' => 4]
         );
 
-        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $record = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         $this->assertEquals(1, $record->livemode);
         $this->assertEquals(4, $record->livemaxusers);
     }
@@ -90,27 +90,27 @@ final class generator_test extends \advanced_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $mavr = $generator->create_module('mavr', [
+        $vrroom = $generator->create_module('vrroom', [
             'course' => $course->id,
             'stationtitles' => 'Vase|Portrait',
             'stationquestions' => 'Q1|',
             'stationpoints' => '2|1',
         ]);
 
-        $config = json_decode($DB->get_field('mavr', 'templateconfig', ['id' => $mavr->id]));
+        $config = json_decode($DB->get_field('vrroom', 'templateconfig', ['id' => $vrroom->id]));
         $this->assertSame(['Vase', 'Portrait'], array_column($config->stations, 'title'));
         $this->assertEquals((int)$question->questionbankentryid, $config->stations[0]->questionbankentryid);
         $this->assertEquals(0, $config->stations[1]->questionbankentryid);
         $this->assertEquals(2.0, $config->stations[0]->points);
 
-        $slots = $DB->get_records('mavr_slots', ['mavrid' => $mavr->id]);
+        $slots = $DB->get_records('vrroom_slots', ['vrroomid' => $vrroom->id]);
         $this->assertCount(1, $slots);
         $slot = reset($slots);
         $this->assertEquals(1, $slot->slot);
 
-        $context = \context_module::instance($mavr->cmid);
+        $context = \context_module::instance($vrroom->cmid);
         $reference = $DB->get_record('question_references', [
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
             'questionarea' => 'slot',
             'itemid' => $slot->id,
         ], '*', MUST_EXIST);
@@ -125,7 +125,7 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $this->expectException(\coding_exception::class);
-        $this->getDataGenerator()->create_module('mavr', [
+        $this->getDataGenerator()->create_module('vrroom', [
             'course' => $course->id,
             'stationtitles' => 'Vase',
             'stationquestions' => 'No such question',
@@ -141,27 +141,27 @@ final class generator_test extends \advanced_testcase {
         $generator = $this->getDataGenerator();
         $course = $generator->create_course();
         $student = $generator->create_and_enrol($course, 'student');
-        $mavr = $generator->create_module('mavr', ['course' => $course->id, 'stationtitles' => 'Vase']);
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
+        $vrroom = $generator->create_module('vrroom', ['course' => $course->id, 'stationtitles' => 'Vase']);
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
 
-        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
+        $attempt = $vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id);
         $this->assertEquals(1, $attempt->attempt);
         $this->assertSame('inprogress', $attempt->state);
-        $this->assertSame((int)$attempt->id, (int)$mavrgen->create_attempt((int)$mavr->id, (int)$student->id)->id);
+        $this->assertSame((int)$attempt->id, (int)$vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id)->id);
 
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $zoneid = $scene['zones'][0]['id'];
-        $eventid = $mavrgen->record_event($attempt, 'entered', 'zone', $scene['id'], $zoneid);
+        $eventid = $vrroomgen->record_event($attempt, 'entered', 'zone', $scene['id'], $zoneid);
 
-        $event = $DB->get_record('mavr_events', ['id' => $eventid], '*', MUST_EXIST);
+        $event = $DB->get_record('vrroom_events', ['id' => $eventid], '*', MUST_EXIST);
         $this->assertSame('entered', $event->verb);
         $this->assertEquals(1, $event->clientasserted);
-        $row = $DB->get_record('mavr_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
+        $row = $DB->get_record('vrroom_attempts', ['id' => $attempt->id], '*', MUST_EXIST);
         $this->assertEquals(1, $row->requireddone);
         $this->assertEqualsWithDelta(1.0, (float)$row->score, 1e-6);
         $this->assertTrue($DB->record_exists(
-            'mavr_events',
+            'vrroom_events',
             ['attemptid' => $attempt->id, 'verb' => 'completed', 'objecttype' => 'objective']
         ));
     }
@@ -175,25 +175,25 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
 
-        $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id, 'template' => 'escape']);
+        $vrroom = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id, 'template' => 'escape']);
 
-        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $record = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         $this->assertSame('escape', $record->template);
         $this->assertEquals(0, $record->customised);
         $config = json_decode($record->templateconfig);
-        $this->assertSame('mavrtemplate_escape/1', $config->schema);
+        $this->assertSame('vrroomtemplate_escape/1', $config->schema);
         $this->assertSame('escape-room', $config->environment);
         $this->assertSame(['Desk', 'Safe'], array_column($config->puzzles, 'title'));
         $this->assertSame(['key', 'none'], array_column($config->puzzles, 'locktype'));
         $this->assertSame('Key', $config->puzzles[0]->keyname);
 
-        $scenes = instance_manager::get_scenes((int)$mavr->id);
+        $scenes = instance_manager::get_scenes((int)$vrroom->id);
         $this->assertCount(1, $scenes);
-        $graph = instance_manager::get_graph((int)$mavr->id);
+        $graph = instance_manager::get_graph((int)$vrroom->id);
         $objectiveids = array_column($graph['objectives'], 'id');
         $this->assertContains('o-exit', $objectiveids);
         $this->assertContains('d-exit', $graph['hidden']);
-        $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+        $this->assertSame(0, $DB->count_records('vrroom_slots', ['vrroomid' => $vrroom->id]));
     }
 
     /**
@@ -211,7 +211,7 @@ final class generator_test extends \advanced_testcase {
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id, 'name' => 'Q1']);
 
-        $mavr = $generator->create_module('mavr', [
+        $vrroom = $generator->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'escape',
             'puzzletitles' => 'Desk|Safe',
@@ -223,7 +223,7 @@ final class generator_test extends \advanced_testcase {
             'story' => 'You are locked in.',
         ]);
 
-        $config = json_decode($DB->get_field('mavr', 'templateconfig', ['id' => $mavr->id]));
+        $config = json_decode($DB->get_field('vrroom', 'templateconfig', ['id' => $vrroom->id]));
         $this->assertSame(['key', 'question'], array_column($config->puzzles, 'locktype'));
         $this->assertSame(['Look on the desk.'], $config->puzzles[0]->hints);
         $this->assertSame([], $config->puzzles[1]->hints);
@@ -232,17 +232,17 @@ final class generator_test extends \advanced_testcase {
         $this->assertEquals(0.5, $config->hintpenalty);
         $this->assertSame('You are locked in.', $config->story);
 
-        $graph = instance_manager::get_graph((int)$mavr->id);
+        $graph = instance_manager::get_graph((int)$vrroom->id);
         $this->assertSame(900, $graph['timelimit']);
-        $slots = $DB->get_records('mavr_slots', ['mavrid' => $mavr->id]);
+        $slots = $DB->get_records('vrroom_slots', ['vrroomid' => $vrroom->id]);
         $this->assertCount(1, $slots);
         $this->assertEquals(1, reset($slots)->slot);
 
         // A new attempt gets its deadline from the graph's time limit.
         $student = $generator->create_and_enrol($course, 'student');
-        /** @var \mod_mavr_generator $mavrgen */
-        $mavrgen = $generator->get_plugin_generator('mod_mavr');
-        $attempt = $mavrgen->create_attempt((int)$mavr->id, (int)$student->id);
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $attempt = $vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id);
         $this->assertEquals((int)$attempt->timestart + 900, (int)$attempt->timedue);
     }
 
@@ -254,21 +254,21 @@ final class generator_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
 
-        $mavr = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id, 'template' => 'blank']);
+        $vrroom = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id, 'template' => 'blank']);
 
-        $record = $DB->get_record('mavr', ['id' => $mavr->id], '*', MUST_EXIST);
+        $record = $DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST);
         $this->assertSame('blank', $record->template);
         $config = json_decode($record->templateconfig);
-        $this->assertSame('mavrtemplate_blank/1', $config->schema);
+        $this->assertSame('vrroomtemplate_blank/1', $config->schema);
         $this->assertSame('gallery-hall', $config->environment);
 
-        $scenes = instance_manager::get_scenes((int)$mavr->id);
+        $scenes = instance_manager::get_scenes((int)$vrroom->id);
         $this->assertCount(1, $scenes);
         $this->assertEmpty($scenes[0]['zones'] ?? []);
         $this->assertEmpty($scenes[0]['interactables'] ?? []);
-        $graph = instance_manager::get_graph((int)$mavr->id);
+        $graph = instance_manager::get_graph((int)$vrroom->id);
         $this->assertSame([], $graph['objectives']);
         $this->assertSame([], $graph['rules']);
-        $this->assertSame(0, $DB->count_records('mavr_slots', ['mavrid' => $mavr->id]));
+        $this->assertSame(0, $DB->count_records('vrroom_slots', ['vrroomid' => $vrroom->id]));
     }
 }

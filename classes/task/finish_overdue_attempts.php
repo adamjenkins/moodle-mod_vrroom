@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\task;
+namespace mod_vrroom\task;
 
-use mod_mavr\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\attempt_manager;
 
 /**
  * Finishes attempts whose time ran out while nobody was sending anything for them.
@@ -25,7 +25,7 @@ use mod_mavr\local\attempt\attempt_manager;
  * the server; this task catches the attempts that were simply left open (a closed tab, a lost
  * connection), so their grades and completion do not wait for the student to come back.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -39,7 +39,7 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('taskfinishoverdue', 'mod_mavr');
+        return get_string('taskfinishoverdue', 'mod_vrroom');
     }
 
     /**
@@ -52,7 +52,7 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
         $now = time();
         $cutoff = $now - attempt_manager::DEADLINE_GRACE;
         $rows = $DB->get_records_select(
-            'mavr_attempts',
+            'vrroom_attempts',
             'state = :state AND timedue > 0 AND timedue < :cutoff',
             ['state' => attempt_manager::STATE_INPROGRESS, 'cutoff' => $cutoff],
             'timedue ASC, id ASC',
@@ -68,11 +68,11 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
                     $finished++;
                 }
             } catch (\Throwable $e) {
-                mtrace('MAVR: could not finish overdue attempt ' . (int)$row->id . ': ' . $e->getMessage());
+                mtrace('VR room: could not finish overdue attempt ' . (int)$row->id . ': ' . $e->getMessage());
             }
         }
         if ($finished > 0) {
-            mtrace('MAVR: finished ' . $finished . ' overdue attempt(s).');
+            mtrace('VR room: finished ' . $finished . ' overdue attempt(s).');
         }
     }
 }

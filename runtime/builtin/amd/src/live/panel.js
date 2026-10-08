@@ -17,7 +17,7 @@
  * The live room panel: notice, group room choice, join and leave, voice controls and the list of
  * the people in the room. It only shows state and reports clicks; live/controller decides.
  *
- * @module     mavrruntime_builtin/live/panel
+ * @module     vrroomruntime_builtin/live/panel
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -50,7 +50,7 @@ class Panel {
     /**
      * Constructor.
      *
-     * @param {HTMLElement} container The mavr-liveroom section.
+     * @param {HTMLElement} container The vrroom-liveroom section.
      * @param {Object} options {cmid, live, secure, str(key, a), handlers: {join, leave, mic, mute, ptt,
      *     talk, mutepeer}}
      */
@@ -92,7 +92,7 @@ class Panel {
             count: 0,
             notice: String(live.notice || ''),
         };
-        return Templates.renderForPromise('mavrruntime_builtin/liveroom', context).then(({html, js}) => {
+        return Templates.renderForPromise('vrroomruntime_builtin/liveroom', context).then(({html, js}) => {
             Templates.replaceNodeContents(this.container, html, js);
             this.container.classList.remove('d-none');
             this.rendered = true;
@@ -118,19 +118,19 @@ class Panel {
                 return;
             }
             const name = button.dataset.action;
-            if (name === 'mavr-live-join') {
+            if (name === 'vrroom-live-join') {
                 e.preventDefault();
                 this.call('join');
-            } else if (name === 'mavr-live-leave') {
+            } else if (name === 'vrroom-live-leave') {
                 e.preventDefault();
                 this.call('leave');
-            } else if (name === 'mavr-live-mic') {
+            } else if (name === 'vrroom-live-mic') {
                 e.preventDefault();
                 this.call('mic');
-            } else if (name === 'mavr-live-mute') {
+            } else if (name === 'vrroom-live-mute') {
                 e.preventDefault();
                 this.call('mute');
-            } else if (name === 'mavr-live-mutepeer') {
+            } else if (name === 'vrroom-live-mutepeer') {
                 e.preventDefault();
                 const item = button.closest('[data-peerid]');
                 if (item) {
@@ -138,10 +138,10 @@ class Panel {
                 }
             }
         });
-        listen(part(this.container, 'mavr-live-ptt'), 'change', (e) => {
+        listen(part(this.container, 'vrroom-live-ptt'), 'change', (e) => {
             this.call('ptt', !!e.target.checked);
         });
-        const talk = action(this.container, 'mavr-live-talk');
+        const talk = action(this.container, 'vrroom-live-talk');
         const press = (e) => {
             if (e.type === 'keydown' && e.key !== ' ' && e.key !== 'Enter') {
                 return;
@@ -185,7 +185,7 @@ class Panel {
      * @returns {number}
      */
     getGroupId() {
-        const select = this.rendered ? part(this.container, 'mavr-live-group') : null;
+        const select = this.rendered ? part(this.container, 'vrroom-live-group') : null;
         return select ? (Number(select.value) || 0) : 0;
     }
 
@@ -199,24 +199,24 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        const join = action(this.container, 'mavr-live-join');
-        const leave = action(this.container, 'mavr-live-leave');
+        const join = action(this.container, 'vrroom-live-join');
+        const leave = action(this.container, 'vrroom-live-leave');
         if (join) {
             join.classList.toggle('d-none', this.joined);
         }
         if (leave) {
             leave.classList.toggle('d-none', !this.joined);
         }
-        const select = part(this.container, 'mavr-live-group');
+        const select = part(this.container, 'vrroom-live-group');
         if (select) {
             select.disabled = this.joined || this.busy;
         }
-        part(this.container, 'mavr-live-voice').classList.toggle('d-none', !this.joined || this.novoice);
-        part(this.container, 'mavr-live-people').classList.toggle('d-none', !this.joined);
+        part(this.container, 'vrroom-live-voice').classList.toggle('d-none', !this.joined || this.novoice);
+        part(this.container, 'vrroom-live-people').classList.toggle('d-none', !this.joined);
         if (!this.joined) {
             this.setTalking(false);
             this.listseq++;
-            part(this.container, 'mavr-live-participants').textContent = '';
+            part(this.container, 'vrroom-live-participants').textContent = '';
         }
         this.setBusy(this.busy);
     }
@@ -231,7 +231,7 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        part(this.container, 'mavr-live-voice').classList.toggle('d-none', !available || !this.joined);
+        part(this.container, 'vrroom-live-voice').classList.toggle('d-none', !available || !this.joined);
     }
 
     /**
@@ -244,13 +244,13 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        ['mavr-live-join', 'mavr-live-leave'].forEach((name) => {
+        ['vrroom-live-join', 'vrroom-live-leave'].forEach((name) => {
             const button = action(this.container, name);
             if (button) {
                 button.disabled = this.busy;
             }
         });
-        const select = part(this.container, 'mavr-live-group');
+        const select = part(this.container, 'vrroom-live-group');
         if (select) {
             select.disabled = this.joined || this.busy;
         }
@@ -265,7 +265,7 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        part(this.container, 'mavr-live-status').textContent = text || '';
+        part(this.container, 'vrroom-live-status').textContent = text || '';
     }
 
     /**
@@ -277,10 +277,10 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        const mic = action(this.container, 'mavr-live-mic');
-        const mute = action(this.container, 'mavr-live-mute');
-        const ptt = part(this.container, 'mavr-live-ptt');
-        const talk = action(this.container, 'mavr-live-talk');
+        const mic = action(this.container, 'vrroom-live-mic');
+        const mute = action(this.container, 'vrroom-live-mute');
+        const ptt = part(this.container, 'vrroom-live-ptt');
+        const talk = action(this.container, 'vrroom-live-talk');
         const on = state.micstate !== 'off';
         if (mic) {
             mic.textContent = this.str(on ? 'livemicoff' : 'livemicon');
@@ -311,7 +311,7 @@ class Panel {
         if (!this.rendered) {
             return;
         }
-        const talk = action(this.container, 'mavr-live-talk');
+        const talk = action(this.container, 'vrroom-live-talk');
         if (talk) {
             talk.setAttribute('aria-pressed', this.talking ? 'true' : 'false');
             talk.classList.toggle('active', this.talking);
@@ -321,7 +321,7 @@ class Panel {
     /**
      * Show the people in the room.
      *
-     * @param {Object[]} people Contexts of mavrruntime_builtin/liveparticipant, oneself first.
+     * @param {Object[]} people Contexts of vrroomruntime_builtin/liveparticipant, oneself first.
      * @returns {Promise}
      */
     setParticipants(people) {
@@ -329,12 +329,12 @@ class Panel {
             return Promise.resolve();
         }
         const seq = ++this.listseq;
-        const count = part(this.container, 'mavr-live-count');
+        const count = part(this.container, 'vrroom-live-count');
         if (count) {
             count.textContent = this.str('liveparticipants', people.length);
         }
-        const pending = new Pending('mavrruntime_builtin/live/panel:participants');
-        return Promise.all(people.map((person) => Templates.renderForPromise('mavrruntime_builtin/liveparticipant', person)))
+        const pending = new Pending('vrroomruntime_builtin/live/panel:participants');
+        return Promise.all(people.map((person) => Templates.renderForPromise('vrroomruntime_builtin/liveparticipant', person)))
             .then((results) => {
                 if (seq !== this.listseq || !this.joined) {
                     return undefined;
@@ -342,7 +342,7 @@ class Panel {
                 const html = results.map((r) => r.html).join('');
                 const js = results.map((r) => r.js).join(';');
                 // Template output only: every value is escaped by Mustache.
-                Templates.replaceNodeContents(part(this.container, 'mavr-live-participants'), html, js);
+                Templates.replaceNodeContents(part(this.container, 'vrroom-live-participants'), html, js);
                 return undefined;
             })
             .then(() => {
@@ -363,10 +363,10 @@ class Panel {
         if (!this.rendered || !this.joined) {
             return;
         }
-        part(this.container, 'mavr-live-participants').querySelectorAll('[data-peerid]').forEach((item) => {
-            const indicator = item.querySelector('.mavr-live-speaking');
+        part(this.container, 'vrroom-live-participants').querySelectorAll('[data-peerid]').forEach((item) => {
+            const indicator = item.querySelector('.vrroom-live-speaking');
             if (indicator) {
-                indicator.classList.toggle('mavr-live-speaking-on', !!isSpeaking(item.dataset.peerid));
+                indicator.classList.toggle('vrroom-live-speaking-on', !!isSpeaking(item.dataset.peerid));
             }
         });
     }
@@ -389,7 +389,7 @@ class Panel {
 /**
  * Create the live room panel.
  *
- * @param {HTMLElement} container The mavr-liveroom section.
+ * @param {HTMLElement} container The vrroom-liveroom section.
  * @param {Object} options {cmid, live, secure, str(key, a), handlers}
  * @returns {Panel}
  */

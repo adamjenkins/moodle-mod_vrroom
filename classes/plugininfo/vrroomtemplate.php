@@ -14,20 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+namespace mod_vrroom\plugininfo;
+
+use core\plugininfo\base;
+
 /**
- * English strings for the Empty room template.
+ * Plugin info for the vrroomtemplate sub-plugin type (activity templates).
  *
- * @package    mavrtemplate_blank
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+class vrroomtemplate extends base {
+    /**
+     * A template can be uninstalled only while no activity was built with it.
+     *
+     * @return bool
+     */
+    public function is_uninstall_allowed(): bool {
+        global $DB;
+        return !$DB->record_exists('vrroom', ['template' => $this->name]);
+    }
 
-defined('MOODLE_INTERNAL') || die();
-
-$string['blankheading'] = 'Empty room';
-$string['chooserhelp'] = 'Starts with an empty room that you fill in the room editor.';
-$string['environment'] = 'Surroundings';
-$string['environment_help'] = 'The room you start from. You can change it later in the room editor.';
-$string['pluginname'] = 'Empty room';
-$string['privacy:metadata'] = 'The Empty room template stores no personal data.';
-$string['scenename'] = 'Room 1';
+    /**
+     * Templates cannot be enabled or disabled in Phase 1.
+     *
+     * @return bool
+     */
+    public static function plugintype_supports_disabling(): bool {
+        return false;
+    }
+}

@@ -19,25 +19,25 @@
  *
  * The click-to-raycast-to-hotspot-panel flow follows mod_gear's viewer.
  *
- * @module     mavrruntime_builtin/viewer
+ * @module     vrroomruntime_builtin/viewer
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import * as THREE from 'mavrruntime_builtin/three';
-import {GLTFLoader} from 'mavrruntime_builtin/three';
+import * as THREE from 'vrroomruntime_builtin/three';
+import {GLTFLoader} from 'vrroomruntime_builtin/three';
 import Log from 'core/log';
 import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
-import {buildScene, DEG} from 'mavrruntime_builtin/scenebuilder';
-import {attach} from 'mavrruntime_builtin/controls';
-import {createPanels} from 'mavrruntime_builtin/panels';
-import {detect, createXr, createWristPanel} from 'mavrruntime_builtin/xr';
-import {createXrInput} from 'mavrruntime_builtin/xrinput';
-import {createXrPanels} from 'mavrruntime_builtin/xrpanel';
-import {createAvatarLayer} from 'mavrruntime_builtin/live/avatars';
-import {region, plainText, announce, showMessage, clearMessage, startScene} from 'mavrruntime_builtin/util';
+import {buildScene, DEG} from 'vrroomruntime_builtin/scenebuilder';
+import {attach} from 'vrroomruntime_builtin/controls';
+import {createPanels} from 'vrroomruntime_builtin/panels';
+import {detect, createXr, createWristPanel} from 'vrroomruntime_builtin/xr';
+import {createXrInput} from 'vrroomruntime_builtin/xrinput';
+import {createXrPanels} from 'vrroomruntime_builtin/xrpanel';
+import {createAvatarLayer} from 'vrroomruntime_builtin/live/avatars';
+import {region, plainText, announce, showMessage, clearMessage, startScene} from 'vrroomruntime_builtin/util';
 
 /** Distance within which Enter activates the object in the middle of the screen (m). */
 const REACH = 6;
@@ -126,7 +126,7 @@ const prepareRoom = (base, values) => {
     const scene3 = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 300);
     const rig = new THREE.Group();
-    rig.name = 'mavr-rig';
+    rig.name = 'vrroom-rig';
     rig.add(camera);
     scene3.add(rig);
     const loader = new GLTFLoader();
@@ -173,7 +173,7 @@ const prepareRoom = (base, values) => {
 /**
  * Start the 3D view.
  *
- * @param {HTMLElement} root The MAVR root element (holding the shell).
+ * @param {HTMLElement} root The VR room root element (holding the shell).
  * @param {Object} session The session.
  * @param {Object} config Launch config.
  * @param {Object} [options] {live: LiveController|null} — the live room, when there is one.
@@ -181,22 +181,22 @@ const prepareRoom = (base, values) => {
  */
 export const start = (root, session, config, options = {}) => {
     const live = options && options.live ? options.live : null;
-    const pending = new Pending('mavrruntime_builtin/viewer:start');
-    const stage = region(root, 'mavr-stage');
-    const canvas = region(root, 'mavr-canvas');
+    const pending = new Pending('vrroomruntime_builtin/viewer:start');
+    const stage = region(root, 'vrroom-stage');
+    const canvas = region(root, 'vrroom-canvas');
     const scenes = Array.isArray(config.scenes) ? config.scenes : [];
 
     return getStrings([
-        {key: 'loading', component: 'mavrruntime_builtin'},
-        {key: 'modelloadfailed', component: 'mavrruntime_builtin'},
-        {key: 'stationlocked', component: 'mavrruntime_builtin'},
-        {key: 'entervr', component: 'mavrruntime_builtin'},
-        {key: 'enterar', component: 'mavrruntime_builtin'},
-        {key: 'entermr', component: 'mavrruntime_builtin'},
-        {key: 'exitxr', component: 'mavrruntime_builtin'},
-        {key: 'xrinsecure', component: 'mavrruntime_builtin'},
-        {key: 'xrfailed', component: 'mavrruntime_builtin'},
-        {key: 'xrplace', component: 'mavrruntime_builtin'},
+        {key: 'loading', component: 'vrroomruntime_builtin'},
+        {key: 'modelloadfailed', component: 'vrroomruntime_builtin'},
+        {key: 'stationlocked', component: 'vrroomruntime_builtin'},
+        {key: 'entervr', component: 'vrroomruntime_builtin'},
+        {key: 'enterar', component: 'vrroomruntime_builtin'},
+        {key: 'entermr', component: 'vrroomruntime_builtin'},
+        {key: 'exitxr', component: 'vrroomruntime_builtin'},
+        {key: 'xrinsecure', component: 'vrroomruntime_builtin'},
+        {key: 'xrfailed', component: 'vrroomruntime_builtin'},
+        {key: 'xrplace', component: 'vrroomruntime_builtin'},
     ]).then((values) => prepareRoom({root, session, config, live, stage, canvas, scenes}, values)).then((handle) => {
         pending.resolve();
         return handle;
@@ -240,11 +240,11 @@ const run = (p) => {
     );
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
-    reticle.name = 'mavr-xr-place';
+    reticle.name = 'vrroom-xr-place';
     scene3.add(reticle);
 
-    const xrstatus = region(root, 'mavr-xr-status');
-    const exitbutton = stage.querySelector('[data-action="mavr-exit-xr"]');
+    const xrstatus = region(root, 'vrroom-xr-status');
+    const exitbutton = stage.querySelector('[data-action="vrroom-exit-xr"]');
     const sceneid = () => current.doc.id;
     const findItem = (id) => (Array.isArray(current.doc.interactables) ? current.doc.interactables : [])
         .find((i) => i.id === id) || null;
@@ -358,7 +358,7 @@ const run = (p) => {
         if (element.ended) {
             element.currentTime = 0;
         }
-        Promise.resolve(element.play()).then(() => getString('mediaplay', 'mavrruntime_builtin',
+        Promise.resolve(element.play()).then(() => getString('mediaplay', 'vrroomruntime_builtin',
             plainText(record.item.name || ''))).then((text) => announce(root, text)).catch((error) => Log.debug(error));
     };
     const toggleMedia = (id) => {
@@ -370,7 +370,7 @@ const run = (p) => {
             playMedia(record);
         } else {
             record.media.pause();
-            getString('mediapause', 'mavrruntime_builtin', plainText(record.item.name || ''))
+            getString('mediapause', 'vrroomruntime_builtin', plainText(record.item.name || ''))
                 .then((text) => announce(root, text))
                 .catch((error) => Log.debug(error));
         }
@@ -562,7 +562,7 @@ const run = (p) => {
         if (!doc || switching) {
             return switching || Promise.resolve();
         }
-        const pending = new Pending('mavrruntime_builtin/viewer:room');
+        const pending = new Pending('vrroomruntime_builtin/viewer:room');
         leaveZones();
         panels.close();
         if (xrpanels) {
@@ -592,7 +592,7 @@ const run = (p) => {
             applyLook();
             applyState();
             placeAtSpawn(spawnid);
-            return getString('scenechanged', 'mavrruntime_builtin', plainText(doc.name || ''));
+            return getString('scenechanged', 'vrroomruntime_builtin', plainText(doc.name || ''));
         }).then((text) => {
             if (text && !stopped) {
                 announce(root, text);
@@ -666,7 +666,7 @@ const run = (p) => {
         bounds: current.handle.environment.bounds,
         eyeHeight: EYE,
         rig: rig,
-        stick: region(root, 'mavr-stick'),
+        stick: region(root, 'vrroom-stick'),
         onClick: (ndc) => {
             const item = pick(ndc, Infinity);
             if (item) {
@@ -681,7 +681,7 @@ const run = (p) => {
                 activate(item);
             }
         },
-        onTouch: () => stage.classList.add('mavr-touch'),
+        onTouch: () => stage.classList.add('vrroom-touch'),
     });
     if (resume) {
         controls.teleport(resume.position, resume.yaw);
@@ -816,10 +816,10 @@ const run = (p) => {
         const timeleft = session.getTimeLeft();
         const requests = [];
         if (state.requiredtotal > 0) {
-            requests.push(getString('xrprogress', 'mavrruntime_builtin', {done: state.requireddone, total: state.requiredtotal}));
+            requests.push(getString('xrprogress', 'vrroomruntime_builtin', {done: state.requireddone, total: state.requiredtotal}));
         }
         if (timeleft !== null && timeleft !== undefined) {
-            requests.push(getString('timeleft', 'mavrruntime_builtin', clockText(timeleft)));
+            requests.push(getString('timeleft', 'vrroomruntime_builtin', clockText(timeleft)));
         }
         Promise.all(requests).then((lines) => {
             if (wrist) {
@@ -859,8 +859,8 @@ const run = (p) => {
             panels.close();
             leaveZones();
             session.setChannel(`builtin-${mode}`);
-            stage.classList.add('mavr-xr');
-            stage.classList.toggle('mavr-xr-overlay', mode === 'ar' && xr.domOverlay);
+            stage.classList.add('vrroom-xr');
+            stage.classList.toggle('vrroom-xr-overlay', mode === 'ar' && xr.domOverlay);
             if (exitbutton) {
                 exitbutton.classList.toggle('d-none', !(mode === 'ar' && xr.domOverlay));
             }
@@ -913,7 +913,7 @@ const run = (p) => {
             }
             leaveZones();
             applyLook();
-            stage.classList.remove('mavr-xr', 'mavr-xr-overlay');
+            stage.classList.remove('vrroom-xr', 'vrroom-xr-overlay');
             if (exitbutton) {
                 exitbutton.classList.add('d-none');
             }
@@ -938,7 +938,7 @@ const run = (p) => {
         if (xr.mode || switching) {
             return;
         }
-        const pending = new Pending('mavrruntime_builtin/viewer:xr');
+        const pending = new Pending('vrroomruntime_builtin/viewer:xr');
         // Called straight from the click, so the browser still sees the user's gesture.
         xr.enter(mode).catch((error) => {
             Log.debug(error);
@@ -949,21 +949,21 @@ const run = (p) => {
     };
 
     // HUD buttons.
-    const vrbutton = stage.querySelector('[data-action="mavr-enter-vr"]');
-    const arbutton = stage.querySelector('[data-action="mavr-enter-ar"]');
-    const xrnote = region(root, 'mavr-xr-note');
+    const vrbutton = stage.querySelector('[data-action="vrroom-enter-vr"]');
+    const arbutton = stage.querySelector('[data-action="vrroom-enter-ar"]');
+    const xrnote = region(root, 'vrroom-xr-note');
     const onHudClick = (e) => {
         const button = e.target.closest('[data-action]');
         if (!button || !stage.contains(button)) {
             return;
         }
-        if (button.dataset.action === 'mavr-enter-vr') {
+        if (button.dataset.action === 'vrroom-enter-vr') {
             e.preventDefault();
             enterXr('vr');
-        } else if (button.dataset.action === 'mavr-enter-ar') {
+        } else if (button.dataset.action === 'vrroom-enter-ar') {
             e.preventDefault();
             enterXr('ar');
-        } else if (button.dataset.action === 'mavr-exit-xr') {
+        } else if (button.dataset.action === 'vrroom-exit-xr') {
             e.preventDefault();
             xr.exit();
         }
@@ -971,7 +971,7 @@ const run = (p) => {
     stage.addEventListener('click', onHudClick);
     // Taps on the AR overlay's buttons and panels must not also select in the room.
     const onBeforeXrSelect = (e) => {
-        if (e.target.closest('button, a, input, select, textarea, label, [data-region="mavr-overlay"], .mavr-hud-buttons')) {
+        if (e.target.closest('button, a, input, select, textarea, label, [data-region="vrroom-overlay"], .vrroom-hud-buttons')) {
             e.preventDefault();
         }
     };
@@ -1079,8 +1079,8 @@ const run = (p) => {
     clearMessage(root, strings.loading);
 
     // Behat hooks.
-    root.dataset.mavrReady = '3d';
-    root.mavrTest = {
+    root.dataset.vrroomReady = '3d';
+    root.vrroomTest = {
         enterZone: (name) => {
             const zone = zonesOf(current.doc).find((z) => z.name === name || plainText(z.name) === name);
             if (!zone) {
@@ -1154,9 +1154,9 @@ const run = (p) => {
                 }
             });
             stage.classList.add('d-none');
-            stage.classList.remove('mavr-touch', 'mavr-xr', 'mavr-xr-overlay');
-            delete root.dataset.mavrReady;
-            delete root.mavrTest;
+            stage.classList.remove('vrroom-touch', 'vrroom-xr', 'vrroom-xr-overlay');
+            delete root.dataset.vrroomReady;
+            delete root.vrroomTest;
         },
     };
 };

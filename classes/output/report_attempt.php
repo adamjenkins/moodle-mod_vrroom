@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\output;
+namespace mod_vrroom\output;
 
 use core\output\renderable;
 use core\output\renderer_base;
 use core\output\templatable;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\grading\grader;
-use mod_mavr\local\graph\evaluator;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\grading\grader;
+use mod_vrroom\local\graph\evaluator;
+use mod_vrroom\local\instance_manager;
 
 /**
- * One attempt in the MAVR report: its objectives and its statement timeline.
+ * One attempt in the VR room report: its objectives and its statement timeline.
  *
  * The objective states come from a fresh replay of the stored statements (nothing is persisted).
  * Statements the browser reported are labelled as such, because a browser report can be faked.
@@ -34,7 +34,7 @@ use mod_mavr\local\instance_manager;
  * Escaping: plain values (names, labels, numbers) are escaped by the template ({{ }}); values
  * that are already HTML-safe (format_string() output, the help icon) use {{{ }}}.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -52,25 +52,25 @@ class report_attempt implements renderable, templatable {
     /**
      * Constructor.
      *
-     * @param \stdClass $mavr mavr row
+     * @param \stdClass $vrroom vrroom row
      * @param \cm_info $cm course module
      * @param \context_module $context module context
-     * @param \stdClass $attempt mavr_attempts row
+     * @param \stdClass $attempt vrroom_attempts row
      */
     public function __construct(
-        /** @var \stdClass mavr row */
-        protected \stdClass $mavr,
+        /** @var \stdClass vrroom row */
+        protected \stdClass $vrroom,
         /** @var \cm_info course module */
         protected \cm_info $cm,
         /** @var \context_module module context */
         protected \context_module $context,
-        /** @var \stdClass mavr_attempts row */
+        /** @var \stdClass vrroom_attempts row */
         protected \stdClass $attempt,
     ) {
     }
 
     /**
-     * Data for mod_mavr/report_attempt.
+     * Data for mod_vrroom/report_attempt.
      *
      * @param renderer_base $output renderer
      * @return array
@@ -84,28 +84,28 @@ class report_attempt implements renderable, templatable {
         $objectives = $this->export_objectives();
         $statements = $this->export_statements();
 
-        $baseurl = new \moodle_url('/mod/mavr/report.php', ['id' => $this->cm->id]);
-        $candelete = has_capability('mod/mavr:deleteattempts', $this->context);
+        $baseurl = new \moodle_url('/mod/vrroom/report.php', ['id' => $this->cm->id]);
+        $candelete = has_capability('mod/vrroom:deleteattempts', $this->context);
 
         return [
             'cmid' => (int)$this->cm->id,
             'attemptid' => (int)$this->attempt->id,
             'heading' => get_string(
                 'reportattemptdetails',
-                'mod_mavr',
+                'mod_vrroom',
                 (object)['attempt' => (int)$this->attempt->attempt, 'user' => $fullname]
             ),
             'user' => $fullname,
             'state' => report_overview::state_label((string)$this->attempt->state),
             'score' => report_overview::format_score($score),
-            'grade' => grader::format_grade($this->mavr, $score),
+            'grade' => grader::format_grade($this->vrroom, $score),
             'timestart' => $this->attempt->timestart ? userdate((int)$this->attempt->timestart) : '-',
             'timefinish' => $this->attempt->timefinish ? userdate((int)$this->attempt->timefinish) : '-',
             'hasobjectives' => !empty($objectives),
             'objectives' => $objectives,
             'hasstatements' => !empty($statements),
             'statements' => $statements,
-            'clienthelp' => $output->help_icon('reportclientasserted', 'mod_mavr'),
+            'clienthelp' => $output->help_icon('reportclientasserted', 'mod_vrroom'),
             'backurl' => $baseurl->out(false),
             'candelete' => $candelete,
             'deleteurl' => $candelete ? (new \moodle_url($baseurl, ['delete' => $this->attempt->id]))->out(false) : '',
@@ -119,7 +119,7 @@ class report_attempt implements renderable, templatable {
      */
     protected function export_objectives(): array {
         try {
-            $graph = instance_manager::get_graph((int)$this->attempt->mavrid, (int)$this->attempt->graphversion);
+            $graph = instance_manager::get_graph((int)$this->attempt->vrroomid, (int)$this->attempt->graphversion);
         } catch (\moodle_exception $e) {
             return [];
         }
@@ -133,7 +133,7 @@ class report_attempt implements renderable, templatable {
                 'id' => $id,
                 'title' => $this->format_name($this->objectivetitles[$id] ?? $id),
                 'status' => $status,
-                'statuslabel' => get_string('status_' . $status, 'mod_mavr'),
+                'statuslabel' => get_string('status_' . $status, 'mod_vrroom'),
                 'badgeclass' => match ($status) {
                     evaluator::OBJECTIVE_COMPLETED => 'bg-success',
                     evaluator::OBJECTIVE_AVAILABLE => 'bg-info text-dark',
@@ -165,7 +165,7 @@ class report_attempt implements renderable, templatable {
                 'objectname' => $this->object_name($type, $row->sceneid, $row->objectid),
                 'result' => $this->result_text($verb, $type, $row->resultjson),
                 'clientasserted' => $client,
-                'source' => get_string($client ? 'reportclientasserted' : 'reportserverasserted', 'mod_mavr'),
+                'source' => get_string($client ? 'reportclientasserted' : 'reportserverasserted', 'mod_vrroom'),
             ];
         }
         return $rows;
@@ -177,7 +177,7 @@ class report_attempt implements renderable, templatable {
      * @return void
      */
     protected function load_names(): void {
-        foreach (instance_manager::get_scenes((int)$this->attempt->mavrid) as $scene) {
+        foreach (instance_manager::get_scenes((int)$this->attempt->vrroomid) as $scene) {
             if (isset($scene['id'])) {
                 $this->names[(string)$scene['id']] = (string)($scene['name'] ?? '');
             }
@@ -190,7 +190,7 @@ class report_attempt implements renderable, templatable {
             }
         }
         try {
-            $graph = instance_manager::get_graph((int)$this->attempt->mavrid, (int)$this->attempt->graphversion);
+            $graph = instance_manager::get_graph((int)$this->attempt->vrroomid, (int)$this->attempt->graphversion);
         } catch (\moodle_exception $e) {
             return;
         }
@@ -218,7 +218,7 @@ class report_attempt implements renderable, templatable {
         $raw = null;
         switch ($type) {
             case 'activity':
-                $raw = (string)$this->mavr->name;
+                $raw = (string)$this->vrroom->name;
                 break;
             case 'scene':
                 $raw = $this->names[(string)($objectid ?? $sceneid)] ?? null;
@@ -285,15 +285,15 @@ class report_attempt implements renderable, templatable {
     }
 
     /**
-     * A mod_mavr string when it exists, else the fallback.
+     * A mod_vrroom string when it exists, else the fallback.
      *
      * @param string $identifier string key
      * @param string $fallback raw value
      * @return string
      */
     protected static function label(string $identifier, string $fallback): string {
-        if (get_string_manager()->string_exists($identifier, 'mod_mavr')) {
-            return get_string($identifier, 'mod_mavr');
+        if (get_string_manager()->string_exists($identifier, 'mod_vrroom')) {
+            return get_string($identifier, 'mod_vrroom');
         }
         return $fallback;
     }

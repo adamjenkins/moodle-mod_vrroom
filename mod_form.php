@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Activity settings form for mod_mavr.
+ * Activity settings form for mod_vrroom.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,19 +26,19 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
 
-use mod_mavr\local\grading\grader;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\runtime\registry as runtime_registry;
-use mod_mavr\local\template\registry as template_registry;
+use mod_vrroom\local\grading\grader;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\runtime\registry as runtime_registry;
+use mod_vrroom\local\template\registry as template_registry;
 
 /**
  * Activity settings form: general settings, run mode, template fields, live mode, attempts and grading.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class mod_mavr_mod_form extends moodleform_mod {
+class mod_vrroom_mod_form extends moodleform_mod {
     /** @var string|null|false Resolved template name, null for none, false until resolved. */
     private string|null|false $resolvedtemplate = false;
 
@@ -58,16 +58,16 @@ class mod_mavr_mod_form extends moodleform_mod {
         $this->standard_intro_elements();
 
         // Run mode and template.
-        $mform->addElement('header', 'mavrsettings', get_string('mavrsettings', 'mavr'));
-        $mform->setExpanded('mavrsettings');
+        $mform->addElement('header', 'vrroomsettings', get_string('vrroomsettings', 'vrroom'));
+        $mform->setExpanded('vrroomsettings');
 
-        $mform->addElement('select', 'runtime', get_string('runtime', 'mavr'), runtime_registry::get_choices());
+        $mform->addElement('select', 'runtime', get_string('runtime', 'vrroom'), runtime_registry::get_choices());
         $mform->setDefault('runtime', 'builtin');
-        $mform->addHelpButton('runtime', 'runtime', 'mavr');
+        $mform->addHelpButton('runtime', 'runtime', 'vrroom');
 
         // Registered on every request, so the reload that follows a press still counts as a
         // no-submit press although the select has become a hidden field by then.
-        $mform->registerNoSubmitButton('mavr_choosetemplate');
+        $mform->registerNoSubmitButton('vrroom_choosetemplate');
 
         $name = $this->resolve_template();
         if ($name === null && $this->_instance) {
@@ -75,55 +75,55 @@ class mod_mavr_mod_form extends moodleform_mod {
             $mform->addElement(
                 'static',
                 'templatemissing',
-                get_string('template', 'mavr'),
-                get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? '')))
+                get_string('template', 'vrroom'),
+                get_string('errorunknowntemplate', 'vrroom', s((string)($this->current->template ?? '')))
             );
         } else if ($name !== null) {
             $template = template_registry::get($name);
             $mform->addElement('hidden', 'template', $name);
             $mform->setType('template', PARAM_PLUGIN);
             $mform->setDefault('template', $name);
-            $mform->addElement('static', 'templatename', get_string('template', 'mavr'), s($template->get_display_name()));
+            $mform->addElement('static', 'templatename', get_string('template', 'vrroom'), s($template->get_display_name()));
             if ($this->_instance) {
-                $mform->addElement('static', 'templatelocked', '', get_string('templatelocked', 'mavr'));
+                $mform->addElement('static', 'templatelocked', '', get_string('templatelocked', 'vrroom'));
             } else if (count(template_registry::get_all()) > 1) {
-                $mform->addElement('static', 'templatechosen', '', get_string('templatechosen', 'mavr'));
+                $mform->addElement('static', 'templatechosen', '', get_string('templatechosen', 'vrroom'));
             }
 
             if ($this->is_customised()) {
                 // The room editor owns the room now: the template's fields would not be used.
-                $mform->addElement('static', 'customisednotice', '', get_string('customisednotice', 'mavr'));
-                $mform->addElement('advcheckbox', 'mavr_rebuild', get_string('rebuild', 'mavr'));
-                $mform->addHelpButton('mavr_rebuild', 'rebuild', 'mavr');
-                $mform->setDefault('mavr_rebuild', 0);
+                $mform->addElement('static', 'customisednotice', '', get_string('customisednotice', 'vrroom'));
+                $mform->addElement('advcheckbox', 'vrroom_rebuild', get_string('rebuild', 'vrroom'));
+                $mform->addHelpButton('vrroom_rebuild', 'rebuild', 'vrroom');
+                $mform->setDefault('vrroom_rebuild', 0);
             } else {
                 $template->define_form($this, $mform, $courseid);
             }
         } else {
-            // Reached without a template (e.g. a bare modedit.php?add=mavr link): choose one first.
+            // Reached without a template (e.g. a bare modedit.php?add=vrroom link): choose one first.
             // The no-submit button reloads the form with the template's fields, as the course
             // format select does (course/edit_form.php).
-            $mform->addElement('select', 'template', get_string('template', 'mavr'), template_registry::get_choices());
+            $mform->addElement('select', 'template', get_string('template', 'vrroom'), template_registry::get_choices());
             $mform->setType('template', PARAM_PLUGIN);
-            $mform->addHelpButton('template', 'template', 'mavr');
-            $mform->addElement('submit', 'mavr_choosetemplate', get_string('choosetemplatebutton', 'mavr'));
+            $mform->addHelpButton('template', 'template', 'vrroom');
+            $mform->addElement('submit', 'vrroom_choosetemplate', get_string('choosetemplatebutton', 'vrroom'));
         }
 
         // Live mode.
         $this->define_live_mode($mform);
 
         // Attempts and grading.
-        $mform->addElement('header', 'attemptsandgrading', get_string('attemptsandgrading', 'mavr'));
+        $mform->addElement('header', 'attemptsandgrading', get_string('attemptsandgrading', 'vrroom'));
 
-        $mform->addElement('select', 'grademethod', get_string('grademethod', 'mavr'), grader::grade_options());
+        $mform->addElement('select', 'grademethod', get_string('grademethod', 'vrroom'), grader::grade_options());
         $mform->setDefault('grademethod', grader::GRADE_HIGHEST);
-        $mform->addHelpButton('grademethod', 'grademethod', 'mavr');
+        $mform->addHelpButton('grademethod', 'grademethod', 'vrroom');
 
         $attemptoptions = [0 => get_string('unlimited')];
         for ($i = 1; $i <= 10; $i++) {
             $attemptoptions[$i] = $i;
         }
-        $mform->addElement('select', 'maxattempts', get_string('maxattempts', 'mavr'), $attemptoptions);
+        $mform->addElement('select', 'maxattempts', get_string('maxattempts', 'vrroom'), $attemptoptions);
         $mform->setDefault('maxattempts', 0);
 
         $this->standard_grading_coursemodule_elements();
@@ -168,18 +168,18 @@ class mod_mavr_mod_form extends moodleform_mod {
         $errors = parent::validation($data, $files);
 
         if (isset($data['grade']) && (int)$data['grade'] < 0) {
-            $errors['grade'] = get_string('errorscalenotsupported', 'mavr');
+            $errors['grade'] = get_string('errorscalenotsupported', 'vrroom');
         }
 
         $errors = array_merge($errors, $this->validate_live_mode($data));
 
         $name = $this->resolve_template();
         if ($name === null && $this->_instance) {
-            $errors['name'] = get_string('errorunknowntemplate', 'mavr', s((string)($this->current->template ?? '')));
+            $errors['name'] = get_string('errorunknowntemplate', 'vrroom', s((string)($this->current->template ?? '')));
             return $errors;
         }
         if ($name === null) {
-            $errors['template'] = get_string('choosetemplatefirst', 'mavr');
+            $errors['template'] = get_string('choosetemplatefirst', 'vrroom');
             return $errors;
         }
         if ($this->is_customised()) {
@@ -205,26 +205,26 @@ class mod_mavr_mod_form extends moodleform_mod {
                 $livemax = max($livemax, $max);
             }
         }
-        $mform->addElement('header', 'livemodeheader', get_string('livemodeheader', 'mavr'));
+        $mform->addElement('header', 'livemodeheader', get_string('livemodeheader', 'vrroom'));
         if (!$livecapable) {
-            $mform->addElement('static', 'livemodeunavailable', '', get_string('livemodeunavailable', 'mavr'));
+            $mform->addElement('static', 'livemodeunavailable', '', get_string('livemodeunavailable', 'vrroom'));
             return;
         }
         $mform->addElement(
             'select',
             'livemode',
-            get_string('livemode', 'mavr'),
-            [0 => get_string('livemodeoff', 'mavr'), 1 => get_string('livemodeon', 'mavr')]
+            get_string('livemode', 'vrroom'),
+            [0 => get_string('livemodeoff', 'vrroom'), 1 => get_string('livemodeon', 'vrroom')]
         );
         $mform->setDefault('livemode', 0);
-        $mform->addHelpButton('livemode', 'livemode', 'mavr');
+        $mform->addHelpButton('livemode', 'livemode', 'vrroom');
         $options = [];
         for ($i = 2; $i <= $livemax; $i++) {
             $options[$i] = $i;
         }
-        $mform->addElement('select', 'livemaxusers', get_string('livemaxusers', 'mavr'), $options);
+        $mform->addElement('select', 'livemaxusers', get_string('livemaxusers', 'vrroom'), $options);
         $mform->setDefault('livemaxusers', min(6, $livemax));
-        $mform->addHelpButton('livemaxusers', 'livemaxusers', 'mavr');
+        $mform->addHelpButton('livemaxusers', 'livemaxusers', 'vrroom');
         $mform->hideIf('livemaxusers', 'livemode', 'eq', 0);
         foreach (array_diff(array_keys(runtime_registry::get_all()), $livecapable) as $other) {
             $mform->hideIf('livemode', 'runtime', 'eq', $other);
@@ -247,11 +247,11 @@ class mod_mavr_mod_form extends moodleform_mod {
         $max = isset($all[$runtimename]) ? $all[$runtimename]->capabilities()->maxusers : 0;
         if ($max < 2) {
             // The live fields are hidden for this run mode, so the error goes on the run mode select.
-            return ['runtime' => get_string('errorlivenotsupported', 'mavr')];
+            return ['runtime' => get_string('errorlivenotsupported', 'vrroom')];
         }
         $users = (int)($data['livemaxusers'] ?? 0);
         if ($users < 2 || $users > $max) {
-            return ['livemaxusers' => get_string('errorlivemaxusers', 'mavr', $max)];
+            return ['livemaxusers' => get_string('errorlivemaxusers', 'vrroom', $max)];
         }
         return [];
     }
@@ -264,8 +264,8 @@ class mod_mavr_mod_form extends moodleform_mod {
     public function add_completion_rules() {
         $mform = $this->_form;
         $name = 'completionobjectives' . $this->get_suffix();
-        $mform->addElement('advcheckbox', $name, '', get_string('completionobjectives', 'mavr'));
-        $mform->addHelpButton($name, 'completionobjectives', 'mavr');
+        $mform->addElement('advcheckbox', $name, '', get_string('completionobjectives', 'vrroom'));
+        $mform->addHelpButton($name, 'completionobjectives', 'vrroom');
         return [$name];
     }
 
@@ -346,7 +346,7 @@ class mod_mavr_mod_form extends moodleform_mod {
      * @param stdClass $data Submitted data, changed in place.
      */
     protected function add_stored_template_values(stdClass $data): void {
-        if (!$this->is_customised() || empty($data->mavr_rebuild) || empty($this->_cm)) {
+        if (!$this->is_customised() || empty($data->vrroom_rebuild) || empty($this->_cm)) {
             return;
         }
         $name = $this->resolve_template();

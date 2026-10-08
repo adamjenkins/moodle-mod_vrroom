@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\runtime;
+namespace mod_vrroom\local\runtime;
 
 /**
  * How a run mode launches: inline on the page with a config, or at an external URL.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -33,13 +33,13 @@ final class launch_descriptor {
      * Constructor.
      *
      * @param string $type One of the TYPE_ constants.
-     * @param array $config Inline launch config (mavr-launch/1).
+     * @param array $config Inline launch config (vrroom-launch/1).
      * @param \moodle_url|null $url External launch URL.
      */
     public function __construct(
         /** @var string One of the TYPE_ constants. */
         public readonly string $type,
-        /** @var array Inline launch config (mavr-launch/1). */
+        /** @var array Inline launch config (vrroom-launch/1). */
         public readonly array $config = [],
         /** @var \moodle_url|null External launch URL. */
         public readonly ?\moodle_url $url = null,

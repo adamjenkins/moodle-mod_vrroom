@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Web services of the MAVR built-in viewer run mode (live room signalling).
+ * Web services of the VR room built-in viewer run mode (live room signalling).
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -25,35 +25,35 @@
 defined('MOODLE_INTERNAL') || die();
 
 $functions = [
-    'mavrruntime_builtin_live_join' => [
-        'classname' => \mavrruntime_builtin\external\live_join::class,
-        'description' => 'Join the live room of a MAVR activity (or of the user\'s group) and return the people in it.',
+    'vrroomruntime_builtin_live_join' => [
+        'classname' => \vrroomruntime_builtin\external\live_join::class,
+        'description' => 'Join the live room of a VR room activity (or of the user\'s group) and return the people in it.',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/mavr:view',
+        'capabilities' => 'mod/vrroom:view',
     ],
-    'mavrruntime_builtin_live_poll' => [
-        'classname' => \mavrruntime_builtin\external\live_poll::class,
+    'vrroomruntime_builtin_live_poll' => [
+        'classname' => \vrroomruntime_builtin\external\live_poll::class,
         'description' => 'Keep a live room presence alive and collect the connection messages addressed to it.',
         'type' => 'write',
         'ajax' => true,
         'readonlysession' => true,
-        'capabilities' => 'mod/mavr:view',
+        'capabilities' => 'mod/vrroom:view',
     ],
-    'mavrruntime_builtin_live_send' => [
-        'classname' => \mavrruntime_builtin\external\live_send::class,
+    'vrroomruntime_builtin_live_send' => [
+        'classname' => \vrroomruntime_builtin\external\live_send::class,
         'description' => 'Pass connection messages to other people in the same live room.',
         'type' => 'write',
         'ajax' => true,
         'readonlysession' => true,
-        'capabilities' => 'mod/mavr:view',
+        'capabilities' => 'mod/vrroom:view',
     ],
-    'mavrruntime_builtin_live_leave' => [
-        'classname' => \mavrruntime_builtin\external\live_leave::class,
+    'vrroomruntime_builtin_live_leave' => [
+        'classname' => \vrroomruntime_builtin\external\live_leave::class,
         'description' => 'Leave a live room.',
         'type' => 'write',
         'ajax' => true,
         'readonlysession' => true,
-        'capabilities' => 'mod/mavr:view',
+        'capabilities' => 'mod/vrroom:view',
     ],
 ];

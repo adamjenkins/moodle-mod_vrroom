@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\output;
+namespace mod_vrroom\output;
 
 use core\output\renderable;
 use core\output\renderer_base;
 use core\output\templatable;
-use mod_mavr\local\grading\grader;
+use mod_vrroom\local\grading\grader;
 
 /**
- * The attempts overview of the MAVR report: one row per attempt.
+ * The attempts overview of the VR room report: one row per attempt.
  *
  * The idea of a teacher report over an activity's tracked actions is adapted from mod_gear's
  * analytics report.
@@ -30,7 +30,7 @@ use mod_mavr\local\grading\grader;
  * Text is handed to the template raw and escaped there ({{ }}), so names reach the page escaped
  * exactly once.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -39,14 +39,14 @@ class report_overview implements renderable, templatable {
     /**
      * Constructor.
      *
-     * @param \stdClass $mavr mavr row
+     * @param \stdClass $vrroom vrroom row
      * @param \cm_info $cm course module
      * @param \context_module $context module context
      * @param int $groupid group to show (0 = all groups the viewer may see)
      */
     public function __construct(
-        /** @var \stdClass mavr row */
-        protected \stdClass $mavr,
+        /** @var \stdClass vrroom row */
+        protected \stdClass $vrroom,
         /** @var \cm_info course module */
         protected \cm_info $cm,
         /** @var \context_module module context */
@@ -57,7 +57,7 @@ class report_overview implements renderable, templatable {
     }
 
     /**
-     * Data for mod_mavr/report_overview.
+     * Data for mod_vrroom/report_overview.
      *
      * @param renderer_base $output renderer
      * @return array
@@ -65,7 +65,7 @@ class report_overview implements renderable, templatable {
     public function export_for_template(renderer_base $output): array {
         global $DB;
 
-        $candelete = has_capability('mod/mavr:deleteattempts', $this->context);
+        $candelete = has_capability('mod/vrroom:deleteattempts', $this->context);
         $groupmode = groups_get_activity_groupmode($this->cm);
         $records = [];
         if (
@@ -76,23 +76,23 @@ class report_overview implements renderable, templatable {
             // else without a group of their own sees no attempts.
             $userfields = \core_user\fields::for_name()->get_sql('u', true, '', '', true);
             $groupjoin = '';
-            $params = ['mavrid' => $this->mavr->id];
+            $params = ['vrroomid' => $this->vrroom->id];
             if ($this->groupid > 0) {
                 $groupjoin = 'JOIN {groups_members} gm ON gm.userid = a.userid AND gm.groupid = :groupid';
                 $params['groupid'] = $this->groupid;
             }
             $sql = "SELECT a.id, a.userid, a.attempt, a.state, a.score, a.timestart, a.timefinish
                            {$userfields->selects}
-                      FROM {mavr_attempts} a
+                      FROM {vrroom_attempts} a
                       JOIN {user} u ON u.id = a.userid
                            {$groupjoin}
                            {$userfields->joins}
-                     WHERE a.mavrid = :mavrid
+                     WHERE a.vrroomid = :vrroomid
                   ORDER BY u.lastname ASC, u.firstname ASC, a.userid ASC, a.attempt ASC";
             $records = $DB->get_records_sql($sql, $params + $userfields->params);
         }
 
-        $baseurl = new \moodle_url('/mod/mavr/report.php', ['id' => $this->cm->id]);
+        $baseurl = new \moodle_url('/mod/vrroom/report.php', ['id' => $this->cm->id]);
         $rows = [];
         foreach ($records as $record) {
             $score = $record->score === null ? null : (float)$record->score;
@@ -106,7 +106,7 @@ class report_overview implements renderable, templatable {
                 'attempt' => (int)$record->attempt,
                 'state' => self::state_label((string)$record->state),
                 'score' => self::format_score($score),
-                'grade' => grader::format_grade($this->mavr, $score),
+                'grade' => grader::format_grade($this->vrroom, $score),
                 'timestart' => $record->timestart ? userdate((int)$record->timestart) : '-',
                 'timefinish' => $record->timefinish ? userdate((int)$record->timefinish) : '-',
                 'viewurl' => (new \moodle_url($baseurl, ['attemptid' => $record->id]))->out(false),
@@ -132,13 +132,13 @@ class report_overview implements renderable, templatable {
      *
      * @param \stdClass $course the course
      * @param \cm_info $cm course module
-     * @param \stdClass $attempt mavr_attempts row (already checked to belong to the activity)
+     * @param \stdClass $attempt vrroom_attempts row (already checked to belong to the activity)
      * @return void
      * @throws \moodle_exception errorattemptnotingroup
      */
     public static function require_attempt_in_groups(\stdClass $course, \cm_info $cm, \stdClass $attempt): void {
         if (!groups_user_groups_visible($course, (int)$attempt->userid, $cm)) {
-            throw new \moodle_exception('errorattemptnotingroup', 'mod_mavr');
+            throw new \moodle_exception('errorattemptnotingroup', 'mod_vrroom');
         }
     }
 
@@ -149,8 +149,8 @@ class report_overview implements renderable, templatable {
      * @return string
      */
     public static function state_label(string $state): string {
-        if (get_string_manager()->string_exists('state_' . $state, 'mod_mavr')) {
-            return get_string('state_' . $state, 'mod_mavr');
+        if (get_string_manager()->string_exists('state_' . $state, 'mod_vrroom')) {
+            return get_string('state_' . $state, 'mod_vrroom');
         }
         return $state;
     }

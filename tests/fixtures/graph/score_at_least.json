@@ -2,7 +2,7 @@
   "name": "score_at_least",
   "intent": "Objective c unlocks only when earnedpoints >= 2 (reached exactly 2); d needs 3 and stays locked; the objective_unlocked trigger fires on the event that unlocks c.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "a",

@@ -17,7 +17,7 @@
  * The room editor: loads the document, wires the toolbar, the outline, the inspector, the 3D
  * preview and the logic editor to one model, and saves everything in one call.
  *
- * @module     mod_mavr/editor_app
+ * @module     mod_vrroom/editor_app
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -27,13 +27,13 @@ import Log from 'core/log';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
-import {validate} from 'mavrruntime_builtin/graph';
-import {clone, createModel, findRef, findScene, getCollection} from 'mod_mavr/editor_model';
-import {assetsOfKind, upload, toRef} from 'mod_mavr/editor_assets';
-import {displayName, init as initInspector} from 'mod_mavr/editor_inspector';
-import {init as initOutline} from 'mod_mavr/editor_outline';
-import {init as initView, isWebGLAvailable} from 'mod_mavr/editor_view';
-import {init as initLogic} from 'mod_mavr/editor_logic';
+import {validate} from 'vrroomruntime_builtin/graph';
+import {clone, createModel, findRef, findScene, getCollection} from 'mod_vrroom/editor_model';
+import {assetsOfKind, upload, toRef} from 'mod_vrroom/editor_assets';
+import {displayName, init as initInspector} from 'mod_vrroom/editor_inspector';
+import {init as initOutline} from 'mod_vrroom/editor_outline';
+import {init as initView, isWebGLAvailable} from 'mod_vrroom/editor_view';
+import {init as initLogic} from 'mod_vrroom/editor_logic';
 
 /** Kind => lang string naming it. */
 const KINDLABELS = {
@@ -105,21 +105,21 @@ export const init = ({cmid, rootid}) => {
     if (!root) {
         return;
     }
-    const pending = new Pending('mod_mavr/editor_app:init');
+    const pending = new Pending('mod_vrroom/editor_app:init');
     const strings = {};
     const stringkeys = ['editorsaving', 'editorsaved', 'editorunsaved', 'editornowebgl', 'editorundo', 'editorredo']
         .concat(Object.values(KINDLABELS));
 
     Promise.all([
-        Promise.resolve(Ajax.call([{methodname: 'mod_mavr_editor_load', args: {cmid: cmid}}])[0]),
-        getStrings(stringkeys.map((key) => ({key: key, component: 'mod_mavr'}))),
+        Promise.resolve(Ajax.call([{methodname: 'mod_vrroom_editor_load', args: {cmid: cmid}}])[0]),
+        getStrings(stringkeys.map((key) => ({key: key, component: 'mod_vrroom'}))),
     ]).then(([response, values]) => {
         stringkeys.forEach((key, i) => {
             strings[key] = values[i];
         });
         return start(root, cmid, response, strings);
     }).catch((error) => {
-        region(root, 'mavr-editor-status').textContent = '';
+        region(root, 'vrroom-editor-status').textContent = '';
         Notification.exception(error);
     }).finally(() => pending.resolve());
 };
@@ -129,7 +129,7 @@ export const init = ({cmid, rootid}) => {
  *
  * @param {HTMLElement} root Editor root.
  * @param {number} cmid Course module id.
- * @param {Object} response mod_mavr_editor_load result.
+ * @param {Object} response mod_vrroom_editor_load result.
  * @param {Object} strings Strings by key.
  * @returns {Promise}
  */
@@ -143,20 +143,20 @@ const start = (root, cmid, response, strings) => {
         actions: {},
     };
     const model = createModel(document0);
-    const status = region(root, 'mavr-editor-status');
-    const live = region(root, 'mavr-editor-live');
-    const message = region(root, 'mavr-editor-message');
-    const stage = region(root, 'mavr-editor-stage');
-    const canvas = region(root, 'mavr-editor-canvas');
-    const undobutton = root.querySelector('[data-action="mavr-editor-undo"]');
-    const redobutton = root.querySelector('[data-action="mavr-editor-redo"]');
-    const savebutton = root.querySelector('[data-action="mavr-editor-save"]');
+    const status = region(root, 'vrroom-editor-status');
+    const live = region(root, 'vrroom-editor-live');
+    const message = region(root, 'vrroom-editor-message');
+    const stage = region(root, 'vrroom-editor-stage');
+    const canvas = region(root, 'vrroom-editor-canvas');
+    const undobutton = root.querySelector('[data-action="vrroom-editor-undo"]');
+    const redobutton = root.querySelector('[data-action="vrroom-editor-redo"]');
+    const savebutton = root.querySelector('[data-action="vrroom-editor-save"]');
     let view = null;
     let saving = false;
     let eversaved = false;
 
     if (document0.hasattempts) {
-        region(root, 'mavr-editor-attempts').classList.remove('d-none');
+        region(root, 'vrroom-editor-attempts').classList.remove('d-none');
     }
 
     const announce = (text) => {
@@ -288,13 +288,13 @@ const start = (root, cmid, response, strings) => {
             state.current = findScene(state.doc, scene.id);
             const count = getCollection(clone(state.current), collection)
                 .filter((o) => collection !== 'interactable' || o.kind === kind).length;
-            return getString('editornewname', 'mod_mavr', {kind: strings[KINDLABELS[kind]], number: count + 1});
+            return getString('editornewname', 'mod_vrroom', {kind: strings[KINDLABELS[kind]], number: count + 1});
         }).then((name) => {
             if (name === null) {
                 return null;
             }
             state.name = name;
-            return getString('editorchange_add', 'mod_mavr', name);
+            return getString('editorchange_add', 'mod_vrroom', name);
         }).then((label) => {
             if (label === null) {
                 return null;
@@ -332,7 +332,7 @@ const start = (root, cmid, response, strings) => {
         if (ref.kind === 'spawn' && (!Array.isArray(scene.spawn) || scene.spawn.length < 2)) {
             return;
         }
-        getString('editorchange_delete', 'mod_mavr', displayName(object)).then((label) => {
+        getString('editorchange_delete', 'mod_vrroom', displayName(object)).then((label) => {
             model.transact(label, (draft) => {
                 const target = findScene(draft, ref.scene);
                 const list = getCollection(target, ref.kind);
@@ -366,7 +366,7 @@ const start = (root, cmid, response, strings) => {
             return;
         }
         const kind = ref.kind === 'interactable' ? object.kind : ref.kind;
-        getString('editorchange_add', 'mod_mavr', displayName(object)).then((label) => {
+        getString('editorchange_add', 'mod_vrroom', displayName(object)).then((label) => {
             const copy = clone(object);
             copy.id = model.newId(PREFIXES[kind] || 'x');
             const key = ref.kind === 'zone' ? 'center' : 'position';
@@ -403,16 +403,16 @@ const start = (root, cmid, response, strings) => {
         let name = '';
         let spawnname = '';
         Promise.all([
-            getString('editornewscene', 'mod_mavr', number),
-            getString('editornewname', 'mod_mavr', {kind: strings.editoraddspawn, number: 1}),
+            getString('editornewscene', 'mod_vrroom', number),
+            getString('editornewname', 'mod_vrroom', {kind: strings.editoraddspawn, number: 1}),
         ]).then((values) => {
             [name, spawnname] = values;
-            return getString('editorchange_add', 'mod_mavr', name);
+            return getString('editorchange_add', 'mod_vrroom', name);
         }).then((label) => {
             const sceneid = model.newSceneId();
             const spawn = preset.spawn || {position: [0, 0, 0], yaw: 0};
             const scene = {
-                schema: 'mavr-scene/1',
+                schema: 'vrroom-scene/1',
                 id: sceneid,
                 name: name,
                 environment: {type: 'preset', preset: presetid, shape: clone(preset.shape), sky: preset.sky,
@@ -445,7 +445,7 @@ const start = (root, cmid, response, strings) => {
         if (!scene || doc.scenes.length < 2) {
             return;
         }
-        getString('editorchange_delete', 'mod_mavr', displayName(scene)).then((label) => {
+        getString('editorchange_delete', 'mod_vrroom', displayName(scene)).then((label) => {
             model.transact(label, (draft) => {
                 draft.scenes = draft.scenes.filter((s) => s.id !== sceneid);
                 return true;
@@ -468,7 +468,7 @@ const start = (root, cmid, response, strings) => {
         if (index < 0 || other < 0 || other >= doc.scenes.length) {
             return;
         }
-        getString('editorchange_edit', 'mod_mavr', displayName(doc.scenes[index])).then((label) => {
+        getString('editorchange_edit', 'mod_vrroom', displayName(doc.scenes[index])).then((label) => {
             model.transact(label, (draft) => {
                 const [moved] = draft.scenes.splice(index, 1);
                 draft.scenes.splice(other, 0, moved);
@@ -490,7 +490,7 @@ const start = (root, cmid, response, strings) => {
             getString(key, component).then(showMessage).catch(Notification.exception);
         },
         onMode: (mode) => {
-            root.querySelectorAll('[data-action="mavr-editor-mode"]').forEach((button) => {
+            root.querySelectorAll('[data-action="vrroom-editor-mode"]').forEach((button) => {
                 const on = button.dataset.mode === mode;
                 button.classList.toggle('active', on);
                 button.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -505,9 +505,9 @@ const start = (root, cmid, response, strings) => {
      */
     const showTab = (tab) => {
         const roomtab = tab !== 'tasks';
-        region(root, 'mavr-editor-room').classList.toggle('d-none', !roomtab);
-        region(root, 'mavr-editor-tasks').classList.toggle('d-none', roomtab);
-        root.querySelectorAll('[data-action="mavr-editor-tab"]').forEach((button) => {
+        region(root, 'vrroom-editor-room').classList.toggle('d-none', !roomtab);
+        region(root, 'vrroom-editor-tasks').classList.toggle('d-none', roomtab);
+        root.querySelectorAll('[data-action="vrroom-editor-tab"]').forEach((button) => {
             const on = button.dataset.tab === tab;
             button.classList.toggle('active', on);
             button.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -520,9 +520,9 @@ const start = (root, cmid, response, strings) => {
         undobutton.disabled = !model.canUndo();
         redobutton.disabled = !model.canRedo();
         const labels = [];
-        labels.push(model.canUndo() ? getString('editorundolabel', 'mod_mavr', model.undoLabel())
+        labels.push(model.canUndo() ? getString('editorundolabel', 'mod_vrroom', model.undoLabel())
             : Promise.resolve(strings.editorundo));
-        labels.push(model.canRedo() ? getString('editorredolabel', 'mod_mavr', model.redoLabel())
+        labels.push(model.canRedo() ? getString('editorredolabel', 'mod_vrroom', model.redoLabel())
             : Promise.resolve(strings.editorredo));
         // A title (not an aria-label) keeps the buttons' accessible names "Undo" and "Redo".
         Promise.all(labels).then(([undo, redo]) => {
@@ -553,13 +553,13 @@ const start = (root, cmid, response, strings) => {
     const checkLogic = (doc) => {
         const errors = validate(doc.graph || {});
         if (errors.length) {
-            return getString('logicinvalid', 'mod_mavr', errors[0]);
+            return getString('logicinvalid', 'mod_vrroom', errors[0]);
         }
         const objectives = (doc.graph && Array.isArray(doc.graph.objectives)) ? doc.graph.objectives : [];
         const missing = (doc.bindings || []).find((b) => !(Number(b.questionbankentryid) > 0));
         if (missing) {
             const objective = objectives.find((o) => o && o.type === 'answer_question' && Number(o.slot) === Number(missing.slot));
-            return getString('logicnoquestion', 'mod_mavr', objective ? (objective.title || objective.id) : String(missing.slot));
+            return getString('logicnoquestion', 'mod_vrroom', objective ? (objective.title || objective.id) : String(missing.slot));
         }
         return Promise.resolve(null);
     };
@@ -570,7 +570,7 @@ const start = (root, cmid, response, strings) => {
             return;
         }
         const doc = model.getDocument();
-        const savepending = new Pending('mod_mavr/editor_app:save');
+        const savepending = new Pending('mod_vrroom/editor_app:save');
         saving = true;
         savebutton.disabled = true;
         // The document being sent, once the checks have passed: a failure after that is a failed save.
@@ -584,14 +584,14 @@ const start = (root, cmid, response, strings) => {
             }
             setStatus(strings.editorsaving);
             const payload = {
-                schema: doc.schema || 'mavr-editdoc/1',
+                schema: doc.schema || 'vrroom-editdoc/1',
                 revision: model.getRevision(),
                 scenes: doc.scenes,
                 graph: doc.graph,
                 bindings: doc.bindings,
             };
             savedoc = doc;
-            return Ajax.call([{methodname: 'mod_mavr_editor_save',
+            return Ajax.call([{methodname: 'mod_vrroom_editor_save',
                 args: {cmid: cmid, documentjson: JSON.stringify(payload)}}])[0];
         }).then((result) => {
             if (!result) {
@@ -609,7 +609,7 @@ const start = (root, cmid, response, strings) => {
                 Notification.exception(error);
                 return null;
             }
-            return getString('editorsavefailed', 'mod_mavr', plain(error && error.message));
+            return getString('editorsavefailed', 'mod_vrroom', plain(error && error.message));
         }).then((text) => {
             if (text) {
                 setStatus(text);
@@ -631,25 +631,25 @@ const start = (root, cmid, response, strings) => {
             return;
         }
         switch (button.dataset.action) {
-            case 'mavr-editor-add':
+            case 'vrroom-editor-add':
                 e.preventDefault();
                 addObject(button.dataset.kind, button.dataset.media, button);
                 break;
-            case 'mavr-editor-mode':
+            case 'vrroom-editor-mode':
                 if (view) {
                     view.setMode(button.dataset.mode);
                 }
                 break;
-            case 'mavr-editor-undo':
+            case 'vrroom-editor-undo':
                 model.undo();
                 break;
-            case 'mavr-editor-redo':
+            case 'vrroom-editor-redo':
                 model.redo();
                 break;
-            case 'mavr-editor-save':
+            case 'vrroom-editor-save':
                 save();
                 break;
-            case 'mavr-editor-tab':
+            case 'vrroom-editor-tab':
                 showTab(button.dataset.tab);
                 break;
         }
@@ -678,14 +678,14 @@ const start = (root, cmid, response, strings) => {
     if (!view) {
         canvas.classList.add('d-none');
         showMessage(strings.editornowebgl);
-        root.querySelectorAll('[data-action="mavr-editor-mode"]').forEach((button) => {
+        root.querySelectorAll('[data-action="vrroom-editor-mode"]').forEach((button) => {
             button.disabled = true;
         });
     }
 
-    const outline = initOutline(region(root, 'mavr-editor-outline'), model, context);
-    const inspector = initInspector(region(root, 'mavr-editor-inspector'), model, context);
-    const logicapi = initLogic(region(root, 'mavr-editor-logic'), model, {
+    const outline = initOutline(region(root, 'vrroom-editor-outline'), model, context);
+    const inspector = initInspector(region(root, 'vrroom-editor-inspector'), model, context);
+    const logicapi = initLogic(region(root, 'vrroom-editor-logic'), model, {
         questions: context.questions,
         presets: context.presets,
         info: context.info,
@@ -697,11 +697,11 @@ const start = (root, cmid, response, strings) => {
         if (first) {
             model.select({scene: first.id, kind: 'environment', id: first.id});
         }
-        root.querySelector('.mavr-editor-toolbar .dropdown-toggle').disabled = false;
+        root.querySelector('.vrroom-editor-toolbar .dropdown-toggle').disabled = false;
         savebutton.disabled = false;
         setStatus('');
         updateToolbar();
-        root.dataset.mavrEditorReady = '1';
+        root.dataset.vrroomEditorReady = '1';
         return null;
     });
 };

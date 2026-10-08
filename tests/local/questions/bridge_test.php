@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 use core_external\external_api;
-use mod_mavr\external\start_attempt;
-use mod_mavr\external\submit_question;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\external\start_attempt;
+use mod_vrroom\external\submit_question;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
 
 /**
  * Tests of the plain-text question view for in-world panels.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -66,7 +66,7 @@ final class bridge_test extends \advanced_testcase {
                 'questionbankentryid' => (int)$question->questionbankentryid, 'required' => 1, 'points' => 1,
                 'mediatype' => 'none'];
         }
-        $module = $generator->create_module('mavr', ['course' => $course->id, 'stations' => $stations]);
+        $module = $generator->create_module('vrroom', ['course' => $course->id, 'stations' => $stations]);
         $student = $generator->create_and_enrol($course, 'student');
 
         $graphslots = [];
@@ -158,7 +158,7 @@ final class bridge_test extends \advanced_testcase {
         $this->assert_no_secrets($view, ['You should have selected true', 'This is the right answer',
             'This is the wrong answer']);
 
-        $returned = external_api::clean_returnvalue(\mod_mavr\external\get_question_view::execute_returns(), $view);
+        $returned = external_api::clean_returnvalue(\mod_vrroom\external\get_question_view::execute_returns(), $view);
         $this->assertSame($view['choices'], $returned['choices']);
     }
 
@@ -231,7 +231,7 @@ final class bridge_test extends \advanced_testcase {
     }
 
     /**
-     * The field names and values of each view are graded correctly by mod_mavr_submit_question.
+     * The field names and values of each view are graded correctly by mod_vrroom_submit_question.
      *
      * @return void
      */

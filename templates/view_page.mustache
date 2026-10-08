@@ -15,16 +15,16 @@
     along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 }}
 {{!
-    @template mod_mavr/view_page
+    @template mod_vrroom/view_page
 
     The activity page: the learner's attempts, the final grade, a message and the root element
     the run mode's client renders into.
 
     Classes required for JS:
-    * mavr-root
+    * vrroom-root
 
     Data attributes required for JS:
-    * data-region="mavr-root"
+    * data-region="vrroom-root"
     * data-cmid
 
     Context variables required for this template:
@@ -40,7 +40,7 @@
 
     Example context (json):
     {
-        "rootid": "mavr-root-12",
+        "rootid": "vrroom-root-12",
         "cmid": 12,
         "hasroot": true,
         "hasattempts": true,
@@ -50,22 +50,22 @@
         ],
         "finalgrade": "Your final grade: 75.00 / 100.00",
         "message": "No more attempts are allowed.",
-        "reporturl": "https://example.com/mod/mavr/report.php?id=12",
-        "editurl": "https://example.com/mod/mavr/edit.php?id=12"
+        "reporturl": "https://example.com/mod/vrroom/report.php?id=12",
+        "editurl": "https://example.com/mod/vrroom/edit.php?id=12"
     }
 }}
-<div class="mod-mavr-view">
+<div class="mod-vrroom-view">
     {{#hasattempts}}
-    <h3 class="h5">{{#str}}yourattempts, mod_mavr{{/str}}</h3>
+    <h3 class="h5">{{#str}}yourattempts, mod_vrroom{{/str}}</h3>
     <div class="table-responsive">
-        <table class="table table-sm mavr-attempts">
+        <table class="table table-sm vrroom-attempts">
             <thead>
                 <tr>
-                    <th scope="col">{{#str}}attemptnumber, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}attemptstate, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}attemptscore, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}attemptgrade, mod_mavr{{/str}}</th>
-                    <th scope="col">{{#str}}attemptfinished, mod_mavr{{/str}}</th>
+                    <th scope="col">{{#str}}attemptnumber, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}attemptstate, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}attemptscore, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}attemptgrade, mod_vrroom{{/str}}</th>
+                    <th scope="col">{{#str}}attemptfinished, mod_vrroom{{/str}}</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,18 +83,18 @@
     </div>
     {{/hasattempts}}
     {{#finalgrade}}
-    <p class="fw-bold mavr-finalgrade">{{finalgrade}}</p>
+    <p class="fw-bold vrroom-finalgrade">{{finalgrade}}</p>
     {{/finalgrade}}
     {{#message}}
     <div class="alert alert-info" role="status">{{message}}</div>
     {{/message}}
     {{#editurl}}
-    <p><a class="btn btn-secondary" href="{{editurl}}" data-action="mavr-edit-room">{{#str}}editroom, mod_mavr{{/str}}</a></p>
+    <p><a class="btn btn-secondary" href="{{editurl}}" data-action="vrroom-edit-room">{{#str}}editroom, mod_vrroom{{/str}}</a></p>
     {{/editurl}}
     {{#reporturl}}
-    <p><a href="{{reporturl}}">{{#str}}reportlink, mod_mavr{{/str}}</a></p>
+    <p><a href="{{reporturl}}">{{#str}}reportlink, mod_vrroom{{/str}}</a></p>
     {{/reporturl}}
     {{#hasroot}}
-    <div id="{{rootid}}" class="mavr-root" data-region="mavr-root" data-cmid="{{cmid}}"></div>
+    <div id="{{rootid}}" class="vrroom-root" data-region="vrroom-root" data-cmid="{{cmid}}"></div>
     {{/hasroot}}
 </div>

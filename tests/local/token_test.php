@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local;
+namespace mod_vrroom\local;
 
 /**
  * Tests of launch tokens.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,12 +33,12 @@ final class token_test extends \advanced_testcase {
      */
     public function test_ensure_secret(): void {
         $this->resetAfterTest();
-        unset_config('tokensecret', 'mod_mavr');
+        unset_config('tokensecret', 'mod_vrroom');
         token::ensure_secret();
-        $secret = get_config('mod_mavr', 'tokensecret');
+        $secret = get_config('mod_vrroom', 'tokensecret');
         $this->assertSame(64, strlen($secret));
         token::ensure_secret();
-        $this->assertSame($secret, get_config('mod_mavr', 'tokensecret'));
+        $this->assertSame($secret, get_config('mod_vrroom', 'tokensecret'));
     }
 
     /**
@@ -64,7 +64,7 @@ final class token_test extends \advanced_testcase {
      */
     public function test_default_ttl_from_setting(): void {
         $this->resetAfterTest();
-        set_config('tokenttl', 120, 'mod_mavr');
+        set_config('tokenttl', 120, 'mod_vrroom');
         $data = token::verify(token::issue(5, 12, 7));
         $this->assertLessThanOrEqual(time() + 120, $data['exp']);
         $this->assertGreaterThan(time() + 100, $data['exp']);
@@ -106,7 +106,7 @@ final class token_test extends \advanced_testcase {
         $this->assertNull(token::verify('v1.!!!.???'));
 
         // A token signed with another site's secret is refused.
-        set_config('tokensecret', random_string(64), 'mod_mavr');
+        set_config('tokensecret', random_string(64), 'mod_vrroom');
         $this->assertNull(token::verify($token));
     }
 }

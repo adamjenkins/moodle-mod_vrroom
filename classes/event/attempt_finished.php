@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 /**
- * A MAVR attempt was finished.
+ * A VR room attempt was finished.
  *
  * @property-read array $other {
- *      - int mavrid: the MAVR instance id.
+ *      - int vrroomid: the VR room instance id.
  *      - float score: the attempt's score fraction (0..1).
  * }
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -35,7 +35,7 @@ class attempt_finished extends \core\event\base {
      * @return void
      */
     protected function init() {
-        $this->data['objecttable'] = 'mavr_attempts';
+        $this->data['objecttable'] = 'vrroom_attempts';
         $this->data['crud'] = 'u';
         $this->data['edulevel'] = self::LEVEL_PARTICIPATING;
     }
@@ -46,7 +46,7 @@ class attempt_finished extends \core\event\base {
      * @return string
      */
     public static function get_name() {
-        return get_string('eventattemptfinished', 'mod_mavr');
+        return get_string('eventattemptfinished', 'mod_vrroom');
     }
 
     /**
@@ -56,7 +56,7 @@ class attempt_finished extends \core\event\base {
      */
     public function get_description() {
         return "The user with id '$this->relateduserid' finished the attempt with id '$this->objectid' at the " .
-            "MAVR activity with course module id '$this->contextinstanceid'.";
+            "VR room activity with course module id '$this->contextinstanceid'.";
     }
 
     /**
@@ -65,7 +65,7 @@ class attempt_finished extends \core\event\base {
      * @return \moodle_url
      */
     public function get_url() {
-        return new \moodle_url('/mod/mavr/report.php', ['id' => $this->contextinstanceid, 'attemptid' => $this->objectid]);
+        return new \moodle_url('/mod/vrroom/report.php', ['id' => $this->contextinstanceid, 'attemptid' => $this->objectid]);
     }
 
     /**
@@ -79,8 +79,8 @@ class attempt_finished extends \core\event\base {
         if (!isset($this->relateduserid)) {
             throw new \coding_exception('The \'relateduserid\' must be set.');
         }
-        if (!isset($this->other['mavrid'])) {
-            throw new \coding_exception('The \'mavrid\' value must be set in other.');
+        if (!isset($this->other['vrroomid'])) {
+            throw new \coding_exception('The \'vrroomid\' value must be set in other.');
         }
         if (!array_key_exists('score', $this->other)) {
             throw new \coding_exception('The \'score\' value must be set in other.');
@@ -93,7 +93,7 @@ class attempt_finished extends \core\event\base {
      * @return array
      */
     public static function get_objectid_mapping() {
-        return ['db' => 'mavr_attempts', 'restore' => 'mavr_attempt'];
+        return ['db' => 'vrroom_attempts', 'restore' => 'vrroom_attempt'];
     }
 
     /**
@@ -102,6 +102,6 @@ class attempt_finished extends \core\event\base {
      * @return array
      */
     public static function get_other_mapping() {
-        return ['mavrid' => ['db' => 'mavr', 'restore' => 'mavr']];
+        return ['vrroomid' => ['db' => 'vrroom', 'restore' => 'vrroom']];
     }
 }

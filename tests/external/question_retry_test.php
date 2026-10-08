@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
-use mod_mavr\local\questions\slots;
-use mod_mavr\local\questions\usage;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\questions\slots;
+use mod_vrroom\local\questions\usage;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * Tests of the code-lock retry: an answer below the objective's pass_fraction restarts the
- * question in place (mod_mavr_submit_question returns retry).
+ * question in place (mod_vrroom_submit_question returns retry).
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -53,7 +53,7 @@ final class question_retry_test extends \advanced_testcase {
         $qgen = $generator->get_plugin_generator('core_question');
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id]);
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'gallery',
             'stations' => [
@@ -61,13 +61,13 @@ final class question_retry_test extends \advanced_testcase {
                     'required' => 1, 'points' => 2, 'mediatype' => 'none'],
             ],
         ]);
-        $mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $context = \context_module::instance((int)$module->cmid);
-        $scene = instance_manager::get_scenes((int)$mavr->id)[0];
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
         $zone = (string)$scene['zones'][0]['id'];
 
         $bindings = [];
-        foreach (slots::get_slots((int)$mavr->id, $context) as $slot) {
+        foreach (slots::get_slots((int)$vrroom->id, $context) as $slot) {
             $bindings[] = ['slot' => $slot->slot, 'questionbankentryid' => $slot->questionbankentryid,
                 'maxmark' => 2.0, 'objectiveid' => 'q-1'];
         }
@@ -79,7 +79,7 @@ final class question_retry_test extends \advanced_testcase {
             $objective['pass_fraction'] = 1;
         }
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'v-1', 'type' => 'visit_zone', 'title' => 'Visit', 'zone' => $zone, 'points' => 0,
                     'required' => true],
@@ -87,7 +87,7 @@ final class question_retry_test extends \advanced_testcase {
             ],
             'rules' => [],
         ];
-        instance_manager::apply_compiled($mavr, $context, new compiled_activity([$scene], $graph, $bindings));
+        instance_manager::apply_compiled($vrroom, $context, new compiled_activity([$scene], $graph, $bindings));
 
         $student = $generator->create_and_enrol($course, 'student');
         $this->setUser($student);
@@ -157,7 +157,7 @@ final class question_retry_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
         // The feedback of the graded try comes back before the restart.
         $this->assertStringContainsString('q' . $fx->attempt->uniqueid . ':', $result['html']);
-        $this->assertCount(1, $DB->get_records('mavr_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
+        $this->assertCount(1, $DB->get_records('vrroom_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
 
         // The slot map is unchanged; the usage slot now holds a fresh attempt, the old try moved.
         $attempt = attempt_manager::get_attempt($fx->attemptid);
@@ -177,7 +177,7 @@ final class question_retry_test extends \advanced_testcase {
         $this->assertSame('gradedright', $result['status']);
         $this->assertSame('completed', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(2.0, $result['state']['earnedpoints'], 1e-6);
-        $this->assertCount(2, $DB->get_records('mavr_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
+        $this->assertCount(2, $DB->get_records('vrroom_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
 
         // Completed: no further submission.
         try {

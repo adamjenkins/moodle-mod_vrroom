@@ -17,7 +17,7 @@
  * The room editor's outline: the rooms, then everything in the chosen room grouped by kind, as a
  * list of buttons (the keyboard and screen reader way to select things).
  *
- * @module     mod_mavr/editor_outline
+ * @module     mod_vrroom/editor_outline
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -26,7 +26,7 @@ import Templates from 'core/templates';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {getStrings} from 'core/str';
-import {displayName} from 'mod_mavr/editor_inspector';
+import {displayName} from 'mod_vrroom/editor_inspector';
 
 /** Outline groups in display order: [group, selection kind, heading string]. */
 const GROUPS = [
@@ -51,7 +51,7 @@ const GROUPS = [
  * @param {Object} context Editor context ({info, actions: {addScene, deleteScene, moveScene}}).
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
-export const init = (container, model, context) => getStrings(GROUPS.map(([, , key]) => ({key: key, component: 'mod_mavr'})))
+export const init = (container, model, context) => getStrings(GROUPS.map(([, , key]) => ({key: key, component: 'mod_vrroom'})))
     .then((headings) => start(container, model, context, headings));
 
 /**
@@ -124,8 +124,8 @@ const start = (container, model, context, headings) => {
         const focused = document.activeElement && container.contains(document.activeElement) ? document.activeElement : null;
         const focuskey = focused ? {action: focused.dataset.action, id: focused.dataset.id || focused.dataset.scene || ''} : null;
         const id = ++renderid;
-        const pending = new Pending('mod_mavr/editor_outline:render');
-        Templates.renderForPromise('mod_mavr/editor_outline', build()).then(({html, js}) => {
+        const pending = new Pending('mod_vrroom/editor_outline:render');
+        Templates.renderForPromise('mod_vrroom/editor_outline', build()).then(({html, js}) => {
             if (id !== renderid || destroyed) {
                 return null;
             }
@@ -149,29 +149,29 @@ const start = (container, model, context, headings) => {
         }
         const active = model.getActiveScene();
         switch (button.dataset.action) {
-            case 'mavr-editor-scene':
+            case 'vrroom-editor-scene':
                 model.setActiveScene(button.dataset.scene);
                 model.select({scene: button.dataset.scene, kind: 'environment', id: button.dataset.scene});
                 break;
-            case 'mavr-editor-select':
+            case 'vrroom-editor-select':
                 if (active) {
                     model.select({scene: active.id, kind: button.dataset.kind, id: button.dataset.id});
                 }
                 break;
-            case 'mavr-editor-addscene':
+            case 'vrroom-editor-addscene':
                 context.actions.addScene();
                 break;
-            case 'mavr-editor-scene-up':
+            case 'vrroom-editor-scene-up':
                 if (active) {
                     context.actions.moveScene(active.id, -1);
                 }
                 break;
-            case 'mavr-editor-scene-down':
+            case 'vrroom-editor-scene-down':
                 if (active) {
                     context.actions.moveScene(active.id, 1);
                 }
                 break;
-            case 'mavr-editor-scene-delete':
+            case 'vrroom-editor-scene-delete':
                 if (active) {
                     context.actions.deleteScene(active.id);
                 }

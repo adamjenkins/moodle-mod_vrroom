@@ -2,7 +2,7 @@
   "name": "locked_until_after",
   "intent": "Visit B before A is locked; after A, B applies.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "a",

@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\scene;
+namespace mod_vrroom\local\scene;
 
 /**
- * Tests for the mavr-scene/1 validator.
+ * Tests for the vrroom-scene/1 validator.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -34,7 +34,7 @@ final class scene_validator_test extends \advanced_testcase {
     public static function valid_scene(): array {
         return json_decode(<<<'JSON'
 {
-  "schema": "mavr-scene/1",
+  "schema": "vrroom-scene/1",
   "id": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11",
   "name": "Gallery",
   "environment": {
@@ -100,7 +100,7 @@ JSON
      */
     public static function invalid_provider(): array {
         return [
-            'wrong schema' => [fn(array &$s) => $s['schema'] = 'mavr-scene/2'],
+            'wrong schema' => [fn(array &$s) => $s['schema'] = 'vrroom-scene/2'],
             'missing id' => [function (array &$s) {
                 unset($s['id']);
             }],
@@ -254,7 +254,7 @@ JSON
     public function test_validate_set(): void {
         $first = self::valid_scene();
         $second = [
-            'schema' => 'mavr-scene/1',
+            'schema' => 'vrroom-scene/1',
             'id' => '1f5e7c2a-9b3d-4e8f-a1c6-5d2e0b7f3a99',
             'name' => 'Cellar',
             'environment' => $first['environment'],

@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 /**
- * The tasks (task graph) of a MAVR activity were changed in the room editor, so a new graph
+ * The tasks (task graph) of a VR room activity were changed in the room editor, so a new graph
  * version was stored.
  *
  * @property-read array $other {
- *      - int mavrid: the MAVR instance id.
+ *      - int vrroomid: the VR room instance id.
  *      - int version: the new graph version.
  * }
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -36,7 +36,7 @@ class graph_updated extends \core\event\base {
      * @return void
      */
     protected function init() {
-        $this->data['objecttable'] = 'mavr_graphs';
+        $this->data['objecttable'] = 'vrroom_graphs';
         $this->data['crud'] = 'u';
         $this->data['edulevel'] = self::LEVEL_TEACHING;
     }
@@ -47,7 +47,7 @@ class graph_updated extends \core\event\base {
      * @return string
      */
     public static function get_name() {
-        return get_string('eventgraphupdated', 'mod_mavr');
+        return get_string('eventgraphupdated', 'mod_vrroom');
     }
 
     /**
@@ -57,7 +57,7 @@ class graph_updated extends \core\event\base {
      */
     public function get_description() {
         $version = (int)($this->other['version'] ?? 0);
-        return "The user with id '$this->userid' changed the tasks of the MAVR activity with course module id " .
+        return "The user with id '$this->userid' changed the tasks of the VR room activity with course module id " .
             "'$this->contextinstanceid' in the room editor; the task graph is now version $version.";
     }
 
@@ -67,7 +67,7 @@ class graph_updated extends \core\event\base {
      * @return \moodle_url
      */
     public function get_url() {
-        return new \moodle_url('/mod/mavr/edit.php', ['id' => $this->contextinstanceid]);
+        return new \moodle_url('/mod/vrroom/edit.php', ['id' => $this->contextinstanceid]);
     }
 
     /**
@@ -81,8 +81,8 @@ class graph_updated extends \core\event\base {
         if ($this->contextlevel != CONTEXT_MODULE) {
             throw new \coding_exception('The context must be a module context.');
         }
-        if (!isset($this->other['mavrid'])) {
-            throw new \coding_exception('The \'mavrid\' value must be set in other.');
+        if (!isset($this->other['vrroomid'])) {
+            throw new \coding_exception('The \'vrroomid\' value must be set in other.');
         }
         if (!isset($this->other['version'])) {
             throw new \coding_exception('The \'version\' value must be set in other.');
@@ -104,6 +104,6 @@ class graph_updated extends \core\event\base {
      * @return array
      */
     public static function get_other_mapping() {
-        return ['mavrid' => ['db' => 'mavr', 'restore' => 'mavr']];
+        return ['vrroomid' => ['db' => 'vrroom', 'restore' => 'vrroom']];
     }
 }

@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\event;
+namespace mod_vrroom\event;
 
 /**
- * An xAPI statement was accepted and stored for a MAVR attempt.
+ * An xAPI statement was accepted and stored for a VR room attempt.
  *
  * @property-read array $other {
  *      - int attemptid: the attempt id.
@@ -26,7 +26,7 @@ namespace mod_mavr\event;
  *      - string|null objectid: object id (null for the activity).
  * }
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -37,7 +37,7 @@ class statement_recorded extends \core\event\base {
      * @return void
      */
     protected function init() {
-        $this->data['objecttable'] = 'mavr_events';
+        $this->data['objecttable'] = 'vrroom_events';
         $this->data['crud'] = 'c';
         $this->data['edulevel'] = self::LEVEL_PARTICIPATING;
     }
@@ -48,7 +48,7 @@ class statement_recorded extends \core\event\base {
      * @return string
      */
     public static function get_name() {
-        return get_string('eventstatementrecorded', 'mod_mavr');
+        return get_string('eventstatementrecorded', 'mod_vrroom');
     }
 
     /**
@@ -61,7 +61,7 @@ class statement_recorded extends \core\event\base {
         $type = $this->other['objecttype'] ?? '';
         $attemptid = $this->other['attemptid'] ?? 0;
         return "A statement '$verb' about a '$type' was recorded for the user with id '$this->relateduserid' in the " .
-            "attempt with id '$attemptid' at the MAVR activity with course module id '$this->contextinstanceid'.";
+            "attempt with id '$attemptid' at the VR room activity with course module id '$this->contextinstanceid'.";
     }
 
     /**
@@ -70,7 +70,7 @@ class statement_recorded extends \core\event\base {
      * @return \moodle_url
      */
     public function get_url() {
-        return new \moodle_url('/mod/mavr/report.php', [
+        return new \moodle_url('/mod/vrroom/report.php', [
             'id' => $this->contextinstanceid,
             'attemptid' => $this->other['attemptid'] ?? 0,
         ]);
@@ -103,7 +103,7 @@ class statement_recorded extends \core\event\base {
      * @return array
      */
     public static function get_objectid_mapping() {
-        return ['db' => 'mavr_events', 'restore' => \core\event\base::NOT_MAPPED];
+        return ['db' => 'vrroom_events', 'restore' => \core\event\base::NOT_MAPPED];
     }
 
     /**
@@ -113,7 +113,7 @@ class statement_recorded extends \core\event\base {
      */
     public static function get_other_mapping() {
         return [
-            'attemptid' => ['db' => 'mavr_attempts', 'restore' => 'mavr_attempt'],
+            'attemptid' => ['db' => 'vrroom_attempts', 'restore' => 'vrroom_attempt'],
             'verb' => \core\event\base::NOT_MAPPED,
             'objecttype' => \core\event\base::NOT_MAPPED,
             'objectid' => \core\event\base::NOT_MAPPED,

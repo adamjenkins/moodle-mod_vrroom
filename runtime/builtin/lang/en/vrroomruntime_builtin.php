@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * English strings for the MAVR built-in viewer run mode.
+ * English strings for the VR room built-in viewer run mode.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @category   string
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -54,7 +54,7 @@ $string['liveclosed'] = 'The live room has been closed.';
 $string['liveconnectfailed'] = 'Could not connect to {$a}.';
 $string['liveconnecting'] = 'Connecting…';
 $string['liveenabled'] = 'Live mode';
-$string['liveenabled_desc'] = 'Let teachers turn on live mode in MAVR activities that use the built-in viewer: up to six people share a room, see each other as avatars and can talk. The browsers connect directly to each other, so each participant can see the IP addresses of the others.';
+$string['liveenabled_desc'] = 'Let teachers turn on live mode in VR room activities that use the built-in viewer: up to six people share a room, see each other as avatars and can talk. The browsers connect directly to each other, so each participant can see the IP addresses of the others.';
 $string['livefull'] = 'The live room is full ({$a} people). Try again later.';
 $string['livegroupselect'] = 'Room of group';
 $string['liveholdtotalk'] = 'Hold to talk';
@@ -130,7 +130,7 @@ $string['privacy:metadata:livepeers:fullname'] = 'Your name, shown above your av
 $string['privacy:metadata:livepeers:ipaddress'] = 'The IP addresses of your device.';
 $string['privacy:metadata:livepeers:pose'] = 'Where you are and where you look in the room, and your hands in VR.';
 $string['privacy:metadata:livepeers:voice'] = 'Your voice, while your microphone is on.';
-$string['privacy:metadata:peers'] = 'Who is in a live room of a MAVR activity right now. The record is removed when the person leaves or stops responding for 20 seconds.';
+$string['privacy:metadata:peers'] = 'Who is in a live room of a VR room activity right now. The record is removed when the person leaves or stops responding for 20 seconds.';
 $string['privacy:metadata:peers:groupid'] = 'The group whose live room it is.';
 $string['privacy:metadata:peers:timejoined'] = 'When the user joined the live room.';
 $string['privacy:metadata:peers:timeseen'] = 'When the user\'s browser last checked in.';

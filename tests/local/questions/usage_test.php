@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
- * Tests for the question usage behind a MAVR attempt.
+ * Tests for the question usage behind a VR room attempt.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(usage::class)]
 final class usage_test extends \advanced_testcase {
-    /** @var \stdClass The mavr record. */
-    private \stdClass $mavr;
+    /** @var \stdClass The vrroom record. */
+    private \stdClass $vrroom;
 
     /** @var \context_module The activity context. */
     private \context_module $context;
@@ -56,11 +56,11 @@ final class usage_test extends \advanced_testcase {
             ]);
         }
 
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
-        $this->mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
+        $this->vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $this->context = \context_module::instance($module->cmid);
 
-        slots::sync($this->mavr, $this->context, [
+        slots::sync($this->vrroom, $this->context, [
             ['slot' => 1, 'questionbankentryid' => (int)$this->questions['A']->questionbankentryid,
                 'maxmark' => 2.0, 'objectiveid' => 'q-a'],
             ['slot' => 2, 'questionbankentryid' => (int)$this->questions['B']->questionbankentryid,
@@ -75,7 +75,7 @@ final class usage_test extends \advanced_testcase {
      * @return \stdClass Attempt with uniqueid and slotmap.
      */
     private function make_attempt(): \stdClass {
-        [$qubaid, $slotmap] = usage::create($this->context, slots::get_slots((int)$this->mavr->id, $this->context));
+        [$qubaid, $slotmap] = usage::create($this->context, slots::get_slots((int)$this->vrroom->id, $this->context));
         return (object)['uniqueid' => $qubaid, 'slotmap' => json_encode($slotmap)];
     }
 
@@ -109,7 +109,7 @@ final class usage_test extends \advanced_testcase {
 
         $this->assertSame([1, 2], array_keys($slotmap));
         $quba = \question_engine::load_questions_usage_by_activity($attempt->uniqueid);
-        $this->assertSame('mod_mavr', $quba->get_owning_component());
+        $this->assertSame('mod_vrroom', $quba->get_owning_component());
         $this->assertSame((int)$this->context->id, (int)$quba->get_owning_context()->id);
         $this->assertSame('immediatefeedback', $quba->get_preferred_behaviour());
         $this->assertCount(2, $quba->get_slots());
@@ -151,7 +151,7 @@ final class usage_test extends \advanced_testcase {
     public function test_render_unknown_slot(): void {
         $attempt = $this->make_attempt();
         $this->expectException(\moodle_exception::class);
-        $this->expectExceptionMessage(get_string('questionmissing', 'mod_mavr'));
+        $this->expectExceptionMessage(get_string('questionmissing', 'mod_vrroom'));
         usage::render($attempt, 3, false);
     }
 

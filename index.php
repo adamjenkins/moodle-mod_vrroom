@@ -15,9 +15,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Lists the MAVR activities in a course.
+ * Lists the VR room activities in a course.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -30,12 +30,12 @@ $course = $DB->get_record('course', ['id' => $id], '*', MUST_EXIST);
 require_course_login($course);
 $coursecontext = context_course::instance($course->id);
 
-$event = \mod_mavr\event\course_module_instance_list_viewed::create(['context' => $coursecontext]);
+$event = \mod_vrroom\event\course_module_instance_list_viewed::create(['context' => $coursecontext]);
 $event->add_record_snapshot('course', $course);
 $event->trigger();
 
-$strplural = get_string('modulenameplural', 'mavr');
-$PAGE->set_url('/mod/mavr/index.php', ['id' => $course->id]);
+$strplural = get_string('modulenameplural', 'vrroom');
+$PAGE->set_url('/mod/vrroom/index.php', ['id' => $course->id]);
 $PAGE->set_title(format_string($course->shortname, true, ['context' => $coursecontext]) . ': ' . $strplural);
 $PAGE->set_heading(format_string($course->fullname, true, ['context' => $coursecontext]));
 $PAGE->navbar->add($strplural);
@@ -44,7 +44,7 @@ $PAGE->set_pagelayout('incourse');
 echo $OUTPUT->header();
 echo $OUTPUT->heading($strplural);
 
-$instances = get_all_instances_in_course('mavr', $course);
+$instances = get_all_instances_in_course('vrroom', $course);
 if (!$instances) {
     notice(get_string('thereareno', 'moodle', $strplural), new moodle_url('/course/view.php', ['id' => $course->id]));
     exit;
@@ -57,7 +57,7 @@ $table->align = ['left'];
 foreach ($instances as $instance) {
     $name = format_string($instance->name, true, ['context' => context_module::instance($instance->coursemodule)]);
     $attributes = $instance->visible ? [] : ['class' => 'dimmed'];
-    $link = html_writer::link(new moodle_url('/mod/mavr/view.php', ['id' => $instance->coursemodule]), $name, $attributes);
+    $link = html_writer::link(new moodle_url('/mod/vrroom/view.php', ['id' => $instance->coursemodule]), $name, $attributes);
     $table->data[] = [$link];
 }
 

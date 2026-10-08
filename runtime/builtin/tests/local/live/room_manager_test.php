@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
-use mod_mavr\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\attempt_manager;
 
 /**
  * Tests for live rooms: presence, capacity, isolation, signal delivery and every server limit.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -56,7 +56,7 @@ final class room_manager_test extends \advanced_testcase {
         $this->assertTrue(room_manager::is_peerid($peer->peerid));
         $this->assertSame([], $joined['peers']);
         $this->assertSame(room_manager::INTERVAL_ACTIVE, $joined['interval']);
-        $row = $DB->get_record('mavrruntime_builtin_peers', ['peerid' => $peer->peerid], '*', MUST_EXIST);
+        $row = $DB->get_record('vrroomruntime_builtin_peers', ['peerid' => $peer->peerid], '*', MUST_EXIST);
         $this->assertSame('attempt', $row->kind);
         $this->assertEquals($attempt->id, $row->attemptid);
         $this->assertEquals($this->now, $row->timejoined);
@@ -64,7 +64,7 @@ final class room_manager_test extends \advanced_testcase {
 
         $again = $this->join($activity, $user, $attempt, 0, $this->now + 1);
         $this->assertNotSame($peer->peerid, $again['peer']->peerid);
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_peers', ['userid' => $user->id]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_peers', ['userid' => $user->id]));
         $this->assertNull(room_manager::get_own_peer($peer->peerid, (int)$user->id, $this->now + 1));
     }
 
@@ -91,12 +91,12 @@ final class room_manager_test extends \advanced_testcase {
             $this->fail('A third person joined a room of two.');
         } catch (\moodle_exception $e) {
             $this->assertSame('errorliveroomfull', $e->errorcode);
-            $this->assertSame(get_string('errorliveroomfull', 'mavrruntime_builtin', 2), $e->getMessage());
+            $this->assertSame(get_string('errorliveroomfull', 'vrroomruntime_builtin', 2), $e->getMessage());
         }
 
         // A goes stale: C may join, and A's row is purged.
         $DB->set_field(
-            'mavrruntime_builtin_peers',
+            'vrroomruntime_builtin_peers',
             'timeseen',
             $this->now - room_manager::STALE_AFTER - 1,
             ['peerid' => $peera->peerid]
@@ -104,7 +104,7 @@ final class room_manager_test extends \advanced_testcase {
         $joinedc = $this->join($activity, $c, $attemptc);
         $this->assertCount(1, $joinedc['peers']);
         $this->assertSame($joinedb['peer']->peerid, $joinedc['peers'][0]['peerid']);
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peera->peerid]));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peera->peerid]));
     }
 
     /**
@@ -152,7 +152,7 @@ final class room_manager_test extends \advanced_testcase {
         $peera = $this->join($activity, $a, $attempta)['peer'];
         $peerb = $this->join($activity, $b, $attemptb)['peer'];
         $DB->set_field(
-            'mavrruntime_builtin_peers',
+            'vrroomruntime_builtin_peers',
             'timeseen',
             $this->now - room_manager::STALE_AFTER - 1,
             ['peerid' => $peerb->peerid]
@@ -166,7 +166,7 @@ final class room_manager_test extends \advanced_testcase {
         ]);
         $this->assertSame(array_fill(0, 4, 'unknownpeer'), array_column($result['results'], 'error'));
         $this->assertSame('', $result['results'][3]['to']);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
     }
 
     /**
@@ -182,7 +182,7 @@ final class room_manager_test extends \advanced_testcase {
         $peerb = $this->join($activity, $b, $attemptb)['peer'];
 
         $this->send($activity, $peera, [['to' => $peerb->peerid, 'type' => 'candidates', 'payload' => self::CANDIDATES]]);
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_signals', ['topeer' => $peerb->peerid]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_signals', ['topeer' => $peerb->peerid]));
 
         $poll = $this->poll($activity, $peerb, $this->now + 1);
         $this->assertSame('ok', $poll['status']);
@@ -191,7 +191,7 @@ final class room_manager_test extends \advanced_testcase {
         $this->assertSame('candidates', $poll['signals'][0]['type']);
         $this->assertSame(json_decode(self::CANDIDATES, true), json_decode($poll['signals'][0]['payload'], true));
         $this->assertSame([$peera->peerid], array_column($poll['peers'], 'peerid'));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
 
         $again = $this->poll($activity, $peerb, $this->now + 2);
         $this->assertSame([], $again['signals']);
@@ -209,13 +209,13 @@ final class room_manager_test extends \advanced_testcase {
         $peera = $this->join($activity, $a, $attempta)['peer'];
         $peerb = $this->join($activity, $b, $attemptb)['peer'];
         $this->send($activity, $peera, [['to' => $peerb->peerid, 'type' => 'candidates', 'payload' => self::CANDIDATES]]);
-        $DB->set_field('mavrruntime_builtin_signals', 'timecreated', $this->now - room_manager::SIGNAL_TTL - 1, []);
+        $DB->set_field('vrroomruntime_builtin_signals', 'timecreated', $this->now - room_manager::SIGNAL_TTL - 1, []);
 
         $poll = $this->poll($activity, $peerb, $this->now);
         $this->assertSame([], $poll['signals']);
 
-        room_manager::purge_room((int)$activity['mavr']->id, 0, $this->now);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        room_manager::purge_room((int)$activity['vrroom']->id, 0, $this->now);
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
     }
 
     /**
@@ -248,7 +248,7 @@ final class room_manager_test extends \advanced_testcase {
             array_column($result['results'], 'error')
         );
 
-        $stored = $DB->get_field('mavrruntime_builtin_signals', 'payload', ['topeer' => $to], MUST_EXIST);
+        $stored = $DB->get_field('vrroomruntime_builtin_signals', 'payload', ['topeer' => $to], MUST_EXIST);
         $this->assertSame('{"gen":2,"type":"offer","sdp":"v=0\r\n"}', $stored);
     }
 
@@ -338,14 +338,14 @@ final class room_manager_test extends \advanced_testcase {
         $peera = $this->join($activity, $a, $attempta)['peer'];
 
         $this->assertNull(room_manager::get_own_peer($peera->peerid, (int)$b->id, $this->now + 5));
-        $this->assertEquals($this->now, $DB->get_field('mavrruntime_builtin_peers', 'timeseen', ['peerid' => $peera->peerid]));
+        $this->assertEquals($this->now, $DB->get_field('vrroomruntime_builtin_peers', 'timeseen', ['peerid' => $peera->peerid]));
         $this->assertNull(room_manager::get_own_peer('nonsense', (int)$a->id, $this->now));
         $this->assertNotNull(room_manager::get_own_peer($peera->peerid, (int)$a->id, $this->now + 5));
         $this->assertNull(room_manager::get_own_peer($peera->peerid, (int)$a->id, $this->now + room_manager::STALE_AFTER + 1));
 
         // Leaving with another user's id removes nothing.
         room_manager::leave($peera->peerid, (int)$b->id);
-        $this->assertTrue($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peera->peerid]));
+        $this->assertTrue($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peera->peerid]));
     }
 
     /**
@@ -361,7 +361,7 @@ final class room_manager_test extends \advanced_testcase {
 
         $poll = $this->poll($activity, $peera);
         $this->assertSame('closed', $poll['status']);
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peera->peerid]));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peera->peerid]));
     }
 
     /**
@@ -402,11 +402,11 @@ final class room_manager_test extends \advanced_testcase {
         $this->send($activity, $peerb, [['to' => $peera->peerid, 'type' => 'candidates', 'payload' => self::CANDIDATES]]);
 
         room_manager::leave($peera->peerid, (int)$a->id);
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peera->peerid]));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peera->peerid]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
         room_manager::leave($peera->peerid, (int)$a->id);
         room_manager::leave('', (int)$a->id);
-        $this->assertTrue($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peerb->peerid]));
+        $this->assertTrue($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peerb->peerid]));
     }
 
     /**
@@ -429,24 +429,24 @@ final class room_manager_test extends \advanced_testcase {
         }
 
         room_manager::purge_user((int)$peers[1][0]->id);
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peers[1][1]->peerid]));
-        $this->assertFalse($DB->record_exists('mavrruntime_builtin_signals', ['topeer' => $peers[1][3]->peerid]));
-        $this->assertTrue($DB->record_exists('mavrruntime_builtin_peers', ['peerid' => $peers[1][3]->peerid]));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peers[1][1]->peerid]));
+        $this->assertFalse($DB->record_exists('vrroomruntime_builtin_signals', ['topeer' => $peers[1][3]->peerid]));
+        $this->assertTrue($DB->record_exists('vrroomruntime_builtin_peers', ['peerid' => $peers[1][3]->peerid]));
 
-        room_manager::purge_activity((int)$activity['mavr']->id);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $activity['mavr']->id]));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $activity['mavr']->id]));
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $second['mavr']->id]));
+        room_manager::purge_activity((int)$activity['vrroom']->id);
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $activity['vrroom']->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals', ['vrroomid' => $activity['vrroom']->id]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $second['vrroom']->id]));
 
         room_manager::purge_course((int)$activity['course']->id);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $second['mavr']->id]));
-        $this->assertSame(2, $DB->count_records('mavrruntime_builtin_peers', ['mavrid' => $elsewhere['mavr']->id]));
-        $this->assertSame(1, $DB->count_records('mavrruntime_builtin_signals', ['mavrid' => $elsewhere['mavr']->id]));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $second['vrroom']->id]));
+        $this->assertSame(2, $DB->count_records('vrroomruntime_builtin_peers', ['vrroomid' => $elsewhere['vrroom']->id]));
+        $this->assertSame(1, $DB->count_records('vrroomruntime_builtin_signals', ['vrroomid' => $elsewhere['vrroom']->id]));
 
         $removed = room_manager::purge_expired($this->now + room_manager::SIGNAL_TTL + 1);
         $this->assertSame(['peers' => 2, 'signals' => 1], $removed);
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_peers'));
-        $this->assertSame(0, $DB->count_records('mavrruntime_builtin_signals'));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_peers'));
+        $this->assertSame(0, $DB->count_records('vrroomruntime_builtin_signals'));
     }
 
     /**
@@ -463,7 +463,7 @@ final class room_manager_test extends \advanced_testcase {
         return room_manager::join(
             $activity['cm'],
             $activity['context'],
-            $activity['mavr'],
+            $activity['vrroom'],
             (int)$user->id,
             'attempt',
             (int)$attempt->id,
@@ -482,12 +482,12 @@ final class room_manager_test extends \advanced_testcase {
      */
     private function poll(array $activity, \stdClass $peer, ?int $now = null): array {
         global $DB;
-        $fresh = $DB->get_record('mavrruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
+        $fresh = $DB->get_record('vrroomruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
         return room_manager::poll(
             $fresh,
             $activity['cm'],
             $activity['context'],
-            $activity['mavr'],
+            $activity['vrroom'],
             false,
             $now ?? $this->now
         );
@@ -504,12 +504,12 @@ final class room_manager_test extends \advanced_testcase {
      */
     private function send(array $activity, \stdClass $peer, array $signals, ?int $now = null): array {
         global $DB;
-        $fresh = $DB->get_record('mavrruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
+        $fresh = $DB->get_record('vrroomruntime_builtin_peers', ['id' => $peer->id]) ?: $peer;
         return room_manager::send(
             $fresh,
             $activity['cm'],
             $activity['context'],
-            $activity['mavr'],
+            $activity['vrroom'],
             $signals,
             $now ?? $this->now
         );
@@ -527,9 +527,9 @@ final class room_manager_test extends \advanced_testcase {
         foreach ($groupids as $groupid) {
             $this->getDataGenerator()->create_group_member(['groupid' => $groupid, 'userid' => $user->id]);
         }
-        /** @var \mod_mavr_generator $generator */
-        $generator = $this->getDataGenerator()->get_plugin_generator('mod_mavr');
-        return [$user, $generator->create_attempt((int)$activity['mavr']->id, (int)$user->id)];
+        /** @var \mod_vrroom_generator $generator */
+        $generator = $this->getDataGenerator()->get_plugin_generator('mod_vrroom');
+        return [$user, $generator->create_attempt((int)$activity['vrroom']->id, (int)$user->id)];
     }
 
     /**
@@ -538,13 +538,13 @@ final class room_manager_test extends \advanced_testcase {
      * @param int $groupmode Group mode.
      * @param int $maxusers Room size.
      * @param \stdClass|null $course Course, or null for a new one.
-     * @return array ['course', 'cm', 'context', 'mavr']
+     * @return array ['course', 'cm', 'context', 'vrroom']
      */
     private function create_activity(int $groupmode = NOGROUPS, int $maxusers = 6, ?\stdClass $course = null): array {
         global $DB;
         $course = $course ?? $this->getDataGenerator()->create_course();
-        $record = $this->getDataGenerator()->create_module('mavr', ['course' => $course->id]);
-        $DB->update_record('mavr', (object)['id' => $record->id, 'livemode' => 1, 'livemaxusers' => $maxusers]);
+        $record = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id]);
+        $DB->update_record('vrroom', (object)['id' => $record->id, 'livemode' => 1, 'livemaxusers' => $maxusers]);
         $DB->set_field('course_modules', 'groupmode', $groupmode, ['id' => $record->cmid]);
         rebuild_course_cache((int)$course->id, true);
         $cm = get_fast_modinfo($course->id)->get_cm($record->cmid);
@@ -552,7 +552,7 @@ final class room_manager_test extends \advanced_testcase {
             'course' => $course,
             'cm' => $cm,
             'context' => \context_module::instance($cm->id),
-            'mavr' => $DB->get_record('mavr', ['id' => $record->id], '*', MUST_EXIST),
+            'vrroom' => $DB->get_record('vrroom', ['id' => $record->id], '*', MUST_EXIST),
         ];
     }
 }

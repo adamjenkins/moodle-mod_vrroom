@@ -28,16 +28,16 @@
  * The per-peer maps of media and data connections follow mod_gear's collaborative mode; PeerJS
  * is not used.
  *
- * @module     mavrruntime_builtin/live/mesh
+ * @module     vrroomruntime_builtin/live/mesh
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 import Log from 'core/log';
-import {Transport} from 'mavrruntime_builtin/live/transport';
-import {encode, decode} from 'mavrruntime_builtin/live/codec';
-import {createSignalling, RECONNECTING_AFTER} from 'mavrruntime_builtin/live/signalling';
+import {Transport} from 'vrroomruntime_builtin/live/transport';
+import {encode, decode} from 'vrroomruntime_builtin/live/codec';
+import {createSignalling, RECONNECTING_AFTER} from 'vrroomruntime_builtin/live/signalling';
 
 /** Skip a peer's pose channel while this many bytes wait to be sent. */
 const POSE_BUFFER_LIMIT = 16384;
@@ -1021,7 +1021,7 @@ class MeshTransport extends Transport {
      * @param {Object} detail {to, type, error}.
      */
     onSendError(detail) {
-        Log.debug('mavrruntime_builtin/live/mesh: signal ' + detail.type + ' not delivered (' + detail.error + ')');
+        Log.debug('vrroomruntime_builtin/live/mesh: signal ' + detail.type + ' not delivered (' + detail.error + ')');
     }
 
     /**
@@ -1063,7 +1063,7 @@ class MeshTransport extends Transport {
         }
         const count = (this.regens.get(link.peerid) || 0) + 1;
         if (count > MAX_REGENERATIONS || link.gen >= MAX_GEN) {
-            Log.debug('mavrruntime_builtin/live/mesh: giving up on peer ' + link.peerid);
+            Log.debug('vrroomruntime_builtin/live/mesh: giving up on peer ' + link.peerid);
             return;
         }
         this.regens.set(link.peerid, count);

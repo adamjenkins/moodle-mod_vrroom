@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\graph;
+namespace mod_vrroom\local\graph;
 
 /**
  * Tests for the server-side graph evaluator, driven by the golden fixtures.
  *
  * The same fixtures are run against the client evaluator by tests/js/graph_fixtures.test.mjs.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -106,7 +106,7 @@ final class evaluator_test extends \advanced_testcase {
     public function test_classify(): void {
         $this->resetAfterTest();
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'v1', 'type' => 'visit_zone', 'title' => 'Visit', 'zone' => 'z1', 'required' => true],
                 ['id' => 'q1', 'type' => 'answer_question', 'title' => 'Answer', 'slot' => 1, 'points' => 2,
@@ -138,7 +138,7 @@ final class evaluator_test extends \advanced_testcase {
     public function test_fraction_clamped(): void {
         $this->resetAfterTest();
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'q1', 'type' => 'answer_question', 'title' => 'One', 'slot' => 1, 'points' => 2],
                 ['id' => 'q2', 'type' => 'answer_question', 'title' => 'Two', 'slot' => 2, 'points' => 2],
@@ -167,7 +167,7 @@ final class evaluator_test extends \advanced_testcase {
     public function test_hintsused_and_matching(): void {
         $this->resetAfterTest();
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'x-1', 'type' => 'interact', 'title' => 'One', 'target' => 'g-1', 'points' => 1,
                     'hints' => [['id' => 'hn-1', 'text' => 'A', 'penalty' => 0.25]]],
@@ -204,7 +204,7 @@ final class evaluator_test extends \advanced_testcase {
             $rules[] = ['id' => "r{$n}", 'on' => ['on' => 'objective_unlocked', 'objective' => "o{$n}"],
                 'actions' => [$action]];
         }
-        $graph = ['schema' => 'mavr-graph/1', 'objectives' => $objectives, 'rules' => $rules];
+        $graph = ['schema' => 'vrroom-graph/1', 'objectives' => $objectives, 'rules' => $rules];
         $this->assertSame([], graph_validator::validate($graph));
 
         $events = [['verb' => 'entered', 'type' => 'zone', 'id' => 'z0', 'scene' => null, 'fraction' => null]];
@@ -217,7 +217,7 @@ final class evaluator_test extends \advanced_testcase {
     }
 
     /**
-     * event_from_record converts mavr_events rows.
+     * event_from_record converts vrroom_events rows.
      */
     public function test_event_from_record(): void {
         $this->resetAfterTest();

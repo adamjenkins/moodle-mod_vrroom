@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\graph;
+namespace mod_vrroom\local\graph;
 
 /**
- * Tests for the mavr-graph/1 validator.
+ * Tests for the vrroom-graph/1 validator.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -33,7 +33,7 @@ final class graph_validator_test extends \advanced_testcase {
     private static function example(): array {
         $json = <<<'JSON'
         {
-          "schema": "mavr-graph/1",
+          "schema": "vrroom-graph/1",
           "hidden": [],
           "objectives": [
             {"id": "v-1", "type": "visit_zone", "title": "Visit The Vase", "zone": "z-1",
@@ -138,7 +138,7 @@ final class graph_validator_test extends \advanced_testcase {
     public function test_valid_graphs(): void {
         $this->resetAfterTest();
         $this->assertSame([], graph_validator::validate(self::example()));
-        $this->assertSame([], graph_validator::validate(['schema' => 'mavr-graph/1', 'objectives' => []]));
+        $this->assertSame([], graph_validator::validate(['schema' => 'vrroom-graph/1', 'objectives' => []]));
         // Integral floats count as integers (JSON 1.0 and 1 are the same number in JavaScript).
         $graph = self::example();
         $graph['objectives'][1]['slot'] = 1.0;
@@ -152,7 +152,7 @@ final class graph_validator_test extends \advanced_testcase {
      */
     public static function invalid_provider(): array {
         return [
-            'schema' => ['schema', 'schema must be "mavr-graph/1"'],
+            'schema' => ['schema', 'schema must be "vrroom-graph/1"'],
             'objectives missing' => ['objectives_missing', 'objectives must be an array'],
             'rules not a list' => ['rules_not_list', 'rules must be an array'],
             'hidden bad id' => ['hidden_bad_id', 'hidden[0] is not a valid id'],
@@ -220,7 +220,7 @@ final class graph_validator_test extends \advanced_testcase {
     public function test_cycle_reports_once(): void {
         $this->resetAfterTest();
         $graph = [
-            'schema' => 'mavr-graph/1',
+            'schema' => 'vrroom-graph/1',
             'objectives' => [
                 ['id' => 'a', 'type' => 'visit_zone', 'title' => 'A', 'zone' => 'z-a', 'unlock' => ['after' => ['c']]],
                 ['id' => 'b', 'type' => 'visit_zone', 'title' => 'B', 'zone' => 'z-b', 'unlock' => ['after' => ['a']]],
@@ -243,7 +243,7 @@ final class graph_validator_test extends \advanced_testcase {
         $r = &$graph['rules'];
         switch ($mutation) {
             case 'schema':
-                $graph['schema'] = 'mavr-graph/2';
+                $graph['schema'] = 'vrroom-graph/2';
                 break;
             case 'objectives_missing':
                 unset($graph['objectives']);

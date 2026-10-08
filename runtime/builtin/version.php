@@ -15,19 +15,19 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version information for the MAVR built-in viewer run mode.
+ * Version information for the VR room built-in viewer run mode.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->component = 'mavrruntime_builtin';
+$plugin->component = 'vrroomruntime_builtin';
 $plugin->version = 2026100800;
 $plugin->release = '0.1.0';
 $plugin->maturity = MATURITY_ALPHA;
 $plugin->requires = 2026042000;
 $plugin->supported = [502, 502];
-$plugin->dependencies = ['mod_mavr' => 2026100800];
+$plugin->dependencies = ['mod_vrroom' => 2026100800];

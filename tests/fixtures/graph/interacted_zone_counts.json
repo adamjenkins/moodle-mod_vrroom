@@ -2,7 +2,7 @@
   "name": "interacted_zone_counts",
   "intent": "List-view interacted on a zone completes visit_zone; exited and object events on the same id do not.",
   "graph": {
-    "schema": "mavr-graph/1",
+    "schema": "vrroom-graph/1",
     "objectives": [
       {
         "id": "v1",

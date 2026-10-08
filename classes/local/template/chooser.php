@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\template;
+namespace mod_vrroom\local\template;
 
 use core_course\local\entity\content_item;
 use core_course\local\entity\string_title;
@@ -23,11 +23,11 @@ use core_course\local\entity\string_title;
  * Activity chooser entries: one per installed template.
  *
  * Core shows only the items a module's get_course_content_items() callback returns
- * (course/classes/local/repository/content_item_readonly_repository.php), so MAVR appears in
- * the chooser once per template ("MAVR: Gallery walk", "MAVR: Escape chain", ...), each linking
+ * (course/classes/local/repository/content_item_readonly_repository.php), so VR room appears in
+ * the chooser once per template ("VR room: Gallery walk", "VR room: Escape chain", ...), each linking
  * to the activity form with the template already chosen.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -41,7 +41,7 @@ final class chooser {
      * (the mod_lti precedent for preconfigured tools); the chooser appends the section and
      * beforemod parameters itself. Items without a course scope keep the default link.
      *
-     * @param content_item $default The default content item core built for mod_mavr.
+     * @param content_item $default The default content item core built for mod_vrroom.
      * @return content_item[]
      */
     public static function content_items(content_item $default): array {
@@ -51,8 +51,8 @@ final class chooser {
             $link = self::link_for($default->get_link(), $name);
             $items[] = new content_item(
                 id: $position + 1,
-                name: 'mavr_' . $name,
-                title: new string_title(get_string('choosertitle', 'mod_mavr', $template->get_display_name())),
+                name: 'vrroom_' . $name,
+                title: new string_title(get_string('choosertitle', 'mod_vrroom', $template->get_display_name())),
                 link: $link,
                 icon: $default->get_icon(),
                 help: $template->get_chooser_help() ?: $default->get_help(),
@@ -80,7 +80,7 @@ final class chooser {
         $courseid = (int)$defaultlink->param('id');
         if ($courseid > 0 && str_ends_with($defaultlink->get_path(), '/course/mod.php')) {
             $params = [
-                'add' => 'mavr',
+                'add' => 'vrroom',
                 'return' => 0,
                 'course' => $courseid,
             ];

@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\editor\editor_manager;
+use mod_vrroom\local\editor\editor_manager;
 
 /**
  * Load the room editor document of an activity.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -51,13 +51,13 @@ class editor_load extends external_api {
         global $DB;
         ['cmid' => $cmid] = self::validate_parameters(self::execute_parameters(), ['cmid' => $cmid]);
 
-        [, $cm] = get_course_and_cm_from_cmid($cmid, 'mavr');
+        [, $cm] = get_course_and_cm_from_cmid($cmid, 'vrroom');
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
-        require_capability('mod/mavr:manage', $context);
+        require_capability('mod/vrroom:manage', $context);
 
-        $mavr = $DB->get_record('mavr', ['id' => $cm->instance], '*', MUST_EXIST);
-        return editor_manager::load($cm, $context, $mavr);
+        $vrroom = $DB->get_record('vrroom', ['id' => $cm->instance], '*', MUST_EXIST);
+        return editor_manager::load($cm, $context, $vrroom);
     }
 
     /**
@@ -67,7 +67,7 @@ class editor_load extends external_api {
      */
     public static function execute_returns(): external_single_structure {
         return new external_single_structure([
-            'documentjson' => new external_value(PARAM_RAW, 'JSON mavr-editdoc/1 document'),
+            'documentjson' => new external_value(PARAM_RAW, 'JSON vrroom-editdoc/1 document'),
             'assetsjson' => new external_value(PARAM_RAW, 'JSON list of the files the rooms can use'),
             'presetsjson' => new external_value(PARAM_RAW, 'JSON map of the built-in surroundings'),
             'questionsjson' => new external_value(PARAM_RAW, 'JSON list of the questions that can be chosen'),

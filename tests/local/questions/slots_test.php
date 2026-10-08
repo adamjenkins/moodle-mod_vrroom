@@ -14,19 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\local\questions;
+namespace mod_vrroom\local\questions;
 
 /**
- * Tests for MAVR question slots and their question references.
+ * Tests for VR room question slots and their question references.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(slots::class)]
 final class slots_test extends \advanced_testcase {
-    /** @var \stdClass The mavr record. */
-    private \stdClass $mavr;
+    /** @var \stdClass The vrroom record. */
+    private \stdClass $vrroom;
 
     /** @var \context_module The activity context. */
     private \context_module $context;
@@ -35,7 +35,7 @@ final class slots_test extends \advanced_testcase {
     private array $questions = [];
 
     /**
-     * Create a course, a bank with three questions and a MAVR activity with no question slots.
+     * Create a course, a bank with three questions and a VR room activity with no question slots.
      */
     protected function setUp(): void {
         global $CFG, $DB;
@@ -57,11 +57,11 @@ final class slots_test extends \advanced_testcase {
             ]);
         }
 
-        $module = $generator->create_module('mavr', ['course' => $course->id]);
-        $this->mavr = $DB->get_record('mavr', ['id' => $module->id], '*', MUST_EXIST);
+        $module = $generator->create_module('vrroom', ['course' => $course->id]);
+        $this->vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
         $this->context = \context_module::instance($module->cmid);
         // Start from a clean slate whatever the default stations compiled to.
-        slots::delete_all($this->mavr, $this->context);
+        slots::delete_all($this->vrroom, $this->context);
     }
 
     /**
@@ -90,7 +90,7 @@ final class slots_test extends \advanced_testcase {
         global $DB;
         $rows = $DB->get_records('question_references', [
             'usingcontextid' => $this->context->id,
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
             'questionarea' => 'slot',
         ]);
         $result = [];
@@ -104,9 +104,9 @@ final class slots_test extends \advanced_testcase {
      * Sync creates one slot row and one quiz-style reference per binding.
      */
     public function test_sync_creates_slots_and_references(): void {
-        slots::sync($this->mavr, $this->context, [$this->binding(2, 'B', 3.0), $this->binding(1, 'A')]);
+        slots::sync($this->vrroom, $this->context, [$this->binding(2, 'B', 3.0), $this->binding(1, 'A')]);
 
-        $slots = slots::get_slots((int)$this->mavr->id, $this->context);
+        $slots = slots::get_slots((int)$this->vrroom->id, $this->context);
         $this->assertSame([1, 2], array_keys($slots));
         $this->assertSame('q-1', $slots[1]->objectiveid);
         $this->assertEqualsWithDelta(3.0, $slots[2]->maxmark, 1e-7);
@@ -128,11 +128,11 @@ final class slots_test extends \advanced_testcase {
      * Re-syncing updates in place, deletes vanished slots and adds new ones.
      */
     public function test_sync_updates_and_deletes(): void {
-        slots::sync($this->mavr, $this->context, [$this->binding(1, 'A'), $this->binding(2, 'B')]);
-        $before = slots::get_slots((int)$this->mavr->id, $this->context);
+        slots::sync($this->vrroom, $this->context, [$this->binding(1, 'A'), $this->binding(2, 'B')]);
+        $before = slots::get_slots((int)$this->vrroom->id, $this->context);
 
-        slots::sync($this->mavr, $this->context, [$this->binding(1, 'C', 2.0), $this->binding(3, 'B')]);
-        $after = slots::get_slots((int)$this->mavr->id, $this->context);
+        slots::sync($this->vrroom, $this->context, [$this->binding(1, 'C', 2.0), $this->binding(3, 'B')]);
+        $after = slots::get_slots((int)$this->vrroom->id, $this->context);
 
         $this->assertSame([1, 3], array_keys($after));
         // Slot 1 kept its row, so its reference itemid is unchanged.
@@ -147,8 +147,8 @@ final class slots_test extends \advanced_testcase {
         $this->assertFalse(questions_in_use([$this->questions['A']->id]));
 
         // Syncing to nothing removes everything.
-        slots::sync($this->mavr, $this->context, []);
-        $this->assertSame([], slots::get_slots((int)$this->mavr->id, $this->context));
+        slots::sync($this->vrroom, $this->context, []);
+        $this->assertSame([], slots::get_slots((int)$this->vrroom->id, $this->context));
         $this->assertSame([], $this->references());
     }
 
@@ -157,7 +157,7 @@ final class slots_test extends \advanced_testcase {
      */
     public function test_sync_rejects_duplicate_slot(): void {
         $this->expectException(\coding_exception::class);
-        slots::sync($this->mavr, $this->context, [$this->binding(1, 'A'), $this->binding(1, 'B')]);
+        slots::sync($this->vrroom, $this->context, [$this->binding(1, 'A'), $this->binding(1, 'B')]);
     }
 
     /**
@@ -165,7 +165,7 @@ final class slots_test extends \advanced_testcase {
      */
     public function test_sync_rejects_bad_slot_number(): void {
         $this->expectException(\coding_exception::class);
-        slots::sync($this->mavr, $this->context, [$this->binding(0, 'A')]);
+        slots::sync($this->vrroom, $this->context, [$this->binding(0, 'A')]);
     }
 
     /**
@@ -175,20 +175,20 @@ final class slots_test extends \advanced_testcase {
         global $DB;
 
         // A second activity whose references must survive.
-        $othermodule = $this->getDataGenerator()->create_module('mavr', ['course' => $this->mavr->course]);
-        $othermavr = $DB->get_record('mavr', ['id' => $othermodule->id], '*', MUST_EXIST);
+        $othermodule = $this->getDataGenerator()->create_module('vrroom', ['course' => $this->vrroom->course]);
+        $othervrroom = $DB->get_record('vrroom', ['id' => $othermodule->id], '*', MUST_EXIST);
         $othercontext = \context_module::instance($othermodule->cmid);
-        slots::sync($othermavr, $othercontext, [$this->binding(1, 'C')]);
+        slots::sync($othervrroom, $othercontext, [$this->binding(1, 'C')]);
 
-        slots::sync($this->mavr, $this->context, [$this->binding(1, 'A'), $this->binding(2, 'B')]);
-        slots::delete_all($this->mavr, $this->context);
+        slots::sync($this->vrroom, $this->context, [$this->binding(1, 'A'), $this->binding(2, 'B')]);
+        slots::delete_all($this->vrroom, $this->context);
 
-        $this->assertFalse($DB->record_exists('mavr_slots', ['mavrid' => $this->mavr->id]));
+        $this->assertFalse($DB->record_exists('vrroom_slots', ['vrroomid' => $this->vrroom->id]));
         $this->assertSame([], $this->references());
-        $this->assertCount(1, slots::get_slots((int)$othermavr->id, $othercontext));
+        $this->assertCount(1, slots::get_slots((int)$othervrroom->id, $othercontext));
         $this->assertTrue($DB->record_exists('question_references', [
             'usingcontextid' => $othercontext->id,
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
         ]));
     }
 }

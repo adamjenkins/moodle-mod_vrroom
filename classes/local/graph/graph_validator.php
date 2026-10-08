@@ -15,31 +15,31 @@
 // along with Moodle.  If not, see <https://www.gnu.org/licenses/>.
 
 /**
- * Structural validator for mavr-graph/1 task graphs.
+ * Structural validator for vrroom-graph/1 task graphs.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-namespace mod_mavr\local\graph;
+namespace mod_vrroom\local\graph;
 
 /**
- * Structural validator for mavr-graph/1 task graphs (contract §4.4).
+ * Structural validator for vrroom-graph/1 task graphs (contract §4.4).
  *
- * The client validator validate() in mavrruntime_builtin/graph (runtime/builtin/amd/src/graph.js)
+ * The client validator validate() in vrroomruntime_builtin/graph (runtime/builtin/amd/src/graph.js)
  * applies the same checks in the same order and returns the same messages.
  *
  * Messages are developer-facing English (they describe a template's compile output, not user
  * input), so they are not lang strings; callers wrap the first one in the 'invalidgraph' string.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class graph_validator {
     /** @var string The only supported schema identifier. */
-    public const SCHEMA = 'mavr-graph/1';
+    public const SCHEMA = 'vrroom-graph/1';
 
     /** @var string Pattern for every id (objective, rule, zone, interactable, spawn, scene). */
     public const ID_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/D';
@@ -53,11 +53,11 @@ final class graph_validator {
     /** @var string[] Rule action kinds. */
     public const ACTIONS = ['show', 'hide', 'unlock', 'finish', 'teleport', 'play_media', 'open_question'];
 
-    /** @var string[] Short verbs of the mavr-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
+    /** @var string[] Short verbs of the vrroom-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
     public const VERBS = ['launched', 'initialized', 'terminated', 'entered', 'exited', 'interacted', 'answered',
         'completed', 'passed', 'failed', 'requested'];
 
-    /** @var string[] Object types of the mavr-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
+    /** @var string[] Object types of the vrroom-vocab/1 statement vocabulary (contract §4.3, Phase 2 §3.3). */
     public const OBJECT_TYPES = ['activity', 'scene', 'zone', 'object', 'question', 'objective', 'hint'];
 
     /** @var int Longest time limit in seconds (seven days). */
@@ -72,7 +72,7 @@ final class graph_validator {
     /**
      * Validate a decoded graph.
      *
-     * @param array $graph decoded mavr-graph/1 document (assoc arrays)
+     * @param array $graph decoded vrroom-graph/1 document (assoc arrays)
      * @return string[] developer-facing English errors; [] = valid.
      */
     public static function validate(array $graph): array {

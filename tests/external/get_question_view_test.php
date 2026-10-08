@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_api;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\attempt\event_store;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\attempt\event_store;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Tests of mod_mavr_get_question_view.
+ * Tests of mod_vrroom_get_question_view.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -45,7 +45,7 @@ final class get_question_view_test extends \advanced_testcase {
         $qgen = $generator->get_plugin_generator('core_question');
         $category = $qgen->create_question_category(['contextid' => \context_module::instance($qbank->cmid)->id]);
         $question = $qgen->create_question('truefalse', null, ['category' => $category->id]);
-        $module = $generator->create_module('mavr', [
+        $module = $generator->create_module('vrroom', [
             'course' => $course->id,
             'stations' => [
                 ['title' => 'Vase', 'text' => '<p>Vase</p>', 'questionbankentryid' => (int)$question->questionbankentryid,
@@ -180,7 +180,7 @@ final class get_question_view_test extends \advanced_testcase {
     }
 
     /**
-     * Without mod/mavr:attempt the view is refused.
+     * Without mod/vrroom:attempt the view is refused.
      *
      * @return void
      */
@@ -191,9 +191,9 @@ final class get_question_view_test extends \advanced_testcase {
 
         $context = \context_module::instance((int)$fx->module->cmid);
         $studentrole = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
-        assign_capability('mod/mavr:attempt', CAP_PROHIBIT, $studentrole, $context->id, true);
+        assign_capability('mod/vrroom:attempt', CAP_PROHIBIT, $studentrole, $context->id, true);
         accesslib_clear_all_caches_for_unit_testing();
-        $this->assertFalse(has_capability('mod/mavr:attempt', $context, $fx->student));
+        $this->assertFalse(has_capability('mod/vrroom:attempt', $context, $fx->student));
 
         $this->expectException(\required_capability_exception::class);
         get_question_view::execute((int)$fx->attempt->id, $fx->slot);

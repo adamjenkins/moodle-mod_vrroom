@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mod_mavr\external;
+namespace mod_vrroom\external;
 
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
-use mod_mavr\local\attempt\attempt_manager;
-use mod_mavr\local\instance_manager;
+use mod_vrroom\local\attempt\attempt_manager;
+use mod_vrroom\local\instance_manager;
 
 /**
- * Shared pieces of MAVR's external functions.
+ * Shared pieces of VR room's external functions.
  *
- * @package    mod_mavr
+ * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -75,8 +75,8 @@ final class helper {
      */
     public static function context_for_attempt(int $attemptid): \context_module {
         global $DB;
-        $mavrid = $DB->get_field('mavr_attempts', 'mavrid', ['id' => $attemptid], MUST_EXIST);
-        $cm = get_coursemodule_from_instance('mavr', $mavrid, 0, false, MUST_EXIST);
+        $vrroomid = $DB->get_field('vrroom_attempts', 'vrroomid', ['id' => $attemptid], MUST_EXIST);
+        $cm = get_coursemodule_from_instance('vrroom', $vrroomid, 0, false, MUST_EXIST);
         return \context_module::instance($cm->id);
     }
 
@@ -88,20 +88,20 @@ final class helper {
      *
      * @param int $attemptid
      * @param int $userid
-     * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, mavr, cm, context]
+     * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, vrroom, cm, context]
      * @throws \moodle_exception errornotyourattempt or a missing capability
      */
     public static function require_own_attempt(int $attemptid, int $userid): array {
         $attempt = attempt_manager::get_attempt($attemptid);
         if ((int)$attempt->userid !== $userid) {
-            throw new \moodle_exception('errornotyourattempt', 'mod_mavr');
+            throw new \moodle_exception('errornotyourattempt', 'mod_vrroom');
         }
-        [$mavr, $cm, $context] = attempt_manager::load_activity($attempt);
-        require_capability('mod/mavr:attempt', $context, $userid);
+        [$vrroom, $cm, $context] = attempt_manager::load_activity($attempt);
+        require_capability('mod/vrroom:attempt', $context, $userid);
         if (attempt_manager::close_if_overdue($attempt)) {
             $attempt = attempt_manager::get_attempt($attemptid);
         }
-        return [$attempt, $mavr, $cm, $context];
+        return [$attempt, $vrroom, $cm, $context];
     }
 
     /**
@@ -111,15 +111,15 @@ final class helper {
      *
      * @param \stdClass $attempt attempt row (open)
      * @param int $slot graph slot
-     * @return array{0: string, 1: array, 2: \mod_mavr\local\graph\evaluation_result} [status, objective, result]
+     * @return array{0: string, 1: array, 2: \mod_vrroom\local\graph\evaluation_result} [status, objective, result]
      * @throws \moodle_exception errorinvalidslot
      */
     public static function question_status(\stdClass $attempt, int $slot): array {
         $slotmap = json_decode((string)$attempt->slotmap, true) ?: [];
         if ($slot < 1 || !array_key_exists((string)$slot, $slotmap)) {
-            throw new \moodle_exception('errorinvalidslot', 'mod_mavr');
+            throw new \moodle_exception('errorinvalidslot', 'mod_vrroom');
         }
-        $graph = instance_manager::get_graph((int)$attempt->mavrid, (int)$attempt->graphversion);
+        $graph = instance_manager::get_graph((int)$attempt->vrroomid, (int)$attempt->graphversion);
         $objective = null;
         foreach ($graph['objectives'] ?? [] as $candidate) {
             if (($candidate['type'] ?? '') === 'answer_question' && (int)($candidate['slot'] ?? 0) === $slot) {
@@ -128,7 +128,7 @@ final class helper {
             }
         }
         if ($objective === null) {
-            throw new \moodle_exception('errorinvalidslot', 'mod_mavr');
+            throw new \moodle_exception('errorinvalidslot', 'mod_vrroom');
         }
         $result = attempt_manager::recompute($attempt);
         $status = (string)($result->objectives[(string)$objective['id']]['status'] ?? 'locked');

@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_escape;
+namespace vrroomtemplate_escape;
 
-use mod_mavr\local\graph\graph_validator;
-use mod_mavr\local\scene\scene_validator;
-use mod_mavr\local\template\compiled_activity;
+use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\scene_validator;
+use mod_vrroom\local\template\compiled_activity;
 
 /**
  * Tests for the Escape chain template: compile, config extraction, files, validation and remapping.
  *
- * @package    mavrtemplate_escape
+ * @package    vrroomtemplate_escape
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -34,7 +34,7 @@ final class template_test extends \advanced_testcase {
     private const SCENEID = '7a2e4c1d-3b5f-4e6a-8c9d-0f1e2d3c4b5a';
 
     /**
-     * A module context to hold mod_mavr file areas (compile only reads files from it).
+     * A module context to hold mod_vrroom file areas (compile only reads files from it).
      *
      * @return \context_module
      */
@@ -95,7 +95,7 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
-     * Store a file in a mod_mavr file area.
+     * Store a file in a mod_vrroom file area.
      *
      * @param \context_module $context
      * @param string $area
@@ -106,7 +106,7 @@ final class template_test extends \advanced_testcase {
     private function store_file(\context_module $context, string $area, int $itemid, string $filename, string $content): void {
         get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
             'filearea' => $area,
             'itemid' => $itemid,
             'filepath' => '/',
@@ -142,7 +142,7 @@ final class template_test extends \advanced_testcase {
      */
     private function cube(): string {
         global $CFG;
-        return file_get_contents($CFG->dirroot . '/mod/mavr/tests/fixtures/cube.glb');
+        return file_get_contents($CFG->dirroot . '/mod/vrroom/tests/fixtures/cube.glb');
     }
 
     /**
@@ -160,7 +160,7 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
-     * Assert the compiled scenes and graph pass the mod_mavr validators and survive JSON.
+     * Assert the compiled scenes and graph pass the mod_vrroom validators and survive JSON.
      *
      * @param compiled_activity $compiled
      */
@@ -180,10 +180,10 @@ final class template_test extends \advanced_testcase {
     public function test_basics(): void {
         $template = new template();
         $this->assertSame('escape', $template->get_name());
-        $this->assertSame('mavrtemplate_escape', $template->get_component());
+        $this->assertSame('vrroomtemplate_escape', $template->get_component());
         $this->assertSame(['completionobjectives'], $template->completion_rules());
         $this->assertSame(100, $template->default_grade());
-        $this->assertSame(get_string('chooserhelp', 'mavrtemplate_escape'), $template->get_chooser_help());
+        $this->assertSame(get_string('chooserhelp', 'vrroomtemplate_escape'), $template->get_chooser_help());
     }
 
     /**
@@ -198,7 +198,7 @@ final class template_test extends \advanced_testcase {
         $this->assertCount(1, $compiled->scenes);
         $scene = $compiled->scenes[0];
         $this->assertSame(self::SCENEID, $scene['id']);
-        $this->assertSame(get_string('scenename', 'mavrtemplate_escape'), $scene['name']);
+        $this->assertSame(get_string('scenename', 'vrroomtemplate_escape'), $scene['name']);
         $this->assertSame('preset', $scene['environment']['type']);
         $this->assertSame('escape-room', $scene['environment']['preset']);
         $this->assertSame('#101215', $scene['environment']['sky']);
@@ -248,10 +248,10 @@ final class template_test extends \advanced_testcase {
 
         $door = $items['d-exit'];
         $this->assertSame('hotspot', $door['kind']);
-        $this->assertSame(get_string('exitdoor', 'mavrtemplate_escape'), $door['name']);
+        $this->assertSame(get_string('exitdoor', 'vrroomtemplate_escape'), $door['name']);
         $this->assertSame([0.0, 1.3, -5.3], $door['position']);
         $this->assertArrayNotHasKey('zone', $door);
-        $this->assertSame('<p>' . s(get_string('exittext', 'mavrtemplate_escape')) . '</p>', $door['content']['text']);
+        $this->assertSame('<p>' . s(get_string('exittext', 'vrroomtemplate_escape')) . '</p>', $door['content']['text']);
         $this->assertSame('1', $door['content']['textformat']);
 
         $story = $items['t-story'];
@@ -259,7 +259,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame('You are locked in the lab.', $story['text']);
         $this->assertSame([0.0, 2.2, 2.6], $story['position']);
         $this->assertEquals(2.4, $story['width']);
-        $this->assertSame(get_string('storyname', 'mavrtemplate_escape'), $story['name']);
+        $this->assertSame(get_string('storyname', 'vrroomtemplate_escape'), $story['name']);
     }
 
     /**
@@ -271,7 +271,7 @@ final class template_test extends \advanced_testcase {
         $compiled = (new template())->compile($this->chain_config(), $context);
         $graph = $compiled->graph;
 
-        $this->assertSame('mavr-graph/1', $graph['schema']);
+        $this->assertSame('vrroom-graph/1', $graph['schema']);
         $this->assertSame(900, $graph['timelimit']);
         $this->assertSame(['k-desk', 'd-exit'], $graph['hidden']);
 
@@ -286,13 +286,13 @@ final class template_test extends \advanced_testcase {
         $this->assertTrue($objectives['v-desk']['required']);
         $this->assertArrayNotHasKey('unlock', $objectives['v-desk']);
         $this->assertArrayNotHasKey('hints', $objectives['v-desk']);
-        $this->assertSame(get_string('objectivefind', 'mavrtemplate_escape', 'Desk'), $objectives['v-desk']['title']);
+        $this->assertSame(get_string('objectivefind', 'vrroomtemplate_escape', 'Desk'), $objectives['v-desk']['title']);
 
         $this->assertSame('interact', $objectives['x-desk']['type']);
         $this->assertSame('k-desk', $objectives['x-desk']['target']);
         $this->assertEquals(2, $objectives['x-desk']['points']);
         $this->assertSame(['after' => ['v-desk']], $objectives['x-desk']['unlock']);
-        $this->assertSame(get_string('objectivekey', 'mavrtemplate_escape', 'Brass key'), $objectives['x-desk']['title']);
+        $this->assertSame(get_string('objectivekey', 'vrroomtemplate_escape', 'Brass key'), $objectives['x-desk']['title']);
         $this->assertSame(
             [['id' => 'hn-desk-1', 'text' => 'Look on the desk.', 'penalty' => 0.5]],
             $objectives['x-desk']['hints']
@@ -305,7 +305,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(1, $objectives['x-safe']['pass_fraction']);
         $this->assertEquals(3, $objectives['x-safe']['points']);
         $this->assertSame(['after' => ['v-safe']], $objectives['x-safe']['unlock']);
-        $this->assertSame(get_string('objectivecode', 'mavrtemplate_escape', 'Safe'), $objectives['x-safe']['title']);
+        $this->assertSame(get_string('objectivecode', 'vrroomtemplate_escape', 'Safe'), $objectives['x-safe']['title']);
         $this->assertSame(['hn-safe-1', 'hn-safe-2'], array_column($objectives['x-safe']['hints'], 'id'));
 
         // No lock: the visit is the solve and carries the points and hints.
@@ -321,7 +321,7 @@ final class template_test extends \advanced_testcase {
         $this->assertEquals(0, $objectives['o-exit']['points']);
         $this->assertTrue($objectives['o-exit']['required']);
         $this->assertSame(['after' => ['x-desk', 'x-safe', 'v-hall']], $objectives['o-exit']['unlock']);
-        $this->assertSame(get_string('objectiveexit', 'mavrtemplate_escape'), $objectives['o-exit']['title']);
+        $this->assertSame(get_string('objectiveexit', 'vrroomtemplate_escape'), $objectives['o-exit']['title']);
 
         $rules = $this->by_id($graph['rules']);
         $this->assertSame(['r-show-desk', 'r-take-desk', 'r-open-safe', 'r-exit', 'r-finish'], array_keys($rules));
@@ -378,8 +378,8 @@ final class template_test extends \advanced_testcase {
         // An empty key name falls back to the default name.
         $this->assertSame(get_string(
             'objectivekey',
-            'mavrtemplate_escape',
-            get_string('keyname_default', 'mavrtemplate_escape')
+            'vrroomtemplate_escape',
+            get_string('keyname_default', 'vrroomtemplate_escape')
         ), $objectives['x-pz2']['title']);
 
         $items = $this->by_id($compiled->scenes[0]['interactables']);
@@ -532,7 +532,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(3, $hall->fileitemid);
         $this->assertSame('model', $hall->cluemedia);
         $this->assertSame('none', $hall->locktype);
-        $this->assertSame(get_string('keyname_default', 'mavrtemplate_escape'), $hall->keyname);
+        $this->assertSame(get_string('keyname_default', 'vrroomtemplate_escape'), $hall->keyname);
         $this->assertSame([], $hall->hints);
         $this->assertEquals(0.5, $hall->points);
 
@@ -552,7 +552,7 @@ final class template_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $stored = $this->make_config([['id' => 'keepme', 'title' => 'Old']]);
-        $mavrid = $DB->insert_record('mavr', (object)[
+        $vrroomid = $DB->insert_record('vrroom', (object)[
             'course' => $course->id,
             'name' => 'Escape',
             'runtime' => 'builtin',
@@ -563,7 +563,7 @@ final class template_test extends \advanced_testcase {
         ]);
 
         $formdata = (object)[
-            'instance' => $mavrid,
+            'instance' => $vrroomid,
             'escape_environment' => 'escape-room',
             'escape_puzzleid' => ['keepme', 'keepme'],
             'escape_title' => ['Renamed', 'Copy'],
@@ -595,18 +595,18 @@ final class template_test extends \advanced_testcase {
             'escape_cluemodel' => [0, 0, $this->make_draft('cube.glb', $this->cube())],
         ], $context);
 
-        $this->assertFalse($fs->is_area_empty($context->id, 'mod_mavr', 'media', 1));
+        $this->assertFalse($fs->is_area_empty($context->id, 'mod_vrroom', 'media', 1));
         // The blank row is skipped, so the cube belongs to puzzle 2.
-        $this->assertFalse($fs->is_area_empty($context->id, 'mod_mavr', 'models', 2));
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'models', 3));
+        $this->assertFalse($fs->is_area_empty($context->id, 'mod_vrroom', 'models', 2));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'models', 3));
 
         // Now one puzzle, text only: everything else is removed.
         $template->save_files((object)[
             'escape_title' => ['Note'],
             'escape_cluemedia' => ['none'],
         ], $context);
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'media'));
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'models'));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'media'));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'models'));
     }
 
     /**
@@ -647,7 +647,7 @@ final class template_test extends \advanced_testcase {
         $courseid = (int)$course->id;
         $template = new template();
         $qbeid = $this->create_question_entry($course);
-        $component = 'mavrtemplate_escape';
+        $component = 'vrroomtemplate_escape';
 
         // Unknown room.
         $errors = $template->validation(['escape_environment' => 'moon-base', 'escape_title' => ['A']], [], $courseid);
@@ -685,11 +685,11 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(get_string('errormodelrequired', $component), $errors['escape_cluemodel[1]']);
         $this->assertSame(get_string('errorpoints', $component), $errors['escape_points[2]']);
         $this->assertSame(get_string('errorquestionrequired', $component), $errors['escape_question[3]']);
-        $this->assertSame(get_string('errorquestionnotfound', 'mod_mavr'), $errors['escape_question[5]']);
+        $this->assertSame(get_string('errorquestionnotfound', 'mod_vrroom'), $errors['escape_question[5]']);
         $this->assertSame(get_string('errortitlerequired', $component), $errors['escape_title[6]']);
         // The first use of a question is fine; the second is the duplicate.
         $this->assertArrayNotHasKey('escape_question[4]', $errors);
-        $this->assertSame(get_string('errorquestionduplicate', 'mod_mavr'), $errors['escape_question[7]']);
+        $this->assertSame(get_string('errorquestionduplicate', 'mod_vrroom'), $errors['escape_question[7]']);
         $this->assertArrayNotHasKey('escape_environment', $errors);
     }
 
@@ -714,22 +714,22 @@ final class template_test extends \advanced_testcase {
     public function test_form_for_existing_activity(): void {
         global $CFG, $PAGE;
         require_once($CFG->dirroot . '/course/modlib.php');
-        require_once($CFG->dirroot . '/mod/mavr/mod_form.php');
+        require_once($CFG->dirroot . '/mod/vrroom/mod_form.php');
         $this->resetAfterTest();
         $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
         $PAGE->set_url('/course/modedit.php');
-        $mavr = $this->getDataGenerator()->create_module('mavr', [
+        $vrroom = $this->getDataGenerator()->create_module('vrroom', [
             'course' => $course->id,
             'template' => 'escape',
             'puzzletitles' => 'Desk|Safe',
             'puzzlelocks' => 'key|none',
         ]);
-        $cm = get_coursemodule_from_instance('mavr', $mavr->id, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, 0, false, MUST_EXIST);
         [$cm, , , $data, $cw] = get_moduleinfo_data($cm, $course);
-        $form = new \mod_mavr_mod_form($data, $cw->section, $cm, $course);
+        $form = new \mod_vrroom_mod_form($data, $cw->section, $cm, $course);
         $form->set_data($data);
         $html = $form->render();
 
@@ -740,7 +740,7 @@ final class template_test extends \advanced_testcase {
         $this->assertStringContainsString('value="Safe"', $html);
         $this->assertStringContainsString('name="escape_addpuzzles"', $html);
         $this->assertStringNotContainsString('gallery_', $html);
-        $this->assertStringContainsString(get_string('templatelocked', 'mavr'), $html);
+        $this->assertStringContainsString(get_string('templatelocked', 'vrroom'), $html);
 
         // The stored lock types beat the repeat_elements() default (key): Safe keeps "no lock".
         $dom = new \DOMDocument();

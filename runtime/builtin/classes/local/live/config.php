@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrruntime_builtin\local\live;
+namespace vrroomruntime_builtin\local\live;
 
 /**
  * Site settings of live mode: whether it is on, the STUN and TURN servers, TURN credentials.
@@ -22,13 +22,13 @@ namespace mavrruntime_builtin\local\live;
  * TURN credentials follow the TURN REST API scheme: the username is "<expiry>:<peer id>" and the
  * credential is base64(HMAC-SHA1(secret, username)). The shared secret never leaves the server.
  *
- * @package    mavrruntime_builtin
+ * @package    vrroomruntime_builtin
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class config {
     /** @var string Component that owns the settings. */
-    public const COMPONENT = 'mavrruntime_builtin';
+    public const COMPONENT = 'vrroomruntime_builtin';
 
     /** @var int Most URLs accepted in one STUN or TURN list. */
     public const MAX_ICE_URLS = 10;

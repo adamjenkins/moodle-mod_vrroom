@@ -14,15 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace mavrtemplate_gallery;
+namespace vrroomtemplate_gallery;
 
-use mod_mavr\local\graph\graph_validator;
-use mod_mavr\local\scene\scene_validator;
+use mod_vrroom\local\graph\graph_validator;
+use mod_vrroom\local\scene\scene_validator;
 
 /**
  * Tests for the Gallery walk template: config extraction, files, validation and compile.
  *
- * @package    mavrtemplate_gallery
+ * @package    vrroomtemplate_gallery
  * @category   test
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -33,7 +33,7 @@ final class template_test extends \advanced_testcase {
     private const SCENEID = '5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11';
 
     /**
-     * A module context to hold mod_mavr file areas (compile only reads files from it).
+     * A module context to hold mod_vrroom file areas (compile only reads files from it).
      *
      * @return \context_module
      */
@@ -76,7 +76,7 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
-     * Store a file in a mod_mavr file area.
+     * Store a file in a mod_vrroom file area.
      *
      * @param \context_module $context
      * @param string $area
@@ -87,7 +87,7 @@ final class template_test extends \advanced_testcase {
     private function store_file(\context_module $context, string $area, int $itemid, string $filename, string $content): void {
         get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
-            'component' => 'mod_mavr',
+            'component' => 'mod_vrroom',
             'filearea' => $area,
             'itemid' => $itemid,
             'filepath' => '/',
@@ -123,7 +123,7 @@ final class template_test extends \advanced_testcase {
      */
     private function cube(): string {
         global $CFG;
-        return file_get_contents($CFG->dirroot . '/mod/mavr/tests/fixtures/cube.glb');
+        return file_get_contents($CFG->dirroot . '/mod/vrroom/tests/fixtures/cube.glb');
     }
 
     /**
@@ -141,11 +141,11 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
-     * Assert the compiled scenes and graph pass the mod_mavr validators.
+     * Assert the compiled scenes and graph pass the mod_vrroom validators.
      *
-     * @param \mod_mavr\local\template\compiled_activity $compiled
+     * @param \mod_vrroom\local\template\compiled_activity $compiled
      */
-    private function assert_valid(\mod_mavr\local\template\compiled_activity $compiled): void {
+    private function assert_valid(\mod_vrroom\local\template\compiled_activity $compiled): void {
         foreach ($compiled->scenes as $scene) {
             $this->assertSame([], scene_validator::validate($scene));
         }
@@ -181,7 +181,7 @@ final class template_test extends \advanced_testcase {
 
         $this->assertCount(1, $compiled->scenes);
         $scene = $compiled->scenes[0];
-        $this->assertSame('mavr-scene/1', $scene['schema']);
+        $this->assertSame('vrroom-scene/1', $scene['schema']);
         $this->assertSame(self::SCENEID, $scene['id']);
         $this->assertSame('preset', $scene['environment']['type']);
         $this->assertSame('gallery-hall', $scene['environment']['preset']);
@@ -210,7 +210,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame([], $scene['props']);
 
         $graph = $compiled->graph;
-        $this->assertSame('mavr-graph/1', $graph['schema']);
+        $this->assertSame('vrroom-graph/1', $graph['schema']);
         $objectives = $this->by_id($graph['objectives']);
         $this->assertSame(['v-st1', 'q-st1', 'v-st2', 'v-st3', 'q-st3'], array_keys($objectives));
 
@@ -220,7 +220,7 @@ final class template_test extends \advanced_testcase {
         $this->assertEquals(0, $objectives['v-st1']['points']);
         $this->assertTrue($objectives['v-st1']['required']);
         $this->assertArrayNotHasKey('unlock', $objectives['v-st1']);
-        $this->assertSame(get_string('objectivevisit', 'mavrtemplate_gallery', 'The Vase'), $objectives['v-st1']['title']);
+        $this->assertSame(get_string('objectivevisit', 'vrroomtemplate_gallery', 'The Vase'), $objectives['v-st1']['title']);
 
         $this->assertSame('answer_question', $objectives['q-st1']['type']);
         $this->assertSame(1, $objectives['q-st1']['slot']);
@@ -281,7 +281,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(['v-st1', 'v-st2', 'v-st3'], $objectives['s-order']['steps']);
         $this->assertFalse($objectives['s-order']['required']);
         $this->assertEquals(0, $objectives['s-order']['points']);
-        $this->assertSame(get_string('objectiveordered', 'mavrtemplate_gallery'), $objectives['s-order']['title']);
+        $this->assertSame(get_string('objectiveordered', 'vrroomtemplate_gallery'), $objectives['s-order']['title']);
 
         $this->assertSame(
             [['slot' => 1, 'questionbankentryid' => 55, 'maxmark' => 1.0, 'objectiveid' => 'q-st2']],
@@ -459,7 +459,7 @@ final class template_test extends \advanced_testcase {
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
         $stored = $this->make_config([['id' => 'keepme', 'title' => 'Old']]);
-        $mavrid = $DB->insert_record('mavr', (object)[
+        $vrroomid = $DB->insert_record('vrroom', (object)[
             'course' => $course->id,
             'name' => 'Gallery',
             'runtime' => 'builtin',
@@ -470,7 +470,7 @@ final class template_test extends \advanced_testcase {
         ]);
 
         $formdata = (object)[
-            'instance' => $mavrid,
+            'instance' => $vrroomid,
             'gallery_environment' => 'gallery-hall',
             'gallery_ordered' => 0,
             'gallery_stationid' => ['keepme', 'keepme'],
@@ -510,11 +510,11 @@ final class template_test extends \advanced_testcase {
         $template = new template();
         $template->save_files($formdata, $context);
 
-        $this->assertFalse($fs->is_area_empty($context->id, 'mod_mavr', 'environment', 0));
-        $this->assertFalse($fs->is_area_empty($context->id, 'mod_mavr', 'models', 1));
+        $this->assertFalse($fs->is_area_empty($context->id, 'mod_vrroom', 'environment', 0));
+        $this->assertFalse($fs->is_area_empty($context->id, 'mod_vrroom', 'models', 1));
         // The blank row is skipped, so the picture belongs to station 2.
-        $this->assertFalse($fs->is_area_empty($context->id, 'mod_mavr', 'media', 2));
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'media', 3));
+        $this->assertFalse($fs->is_area_empty($context->id, 'mod_vrroom', 'media', 2));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'media', 3));
 
         // Now one station, text only, bundled environment: everything else is removed.
         $template->save_files((object)[
@@ -522,9 +522,9 @@ final class template_test extends \advanced_testcase {
             'gallery_title' => ['Cube'],
             'gallery_mediatype' => ['none'],
         ], $context);
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'environment'));
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'models'));
-        $this->assertTrue($fs->is_area_empty($context->id, 'mod_mavr', 'media'));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'environment'));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'models'));
+        $this->assertTrue($fs->is_area_empty($context->id, 'mod_vrroom', 'media'));
     }
 
     /**
@@ -562,7 +562,7 @@ final class template_test extends \advanced_testcase {
         $courseid = (int)$course->id;
         $template = new template();
         $qbeid = $this->create_question_entry($course);
-        $component = 'mavrtemplate_gallery';
+        $component = 'vrroomtemplate_gallery';
 
         // No stations at all.
         $errors = $template->validation(['gallery_environment' => 'gallery-hall', 'gallery_title' => ['', '']], [], $courseid);
@@ -597,8 +597,8 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(get_string('errormodelrequired', $component), $errors['gallery_model[0]']);
         $this->assertSame(get_string('errorimagerequired', $component), $errors['gallery_image[1]']);
         $this->assertSame(get_string('errorpoints', $component), $errors['gallery_points[2]']);
-        $this->assertSame(get_string('errorquestionduplicate', 'mod_mavr'), $errors['gallery_question[3]']);
-        $this->assertSame(get_string('errorquestionnotfound', 'mod_mavr'), $errors['gallery_question[4]']);
+        $this->assertSame(get_string('errorquestionduplicate', 'mod_vrroom'), $errors['gallery_question[3]']);
+        $this->assertSame(get_string('errorquestionnotfound', 'mod_vrroom'), $errors['gallery_question[4]']);
         $this->assertSame(get_string('errortitlerequired', $component), $errors['gallery_title[5]']);
         $this->assertArrayNotHasKey('gallery_question[0]', $errors);
         $this->assertArrayNotHasKey('gallery_environment', $errors);
@@ -610,22 +610,22 @@ final class template_test extends \advanced_testcase {
     public function test_form_for_existing_activity(): void {
         global $CFG, $PAGE;
         require_once($CFG->dirroot . '/course/modlib.php');
-        require_once($CFG->dirroot . '/mod/mavr/mod_form.php');
+        require_once($CFG->dirroot . '/mod/vrroom/mod_form.php');
         $this->resetAfterTest();
         $this->setAdminUser();
 
         $course = $this->getDataGenerator()->create_course();
         $PAGE->set_course($course);
         $PAGE->set_url('/course/modedit.php');
-        $mavr = $this->getDataGenerator()->create_module('mavr', [
+        $vrroom = $this->getDataGenerator()->create_module('vrroom', [
             'course' => $course->id,
             'stationtitles' => 'Vase|Portrait',
             'stationrequired' => '1|0',
             'stationpoints' => '1|2',
         ]);
-        $cm = get_coursemodule_from_instance('mavr', $mavr->id, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, 0, false, MUST_EXIST);
         [$cm, , , $data, $cw] = get_moduleinfo_data($cm, $course);
-        $form = new \mod_mavr_mod_form($data, $cw->section, $cm, $course);
+        $form = new \mod_vrroom_mod_form($data, $cw->section, $cm, $course);
         $form->set_data($data);
         $html = $form->render();
 
@@ -688,7 +688,7 @@ final class template_test extends \advanced_testcase {
      * The chooser help comes from the template's own string.
      */
     public function test_chooser_help(): void {
-        $this->assertSame(get_string('chooserhelp', 'mavrtemplate_gallery'), (new template())->get_chooser_help());
+        $this->assertSame(get_string('chooserhelp', 'vrroomtemplate_gallery'), (new template())->get_chooser_help());
     }
 
     /**
