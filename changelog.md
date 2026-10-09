@@ -45,6 +45,9 @@ All notable changes to this plugin are documented here. The format follows
 - GitHub Actions workflow (Moodle 5.3; PHP 8.3 + MariaDB 11.4, PHP 8.4 + PostgreSQL 17), with
   extra steps for the bundled sub-plugins' PHPUnit suites and the built-in run mode's AMD lint and
   build check, and the JavaScript fixture tests.
+- CI checks for development leftovers (TODO, `@testme`, merge conflict markers), for the files every
+  plugin and bundled sub-plugin must ship, and for pending or undefined Behat steps; a newer push
+  cancels the run still going for the older one.
 - Live mode for the built-in run mode (activity setting *Live mode*, 2 to 6 people per room):
   avatars with head and hand poses, positional voice with mute, push to talk and per-person mute,
   and a participant list. Browser-to-browser WebRTC with signalling relayed by Moodle web services

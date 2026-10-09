@@ -1,9 +1,17 @@
+# The concurrency block, the development leftover check, the codebase completeness check and the
+# strict Behat check follow ideas from the moodle-workflows collection of Moodle an Hochschulen e.V.
+# (https://github.com/moodle-an-hochschulen/moodle-workflows), re-implemented here.
 name: Moodle Plugin CI
 
 on: [push, pull_request]
 
 permissions:
   contents: read
+
+# A newer push to the same branch or pull request cancels the run still going for the older one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -88,6 +96,44 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpdoc --max-warnings 0
 
+      - name: Development leftover check
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          # Code files only; vendored libraries (thirdpartylibs.xml) and generated amd/build are not our code.
+          if grep -rnE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=build \
+              --include='*.php' --include='*.js' --include='*.mjs' --include='*.mustache' --include='*.feature' \
+              --include='*.xml' --include='*.json' --include='*.scss' --include='*.css' \
+              --exclude=three.js --exclude=mozlightmap.js \
+              -e '@testme' -e 'TODO' -e '^<<<<<<< ' -e '^>>>>>>> ' .; then
+            echo "::error::Development leftovers found (TODO, @testme or merge conflict markers)."
+            exit 1
+          fi
+          echo "No development leftovers found."
+
+      # The main plugin and each bundled sub-plugin must ship a version.php, its English language
+      # file and a privacy provider; the repository a licence (LICENSE or COPYING.txt) and a README.
+      - name: Codebase completeness check
+        if: ${{ !cancelled() }}
+        working-directory: plugin
+        run: |
+          missing=0
+          need() { if [ ! -f "$1" ]; then echo "::error file=$1::Missing $1"; missing=1; fi; }
+          [ -f LICENSE ] || [ -f COPYING.txt ] || { echo "::error::Missing LICENSE or COPYING.txt"; missing=1; }
+          need README.md
+          for dir in . runtime/* template/*; do
+            [ -f "$dir/version.php" ] || { [ "$dir" = . ] && need version.php; continue; }
+            component=$(grep -oP "\\\$plugin->component\s*=\s*'\K[a-z0-9_]+" "$dir/version.php")
+            if [ -z "$component" ]; then
+              echo "::error file=$dir/version.php::No \$plugin->component"; missing=1; continue
+            fi
+            # An activity module's language file drops the mod_ prefix.
+            need "$dir/lang/en/${component#mod_}.php"
+            need "$dir/classes/privacy/provider.php"
+            echo "$component: checked"
+          done
+          exit $missing
+
       - name: Validating
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci validate
@@ -147,7 +193,29 @@ jobs:
       - name: Behat features
         id: behat
         if: ${{ !cancelled() }}
-        run: moodle-plugin-ci behat --profile chrome --scss-deprecations --tags="@mod_vrroom&&~@mod_vrroom_webgl"
+        run: |
+          set -o pipefail
+          moodle-plugin-ci behat --profile chrome --scss-deprecations --tags="@mod_vrroom&&~@mod_vrroom_webgl" \
+            2>&1 | tee "${{ runner.temp }}/behat-output.log"
+
+      # Behat exits 0 when a step is pending (e.g. a generator entity it does not know) or undefined
+      # (no step definition): the scenario is skipped and the run stays green. Fail on those, and on
+      # a run that found no scenarios at all.
+      - name: Check for pending or undefined Behat steps
+        if: ${{ !cancelled() && steps.behat.outcome == 'success' }}
+        run: |
+          log="${{ runner.temp }}/behat-output.log"
+          summary=$(grep -E '^[0-9]+ (scenarios?|steps?) \(' "$log" || true)
+          echo "$summary"
+          if [ -z "$summary" ]; then
+            echo "::error::No Behat summary found: no scenarios ran."
+            exit 1
+          fi
+          if echo "$summary" | grep -qE 'pending|undefined'; then
+            awk '/^--- (Pending|Undefined) steps:/ { p = 1 } /^[0-9]+ scenarios? \(/ { p = 0 } p' "$log"
+            echo "::error::Behat reported pending or undefined steps."
+            exit 1
+          fi
 
       - name: Upload Behat Faildump
         if: ${{ failure() && steps.behat.outcome == 'failure' }}
