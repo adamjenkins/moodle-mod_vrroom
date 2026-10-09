@@ -305,7 +305,7 @@ function vrroom_pluginfile($course, $cm, $context, $filearea, $args, $forcedownl
     require_login($course, true, $cm);
     require_capability('mod/vrroom:view', $context);
 
-    if (!in_array($filearea, ['models', 'media', 'environment', 'assets'], true)) {
+    if (!\mod_vrroom\local\file_serving::is_served_filearea($filearea)) {
         return false;
     }
 
@@ -322,8 +322,7 @@ function vrroom_pluginfile($course, $cm, $context, $filearea, $args, $forcedownl
         return false;
     }
 
-    $inline = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-    $force = !in_array($file->get_mimetype(), $inline, true) || $forcedownload;
+    $force = \mod_vrroom\local\file_serving::force_download((string)$file->get_mimetype(), (bool)$forcedownload);
     send_stored_file($file, null, 0, $force, $options);
 }
 

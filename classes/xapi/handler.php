@@ -36,9 +36,10 @@ use mod_vrroom\local\xapi\iri;
  * must be theirs); the object must belong to the attempt's activity and exist in its scenes;
  * the attempt must be open; only client verbs are accepted; an event whose objective is still
  * locked on the server is rejected; a resent statement id is accepted once and ignored after;
- * batch size and per-attempt volume are limited; a statement for an attempt whose time ran out
- * is refused and the attempt is finished. Accepted statements are labelled
- * client-asserted. Results sent by a client are ignored.
+ * batch size and per-attempt volume are limited (the volume under a per-attempt lock); a statement
+ * for an attempt whose time ran out is refused and the attempt is finished; a user who can no
+ * longer see the activity or is no longer actively enrolled is refused, as validate_context would.
+ * Accepted statements are labelled client-asserted. Results sent by a client are ignored.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -50,6 +51,9 @@ class handler extends \core_xapi\handler {
 
     /** @var int Seconds a client timestamp may lie outside the attempt window. */
     private const CLOCK_SKEW = 60;
+
+    /** @var int Seconds to wait for the per-attempt events lock. */
+    private const LOCK_TIMEOUT = 5;
 
     /** @var array Per-batch cache: attempt id => attempt row or false. */
     private array $attempts = [];
@@ -63,8 +67,8 @@ class handler extends \core_xapi\handler {
     /** @var array Per-batch cache: attempt id => §4.4.1 events so far. */
     private array $events = [];
 
-    /** @var array Per-batch cache: attempt id => stored row count. */
-    private array $counts = [];
+    /** @var array Per-request cache: "cmid:userid" => whether the user may still use the activity. */
+    private array $access = [];
 
     /**
      * Not used: process_statements() is overridden and stores statements itself.
@@ -129,7 +133,8 @@ class handler extends \core_xapi\handler {
         if (!$cm) {
             return false;
         }
-        return has_capability('mod/vrroom:attempt', $context, $state->get_user());
+        $userid = (int)$state->get_user()->id;
+        return has_capability('mod/vrroom:attempt', $context, $userid) && $this->can_access($cm, $userid);
     }
 
     /**
@@ -174,11 +179,14 @@ class handler extends \core_xapi\handler {
         if (attempt_manager::is_overdue($attempt)) {
             // Nothing is accepted after the deadline; the attempt is finished instead.
             attempt_manager::close_if_overdue($attempt);
-            unset($this->attempts[$attemptid], $this->events[$attemptid], $this->counts[$attemptid], $touched[$attemptid]);
+            unset($this->attempts[$attemptid], $this->events[$attemptid], $touched[$attemptid]);
             return false;
         }
         $activity = $this->get_activity($attempt);
         if (!$activity || !has_capability('mod/vrroom:attempt', $activity['context'], $userid)) {
+            return false;
+        }
+        if (!$this->can_access($activity['cm'], $userid)) {
             return false;
         }
 
@@ -201,12 +209,6 @@ class handler extends \core_xapi\handler {
         if ($limit <= 0) {
             $limit = 5000;
         }
-        if (!isset($this->counts[$attemptid])) {
-            $this->counts[$attemptid] = event_store::count($attemptid);
-        }
-        if ($this->counts[$attemptid] >= $limit) {
-            return false;
-        }
 
         $event = [
             'verb' => $verb,
@@ -226,15 +228,26 @@ class handler extends \core_xapi\handler {
         }
 
         $timestamp = $this->clamp_timestamp($statement->get_timestamp(), (int)$attempt->timestart);
+
+        // The volume limit is a hard cap: count and insert under a per-attempt lock, so parallel
+        // requests of the same attempt cannot each pass the count with a stale value.
+        $lock = \core\lock\lock_config::get_lock_factory('mod_vrroom')->get_lock('events_' . $attemptid, self::LOCK_TIMEOUT);
+        if (!$lock) {
+            return false;
+        }
         try {
+            if (event_store::count($attemptid) >= $limit) {
+                return false;
+            }
             $rowid = event_store::insert($attemptid, $statementid, $event, true, null, $timestamp);
         } catch (\dml_exception $e) {
             // A concurrent request stored the same statement id first.
             return event_store::exists($statementid) && $this->owns_statement($statementid, $userid);
+        } finally {
+            $lock->release();
         }
 
         $this->events[$attemptid][] = $event;
-        $this->counts[$attemptid]++;
         $touched[$attemptid] = $attempt;
 
         statement_recorded::create([
@@ -266,6 +279,55 @@ class handler extends \core_xapi\handler {
               WHERE e.statementid = :sid AND a.userid = :userid',
             ['sid' => $statementid, 'userid' => $userid]
         );
+    }
+
+    /**
+     * Whether the user may still use the activity, as validate_context would decide (cached per request).
+     *
+     * The capability alone ignores a hidden or restricted activity and a suspended or ended
+     * enrolment, so the activity must be visible to the user and the user must be actively
+     * enrolled (or viewing the course without enrolment) in a course they can see.
+     *
+     * @param \stdClass $cm course module row (id, course)
+     * @param int $userid
+     * @return bool
+     */
+    private function can_access(\stdClass $cm, int $userid): bool {
+        $key = (int)$cm->id . ':' . $userid;
+        if (!array_key_exists($key, $this->access)) {
+            $this->access[$key] = $this->check_access((int)$cm->course, (int)$cm->id, $userid);
+        }
+        return $this->access[$key];
+    }
+
+    /**
+     * Uncached access check of can_access().
+     *
+     * @param int $courseid
+     * @param int $cmid
+     * @param int $userid
+     * @return bool
+     */
+    private function check_access(int $courseid, int $cmid, int $userid): bool {
+        try {
+            $modinfo = get_fast_modinfo($courseid, $userid);
+            $cm = $modinfo->get_cm($cmid);
+        } catch (\moodle_exception $e) {
+            return false;
+        }
+        if (!$cm->uservisible) {
+            return false;
+        }
+        if ($courseid === (int)SITEID) {
+            // Front page activities need no enrolment.
+            return true;
+        }
+        $course = $modinfo->get_course();
+        $coursecontext = \context_course::instance($courseid);
+        if (!$course->visible && !has_capability('moodle/course:viewhiddencourses', $coursecontext, $userid)) {
+            return false;
+        }
+        return is_enrolled($coursecontext, $userid, '', true) || is_viewing($coursecontext, $userid);
     }
 
     /**
@@ -391,6 +453,6 @@ class handler extends \core_xapi\handler {
         $this->activities = [];
         $this->evaluators = [];
         $this->events = [];
-        $this->counts = [];
+        $this->access = [];
     }
 }

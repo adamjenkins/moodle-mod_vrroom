@@ -67,13 +67,18 @@ class provider implements
             'userid' => 'privacy:metadata:peers:userid',
             'groupid' => 'privacy:metadata:peers:groupid',
             'room' => 'privacy:metadata:peers:room',
+            'peerid' => 'privacy:metadata:peers:peerid',
+            'kind' => 'privacy:metadata:peers:kind',
+            'attemptid' => 'privacy:metadata:peers:attemptid',
             'timejoined' => 'privacy:metadata:peers:timejoined',
             'timeseen' => 'privacy:metadata:peers:timeseen',
+            'lastsignal' => 'privacy:metadata:peers:lastsignal',
         ], 'privacy:metadata:peers');
 
         $collection->add_database_table(self::TABLE_SIGNALS, [
             'frompeer' => 'privacy:metadata:signals:frompeer',
             'topeer' => 'privacy:metadata:signals:topeer',
+            'type' => 'privacy:metadata:signals:type',
             'payload' => 'privacy:metadata:signals:payload',
             'timecreated' => 'privacy:metadata:signals:timecreated',
         ], 'privacy:metadata:signals');
@@ -134,7 +139,8 @@ class provider implements
     }
 
     /**
-     * Export the user's presence and the connection messages the user's browser sent.
+     * Export the user's presence, the connection messages the user's browser sent and, without
+     * their payload (the sender's data), the messages waiting to be delivered to the user.
      *
      * @param approved_contextlist $contextlist the approved contexts
      * @return void
@@ -160,9 +166,12 @@ class provider implements
                 $presence[] = (object)[
                     'groupid' => (int)$peer->groupid,
                     'room' => (int)$peer->room,
+                    'peerid' => (string)$peer->peerid,
                     'kind' => (string)$peer->kind,
+                    'attemptid' => (int)$peer->attemptid,
                     'timejoined' => transform::datetime($peer->timejoined),
                     'timeseen' => transform::datetime($peer->timeseen),
+                    'lastsignal' => empty($peer->lastsignal) ? null : transform::datetime($peer->lastsignal),
                 ];
             }
 
@@ -173,19 +182,36 @@ class provider implements
                 "vrroomid = :vrroomid AND frompeer {$insql}",
                 ['vrroomid' => $vrroomid] + $inparams,
                 'id ASC',
-                'id, type, payload, timecreated'
+                'id, topeer, type, payload, timecreated'
             );
             foreach ($rows as $row) {
                 $signals[] = (object)[
+                    'topeer' => (string)$row->topeer,
                     'type' => (string)$row->type,
                     'payload' => (string)$row->payload,
                     'timecreated' => transform::datetime($row->timecreated),
                 ];
             }
 
+            // Messages for the user: the payload holds the sender's network addresses, so it stays out.
+            $received = [];
+            $rows = $DB->get_records_select(
+                self::TABLE_SIGNALS,
+                "vrroomid = :vrroomid AND topeer {$insql}",
+                ['vrroomid' => $vrroomid] + $inparams,
+                'id ASC',
+                'id, type, timecreated'
+            );
+            foreach ($rows as $row) {
+                $received[] = (object)[
+                    'type' => (string)$row->type,
+                    'timecreated' => transform::datetime($row->timecreated),
+                ];
+            }
+
             writer::with_context($context)->export_data(
                 [get_string('privacy:livepath', self::COMPONENT)],
-                (object)['presence' => $presence, 'signals' => $signals]
+                (object)['presence' => $presence, 'signals' => $signals, 'received' => $received]
             );
         }
     }

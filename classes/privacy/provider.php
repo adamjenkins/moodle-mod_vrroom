@@ -64,6 +64,7 @@ class provider implements
             'attempt' => 'privacy:metadata:vrroom_attempts:attempt',
             'state' => 'privacy:metadata:vrroom_attempts:state',
             'score' => 'privacy:metadata:vrroom_attempts:score',
+            'requireddone' => 'privacy:metadata:vrroom_attempts:requireddone',
             'timestart' => 'privacy:metadata:vrroom_attempts:timestart',
             'timefinish' => 'privacy:metadata:vrroom_attempts:timefinish',
             'timedue' => 'privacy:metadata:vrroom_attempts:timedue',
@@ -72,7 +73,9 @@ class provider implements
 
         $collection->add_database_table('vrroom_events', [
             'verb' => 'privacy:metadata:vrroom_events:verb',
+            'statementid' => 'privacy:metadata:vrroom_events:statementid',
             'objecttype' => 'privacy:metadata:vrroom_events:objecttype',
+            'sceneid' => 'privacy:metadata:vrroom_events:sceneid',
             'objectid' => 'privacy:metadata:vrroom_events:objectid',
             'resultjson' => 'privacy:metadata:vrroom_events:resultjson',
             'clientasserted' => 'privacy:metadata:vrroom_events:clientasserted',
@@ -205,6 +208,7 @@ class provider implements
             'attempt' => (int)$attempt->attempt,
             'state' => (string)$attempt->state,
             'score' => $attempt->score === null ? null : (float)$attempt->score,
+            'requireddone' => transform::yesno((int)$attempt->requireddone === 1),
             'timestart' => transform::datetime($attempt->timestart),
             'timefinish' => empty($attempt->timefinish) ? null : transform::datetime($attempt->timefinish),
             'timedue' => empty($attempt->timedue) ? null : transform::datetime($attempt->timedue),
@@ -215,6 +219,7 @@ class provider implements
         $statements = [];
         foreach (event_store::get_rows((int)$attempt->id) as $row) {
             $statements[] = (object)[
+                'statementid' => (string)$row->statementid,
                 'verb' => (string)$row->verb,
                 'objecttype' => (string)$row->objecttype,
                 'sceneid' => $row->sceneid,

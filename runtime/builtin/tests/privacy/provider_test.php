@@ -138,11 +138,11 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         );
         $this->assertInstanceOf(\core_privacy\local\metadata\types\external_location::class, $items['livepeers']);
         $this->assertEqualsCanonicalizing(
-            ['userid', 'groupid', 'room', 'timejoined', 'timeseen'],
+            ['userid', 'groupid', 'room', 'peerid', 'kind', 'attemptid', 'timejoined', 'timeseen', 'lastsignal'],
             array_keys($items['vrroomruntime_builtin_peers']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
-            ['frompeer', 'topeer', 'payload', 'timecreated'],
+            ['frompeer', 'topeer', 'type', 'payload', 'timecreated'],
             array_keys($items['vrroomruntime_builtin_signals']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
@@ -195,7 +195,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
     }
 
     /**
-     * Export: the presence and only the messages the user's browser sent.
+     * Export: the presence, the messages the user's browser sent, and the messages for the user
+     * without their payload.
      */
     public function test_export_user_data(): void {
         $this->export_context_data_for_user((int)$this->users[1]->id, $this->context, self::COMPONENT);
@@ -209,12 +210,22 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertSame(0, $presence->groupid);
         $this->assertSame(2, $presence->room);
         $this->assertSame('attempt', $presence->kind);
+        $this->assertSame(0, $presence->attemptid);
+        $this->assertSame($this->peers[1]->peerid, $presence->peerid);
         $this->assertSame(transform::datetime($this->peers[1]->timejoined), $presence->timejoined);
         $this->assertSame(transform::datetime($this->peers[1]->timeseen), $presence->timeseen);
+        $this->assertSame(transform::datetime($this->peers[1]->lastsignal), $presence->lastsignal);
 
         $this->assertCount(1, $data->signals);
+        $this->assertSame($this->peers[2]->peerid, $data->signals[0]->topeer);
         $this->assertSame('description', $data->signals[0]->type);
         $this->assertStringContainsString('"offer"', $data->signals[0]->payload);
+
+        // The message from user 2 is listed, but its payload (user 2's addresses) is not.
+        $this->assertCount(1, $data->received);
+        $this->assertSame('candidates', $data->received[0]->type);
+        $this->assertFalse(property_exists($data->received[0], 'payload'));
+        $this->assertFalse(property_exists($data->received[0], 'frompeer'));
 
         // Nothing is exported for another activity's context.
         writer::reset();

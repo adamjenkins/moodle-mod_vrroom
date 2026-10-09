@@ -19,6 +19,7 @@ namespace mod_vrroom\privacy;
 use core_privacy\local\metadata\collection;
 use core_privacy\local\request\approved_contextlist;
 use core_privacy\local\request\approved_userlist;
+use core_privacy\local\request\transform;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 use mod_vrroom\local\instance_manager;
@@ -127,6 +128,31 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $names = array_map(fn($item) => $item->get_name(), $collection->get_collection());
         $this->assertEqualsCanonicalizing(['vrroom_attempts', 'vrroom_events', 'core_question', 'core_xapi',
             'mod_vrroom_invertx', 'mod_vrroom_inverty', 'mod_vrroom_locky'], $names);
+
+        $fields = [];
+        foreach ($collection->get_collection() as $item) {
+            if ($item instanceof \core_privacy\local\metadata\types\database_table) {
+                $fields[$item->get_name()] = $item->get_privacy_fields();
+            }
+        }
+        $this->assertEqualsCanonicalizing(
+            ['userid', 'attempt', 'state', 'score', 'requireddone', 'timestart', 'timefinish', 'timedue', 'timemodified'],
+            array_keys($fields['vrroom_attempts'])
+        );
+        $this->assertEqualsCanonicalizing(
+            ['statementid', 'verb', 'objecttype', 'sceneid', 'objectid', 'resultjson', 'clientasserted', 'timestamp',
+                'timecreated'],
+            array_keys($fields['vrroom_events'])
+        );
+
+        // Every string exists.
+        $strings = get_string_manager();
+        foreach ($collection->get_collection() as $item) {
+            $this->assertTrue($strings->string_exists($item->get_summary(), 'mod_vrroom'), $item->get_summary());
+            foreach ($item->get_privacy_fields() ?? [] as $identifier) {
+                $this->assertTrue($strings->string_exists($identifier, 'mod_vrroom'), $identifier);
+            }
+        }
     }
 
     /**
@@ -212,6 +238,9 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertContains('launched', $verbs);
         $this->assertContains('entered', $verbs);
         $this->assertContains('answered', $verbs);
+        $entered = array_values(array_filter($related->statements, fn($s) => $s->verb === 'entered'))[0];
+        $this->assertNotEmpty($entered->sceneid);
+        $this->assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $entered->statementid);
 
         $questiondata = $writer->get_data(array_merge($subcontext, [get_string('questions', 'core_question'), 1]));
         $this->assertNotEmpty($questiondata);
@@ -247,6 +276,25 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->export_context_data_for_user((int)$this->students[2]->id, $this->context, 'mod_vrroom');
         $data = writer::with_context($this->context)->get_data($subcontext);
         $this->assertSame(\core_privacy\local\request\transform::datetime($timedue), $data->timedue);
+    }
+
+    /**
+     * Whether every required objective is done is exported as yes/no.
+     */
+    public function test_export_requireddone(): void {
+        global $DB;
+        $DB->set_field('vrroom_attempts', 'requireddone', 1, ['id' => $this->attempts[1]->id]);
+        $DB->set_field('vrroom_attempts', 'requireddone', 0, ['id' => $this->attempts[2]->id]);
+        $subcontext = [get_string('privacy:attemptpath', 'mod_vrroom', 1)];
+
+        $this->export_context_data_for_user((int)$this->students[1]->id, $this->context, 'mod_vrroom');
+        $data = writer::with_context($this->context)->get_data($subcontext);
+        $this->assertSame(transform::yesno(true), $data->requireddone);
+
+        writer::reset();
+        $this->export_context_data_for_user((int)$this->students[2]->id, $this->context, 'mod_vrroom');
+        $data = writer::with_context($this->context)->get_data($subcontext);
+        $this->assertSame(transform::yesno(false), $data->requireddone);
     }
 
     /**

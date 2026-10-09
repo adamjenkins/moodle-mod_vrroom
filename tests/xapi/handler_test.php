@@ -35,6 +35,12 @@ use mod_vrroom\local\xapi\iri;
  */
 #[\PHPUnit\Framework\Attributes\CoversClass(handler::class)]
 final class handler_test extends \advanced_testcase {
+    /** @var int|null Attempt that inject_rows() adds rows to, null when it should do nothing. */
+    private static ?int $injectattempt = null;
+
+    /** @var int Number of rows inject_rows() adds, once. */
+    private static int $injectcount = 0;
+
     /**
      * Create a course, a two-station gallery and an enrolled student.
      *
@@ -386,6 +392,133 @@ final class handler_test extends \advanced_testcase {
         ]);
         $this->assertSame([0 => true, 1 => false], $result);
         $this->assertSame(1, $this->client_rows((int)$attempt->id));
+    }
+
+    /**
+     * Test observer: after the first stored statement, store rows for the attempt as another
+     * request of the same attempt would.
+     *
+     * @param \mod_vrroom\event\statement_recorded $event
+     * @return void
+     */
+    public static function inject_rows(\mod_vrroom\event\statement_recorded $event): void {
+        if (self::$injectattempt === null) {
+            return;
+        }
+        $attemptid = self::$injectattempt;
+        self::$injectattempt = null;
+        for ($i = 0; $i < self::$injectcount; $i++) {
+            \mod_vrroom\local\attempt\event_store::insert(
+                $attemptid,
+                \core\uuid::generate(),
+                ['verb' => 'exited', 'type' => 'activity', 'id' => '', 'scene' => null],
+                false,
+                null,
+                time()
+            );
+        }
+    }
+
+    /**
+     * The volume limit counts rows stored meanwhile by another request, not a count read once per batch.
+     *
+     * @return void
+     */
+    public function test_max_attempt_events_counts_rows_stored_meanwhile(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $stored = $DB->count_records('vrroom_events', ['attemptid' => $attempt->id]);
+        set_config('maxattemptevents', $stored + 3, 'mod_vrroom');
+        $this->setUser($fx->student);
+
+        // Two rows land between the batch's first and second statement.
+        self::$injectattempt = (int)$attempt->id;
+        self::$injectcount = 2;
+        \core\event\manager::phpunit_replace_observers([[
+            'eventname' => '\mod_vrroom\event\statement_recorded',
+            'callback' => '\\' . self::class . '::inject_rows',
+        ]]);
+
+        $result = handler::create('mod_vrroom')->process_statements([
+            $this->statement($fx->student, 'exited', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
+            $this->statement($fx->student, 'exited', $this->zone_iri($fx, 'Portrait'), (int)$attempt->id),
+        ]);
+        $this->assertNull(self::$injectattempt, 'The observer must have run');
+        $this->assertSame([0 => true, 1 => false], $result);
+        $this->assertSame(1, $this->client_rows((int)$attempt->id));
+        $this->assertSame($stored + 3, $DB->count_records('vrroom_events', ['attemptid' => $attempt->id]));
+    }
+
+    /**
+     * Statements and the resume state are refused once the activity is hidden from the student.
+     *
+     * @return void
+     */
+    public function test_hidden_activity_is_rejected(): void {
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        set_coursemodule_visible((int)$fx->cm->id, 0);
+        $this->assertTrue(has_capability('mod/vrroom:attempt', $fx->context, $fx->student));
+        $this->setUser($fx->student);
+
+        $handler = handler::create('mod_vrroom');
+        $result = $handler->process_statements([
+            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
+        ]);
+        $this->assertSame([0 => false], $result);
+        $this->assertSame(0, $this->client_rows((int)$attempt->id));
+
+        $this->assert_state_refused($handler, $fx);
+    }
+
+    /**
+     * Statements and the resume state are refused once the student's enrolment is suspended,
+     * although the role (and so the capability) is kept.
+     *
+     * @return void
+     */
+    public function test_suspended_enrolment_is_rejected(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $instance = $DB->get_record('enrol', ['courseid' => $fx->course->id, 'enrol' => 'manual'], '*', MUST_EXIST);
+        enrol_get_plugin('manual')->update_user_enrol($instance, (int)$fx->student->id, ENROL_USER_SUSPENDED);
+        $this->assertTrue(has_capability('mod/vrroom:attempt', $fx->context, $fx->student));
+        $this->setUser($fx->student);
+
+        $handler = handler::create('mod_vrroom');
+        $result = $handler->process_statements([
+            $this->statement($fx->student, 'entered', $this->zone_iri($fx, 'Vase'), (int)$attempt->id),
+        ]);
+        $this->assertSame([0 => false], $result);
+        $this->assertSame(0, $this->client_rows((int)$attempt->id));
+
+        $this->assert_state_refused($handler, $fx);
+    }
+
+    /**
+     * Assert that the current user's resume state is refused.
+     *
+     * @param handler $handler
+     * @param \stdClass $fx fixture
+     * @return void
+     */
+    private function assert_state_refused(handler $handler, \stdClass $fx): void {
+        global $USER;
+        $state = new state(
+            item_agent::create_from_user($USER),
+            item_activity::create_from_id((string)$fx->context->id),
+            'vrroom-resume',
+            (object) ['scene' => $fx->sceneid, 'position' => [0, 0, 1], 'yaw' => 0],
+            null
+        );
+        try {
+            $handler->save_state($state);
+            $this->fail('State must be refused');
+        } catch (xapi_exception $e) {
+            $this->assertStringContainsString('not accepted', $e->getMessage());
+        }
     }
 
     /**

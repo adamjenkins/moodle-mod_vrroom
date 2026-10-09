@@ -33,6 +33,12 @@ namespace mod_vrroom\local\questions;
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class files {
+    /** @var string The attempt owner fetching files of their own open attempt. */
+    public const ACCESS_OWN = 'own';
+
+    /** @var string A reviewer (or the owner of a closed attempt) fetching files with feedback shown. */
+    public const ACCESS_REVIEW = 'review';
+
     /**
      * Send a question file, or a "not found" response. Never returns normally when a file is sent.
      *
@@ -57,7 +63,7 @@ final class files {
         $forcedownload,
         array $options = []
     ): void {
-        global $CFG, $DB, $USER;
+        global $CFG, $DB;
 
         require_once($CFG->dirroot . '/question/engine/lib.php');
         require_once($CFG->libdir . '/filelib.php');
@@ -74,19 +80,11 @@ final class files {
         require_login($attemptcourse, false, $cm);
         $modulecontext = \context_module::instance($cm->id);
 
-        $isown = (int)$attempt->userid === (int)$USER->id;
-        $isopen = $attempt->state === 'inprogress';
-        if ($isown && $isopen) {
-            require_capability('mod/vrroom:attempt', $modulecontext);
-            $reviewing = false;
-        } else {
-            require_capability('mod/vrroom:viewreports', $modulecontext);
-            // Separate groups: a reviewer sees only attempts of people in their groups (as report.php).
-            if (!$isown && !groups_user_groups_visible($attemptcourse, (int)$attempt->userid, $cm)) {
-                send_file_not_found();
-            }
-            $reviewing = true;
+        $access = self::get_access($attempt, $cm, $attemptcourse);
+        if ($access === null) {
+            send_file_not_found();
         }
+        $reviewing = $access === self::ACCESS_REVIEW;
 
         $quba = \question_engine::load_questions_usage_by_activity((int)$qubaid);
         if (
@@ -117,5 +115,37 @@ final class files {
         }
 
         send_stored_file($file, 0, 0, $forcedownload, $options);
+    }
+
+    /**
+     * Decide how the current user may reach the question files of an attempt.
+     *
+     * The attempt owner may fetch files while the attempt is open (needs mod/vrroom:attempt). Anyone
+     * else, or the owner of a closed attempt, needs mod/vrroom:viewreports and, in separate groups
+     * without "access all groups", a group shared with the attempt's owner (as report.php).
+     * The caller must already have called require_login() for the attempt's course and module.
+     *
+     * @param \stdClass $attempt The vrroom_attempts row.
+     * @param \stdClass|\cm_info $cm The attempt's course module (with groupmode).
+     * @param \stdClass $course The attempt's course.
+     * @return string|null self::ACCESS_OWN, self::ACCESS_REVIEW, or null when the group rule refuses.
+     * @throws \required_capability_exception When the user lacks the capability the access needs.
+     */
+    public static function get_access(\stdClass $attempt, \stdClass|\cm_info $cm, \stdClass $course): ?string {
+        global $USER;
+
+        $modulecontext = \context_module::instance($cm->id);
+        $isown = (int)$attempt->userid === (int)$USER->id;
+        $isopen = $attempt->state === 'inprogress';
+        if ($isown && $isopen) {
+            require_capability('mod/vrroom:attempt', $modulecontext);
+            return self::ACCESS_OWN;
+        }
+        require_capability('mod/vrroom:viewreports', $modulecontext);
+        // Separate groups: a reviewer sees only attempts of people in their groups (as report.php).
+        if (!$isown && !groups_user_groups_visible($course, (int)$attempt->userid, $cm)) {
+            return null;
+        }
+        return self::ACCESS_REVIEW;
     }
 }

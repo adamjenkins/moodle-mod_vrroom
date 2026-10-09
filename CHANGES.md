@@ -1,7 +1,17 @@
 # Changes
 
-## Unreleased
+## 0.1.0 (not yet tagged) — ALPHA
 
+First release.
+
+- New VR room activity: 3D rooms explored in the browser, with stations, models, images, texts and
+  question-bank questions.
+- Built-in viewer (`vrroomruntime_builtin`) for desktop and phone browsers, with an accessible list
+  view that works with a keyboard and a screen reader.
+- Gallery walk template (`vrroomtemplate_gallery`) with two bundled environments or an uploaded GLB
+  room.
+- Actions recorded as xAPI statements; grades and completion calculated on the server.
+- Teacher reports, privacy provider, backup and restore, course reset and uninstall clean-up.
 - The template is now chosen in the activity settings (one "VR room" entry in the activity
   chooser). Choosing another template shows its settings straight away, and it can be changed
   until students have attempts or the room has been edited in the room editor.
@@ -39,16 +49,11 @@
   one, up to a maximum the teacher sets (or no limit), and a room closes when the last person
   leaves. In group mode every group has its own rooms. Activities that already had live mode on
   keep one room. The companion run mode keeps one room.
-
-## 0.1.0 (2026-10-08) — ALPHA
-
-First release (Phase 1).
-
-- New VR room activity: 3D rooms explored in the browser, with stations, models, images, texts and
-  question-bank questions.
-- Built-in viewer (`vrroomruntime_builtin`) for desktop and phone browsers, with an accessible list
-  view that works with a keyboard and a screen reader.
-- Gallery walk template (`vrroomtemplate_gallery`) with two bundled environments or an uploaded GLB
-  room.
-- Actions recorded as xAPI statements; grades and completion calculated on the server.
-- Teacher reports, privacy provider, backup and restore, course reset and uninstall clean-up.
+- Restoring a backup now checks the rooms, task graph and settings the way the activity form and
+  room editor do; anything invalid is skipped or cleaned, and a broken room is rebuilt from its
+  template (or a plain hall) instead of being stored as it is.
+- Actions sent from the 3D room are refused once the student can no longer see the activity (it
+  is hidden, closed by an access restriction, or the enrolment is suspended), and the limit on
+  stored actions per attempt now holds when several requests arrive at once.
+- The privacy export now includes the live-room messages addressed to a user (without their
+  content) and a few more stored fields, all now described in the privacy metadata.

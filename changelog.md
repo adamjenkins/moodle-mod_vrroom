@@ -3,7 +3,9 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.0] - Unreleased
+
+ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Changed
 
@@ -67,15 +69,26 @@ All notable changes to this plugin are documented here. The format follows
   (the companion) keep one room and never store mode 2. `$plugin->version` 2026100803 for
   `mod_vrroom` and 2026100801 for `vrroomruntime_builtin` (schema changes, with upgrade steps).
 
+### Fixed
+
+- Restore validates scenes (`scene_validator::validate_set()`), graph versions
+  (`graph_validator::validate()`) and settings like the form; invalid or duplicate scenes, graphs,
+  slots and attempts are skipped with a restore-log warning, non-UUID statement ids are replaced,
+  and a room left invalid is rebuilt from its template or stored as a plain room.
+- xAPI handler: statements and states are refused unless the activity is visible to the user and
+  the user is actively enrolled (or viewing) the course; the per-attempt statement limit is
+  re-counted under a per-attempt lock before each insert.
+- Privacy: `vrroom_attempts.requireddone`, `vrroom_events.sceneid` and `statementid` declared (and
+  `requireddone` exported); `vrroomruntime_builtin` declares `peerid`, `kind`, `attemptid`,
+  `lastsignal` and `type`, and exports received live messages without their payload.
+- File serving decisions moved to `\mod_vrroom\local\file_serving` and
+  `\mod_vrroom\local\questions\files::get_access()`, with tests (no behaviour change).
+
 ### Changed
 
 - The VR room site settings are a category with *General settings* and one page per run mode.
 
-## [0.1.0] - 2026-10-08
-
-ALPHA. First release, Moodle 5.2 only.
-
-### Added
+### Added (Phase 1)
 
 - Activity module `mod_vrroom` with two sub-plugin types: run modes (`vrroomruntime`) and templates
   (`vrroomtemplate`).

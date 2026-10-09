@@ -29,8 +29,19 @@
  * are numbers, so scenes and graphs need no id remapping. Question references are remapped as
  * mod_quiz does, but onto vrroom_slots ids; attempts are inserted only once their question usage
  * has been restored (inform_new_usage_id), as mod_quiz does with quiz_attempts.
+ *
+ * A backup file is untrusted input: settings are cleaned as the activity form cleans them, scene and
+ * graph documents are checked with the same validators as the form and the room editor (a room that
+ * fails is rebuilt from its template, see after_execute()), rows that would repeat a unique key are
+ * skipped and a statement id that is not a uuid is renewed. Every skip is written to the restore log.
  */
 class restore_vrroom_activity_structure_step extends restore_questions_activity_structure_step {
+    /** @var string Pattern of a statement id, as the xAPI handler accepts it (lowercase uuid). */
+    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/';
+
+    /** @var int[] Longest value of each vrroom_events text column (db/install.xml). */
+    private const EVENT_LENGTHS = ['verb' => 20, 'objecttype' => 20, 'sceneid' => 36, 'objectid' => 64];
+
     /** @var stdClass|null The attempt read from the XML, waiting for its new usage id. */
     protected $currentattempt = null;
 
@@ -75,6 +86,33 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $data = (object)$data;
         $data->course = $this->get_courseid();
         unset($data->id);
+        $data->name = core_text::substr((string)($data->name ?? ''), 0, 255);
+        // The other settings are cleaned as the activity form and instance_manager clean them.
+        $data->grade = max(0, (int)($data->grade ?? 0));
+        $grademethod = (int)($data->grademethod ?? 0);
+        $grademethods = [
+            \mod_vrroom\local\grading\grader::GRADE_HIGHEST,
+            \mod_vrroom\local\grading\grader::GRADE_AVERAGE,
+            \mod_vrroom\local\grading\grader::GRADE_LAST,
+        ];
+        $data->grademethod = in_array($grademethod, $grademethods, true)
+            ? $grademethod : \mod_vrroom\local\grading\grader::GRADE_HIGHEST;
+        // 0 is unlimited; the column holds six digits.
+        $data->maxattempts = min(999999, max(0, (int)($data->maxattempts ?? 0)));
+        $data->questionmode = \mod_vrroom\local\questions\mode::clean((string)($data->questionmode ?? ''));
+        $data->retrypenalty = \mod_vrroom\local\questions\mode::clean_penalty(
+            $data->retrypenalty ?? \mod_vrroom\local\questions\mode::DEFAULT_PENALTY
+        );
+        $data->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
+        $data->customised = max(0, (int)($data->customised ?? 0));
+        $data->livemaxusers = min(50, max(2, (int)($data->livemaxusers ?? 6)));
+        $data->graphversion = max(0, (int)($data->graphversion ?? 0));
+        // A template config that is not a JSON object could never be decoded again: drop it.
+        $templateconfig = $data->templateconfig ?? null;
+        if ($templateconfig !== null && $templateconfig !== '' && !(json_decode((string)$templateconfig) instanceof stdClass)) {
+            $this->log('VR room template settings are not a JSON object. Dropping them', backup::LOG_WARNING);
+            $data->templateconfig = null;
+        }
         // Live mode 2 needs a run mode that runs several rooms; old backups have no liverooms (one room).
         $multi = \mod_vrroom\local\live_settings::runtime_has_multirooms((string)($data->runtime ?? ''));
         $data->livemode = \mod_vrroom\local\live_settings::clean_mode($data->livemode ?? 0, $multi);
@@ -100,6 +138,25 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         unset($data->id);
         $data->vrroomid = $this->get_new_parentid('vrroom');
 
+        // The whole set of rooms is validated in after_execute(); here only what the row needs.
+        $scene = json_decode((string)($data->scenejson ?? ''), true);
+        $sceneid = is_array($scene) ? ($scene['id'] ?? null) : null;
+        if (
+            !is_string($sceneid) || preg_match(\mod_vrroom\local\scene\scene_validator::ID_PATTERN, $sceneid) !== 1
+                || strlen($sceneid) > \mod_vrroom\local\scene\scene_validator::MAX_SCENE_ID_LENGTH
+        ) {
+            $this->log('VR room scene ' . $oldid . ' is not a valid scene document. Skipping it', backup::LOG_WARNING);
+            return;
+        }
+        if ($DB->record_exists('vrroom_scenes', ['vrroomid' => $data->vrroomid, 'idnumber' => $sceneid])) {
+            $this->log('VR room scene ' . $oldid . ' repeats the room id ' . $sceneid . '. Skipping it', backup::LOG_WARNING);
+            return;
+        }
+        $data->idnumber = $sceneid;
+        $data->name = core_text::substr(is_string($scene['name'] ?? null) ? $scene['name'] : (string)($data->name ?? ''), 0, 255);
+        $data->sortorder = (int)($data->sortorder ?? 0);
+        $data->schemaversion = \mod_vrroom\local\scene\scene_validator::SCHEMA;
+
         $newitemid = $DB->insert_record('vrroom_scenes', $data);
         $this->set_mapping('vrroom_scene', $oldid, $newitemid);
     }
@@ -116,6 +173,19 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $oldid = $data->id;
         unset($data->id);
         $data->vrroomid = $this->get_new_parentid('vrroom');
+        $data->version = (int)($data->version ?? 0);
+
+        $graph = json_decode((string)($data->graphjson ?? ''), true);
+        $errors = is_array($graph) ? \mod_vrroom\local\graph\graph_validator::validate($graph) : ['not a JSON object'];
+        if ($data->version < 1 || $errors) {
+            $this->log('VR room task graph version ' . $data->version . ' is not valid (' .
+                ($errors ? reset($errors) : 'bad version number') . '). Skipping it', backup::LOG_WARNING);
+            return;
+        }
+        if ($DB->record_exists('vrroom_graphs', ['vrroomid' => $data->vrroomid, 'version' => $data->version])) {
+            $this->log('VR room task graph version ' . $data->version . ' is repeated. Skipping it', backup::LOG_WARNING);
+            return;
+        }
 
         $newitemid = $DB->insert_record('vrroom_graphs', $data);
         $this->set_mapping('vrroom_graph', $oldid, $newitemid);
@@ -137,6 +207,24 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
             unset($data->slotnumber);
         }
         $data->vrroomid = $this->get_new_parentid('vrroom');
+        $data->slot = (int)($data->slot ?? 0);
+        $data->objectiveid = (string)($data->objectiveid ?? '');
+        $data->maxmark = (float)($data->maxmark ?? 1);
+        if (!is_finite($data->maxmark) || $data->maxmark <= 0) {
+            $data->maxmark = 1.0;
+        }
+
+        // A skipped slot maps to 0, so its question reference is skipped too rather than added to the slot before it.
+        if ($data->slot < 1 || !preg_match(\mod_vrroom\local\scene\scene_validator::ID_PATTERN, $data->objectiveid)) {
+            $this->log('VR room question slot ' . $data->slot . ' is not valid. Skipping it', backup::LOG_WARNING);
+            $this->set_mapping('vrroom_slot', $oldid, 0);
+            return;
+        }
+        if ($DB->record_exists('vrroom_slots', ['vrroomid' => $data->vrroomid, 'slot' => $data->slot])) {
+            $this->log('VR room question slot ' . $data->slot . ' is repeated. Skipping it', backup::LOG_WARNING);
+            $this->set_mapping('vrroom_slot', $oldid, 0);
+            return;
+        }
 
         $newitemid = $DB->insert_record('vrroom_slots', $data);
         $this->set_mapping('vrroom_slot', $oldid, $newitemid);
@@ -157,6 +245,10 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         unset($data->id);
         $data->usingcontextid = $this->get_mappingid('context', $data->usingcontextid);
         $data->itemid = $this->get_new_parentid('vrroom_slot');
+        if (!$data->itemid) {
+            // Its slot was skipped.
+            return;
+        }
         if ($entry = $this->get_mappingid('question_bank_entry', $data->questionbankentryid)) {
             $data->questionbankentryid = $entry;
         }
@@ -170,6 +262,7 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
      * @return void
      */
     protected function process_vrroom_attempt($data) {
+        global $DB;
         $data = (object)$data;
         $this->currentattempt = null;
         $this->currentattemptid = null;
@@ -185,6 +278,15 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         if (!$data->userid) {
             $this->log('Mapped user ID not found for user ' . $olduserid . ', VR room ' . $data->vrroomid .
                 ', attempt ' . $data->attempt . '. Skipping VR room attempt', backup::LOG_INFO);
+            return;
+        }
+        $data->attempt = (int)($data->attempt ?? 0);
+        $unique = ['vrroomid' => $data->vrroomid, 'userid' => $data->userid, 'attempt' => $data->attempt];
+        if ($DB->record_exists('vrroom_attempts', $unique)) {
+            $this->log(
+                'VR room attempt ' . $data->attempt . ' of user ' . $olduserid . ' is repeated. Skipping it',
+                backup::LOG_WARNING
+            );
             return;
         }
 
@@ -219,7 +321,8 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
      * Restore a statement of the attempt being restored.
      *
      * Statement ids are unique site-wide; a restore into the same site (course duplication)
-     * would collide with the original rows, so a colliding id gets a fresh uuid.
+     * would collide with the original rows, so a colliding id gets a fresh uuid, as does an id
+     * that is not a uuid (the xAPI handler accepts uuids only).
      *
      * @param array|stdClass $data element data
      * @return void
@@ -233,16 +336,28 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $data = (object)$data;
         unset($data->id);
         $data->attemptid = $this->currentattemptid;
-        $data->statementid = strtolower((string)$data->statementid);
-        if ($data->statementid === '' || $DB->record_exists('vrroom_events', ['statementid' => $data->statementid])) {
+        foreach (self::EVENT_LENGTHS as $field => $length) {
+            if (isset($data->$field) && core_text::strlen((string)$data->$field) > $length) {
+                $this->log(
+                    'VR room statement with a ' . $field . ' longer than ' . $length . ' characters. Skipping it',
+                    backup::LOG_WARNING
+                );
+                return;
+            }
+        }
+        $data->statementid = strtolower((string)($data->statementid ?? ''));
+        if (
+            preg_match(self::UUID_PATTERN, $data->statementid) !== 1
+                || $DB->record_exists('vrroom_events', ['statementid' => $data->statementid])
+        ) {
             $data->statementid = strtolower(\core\uuid::generate());
         }
         $DB->insert_record('vrroom_events', $data);
     }
 
     /**
-     * Restore the file areas and let the template remap the question bank entries named in its
-     * stored config.
+     * Restore the file areas, let the template remap the question bank entries named in its
+     * stored config, then make sure the restored room is valid.
      *
      * Times are not shifted: attempt times keep their original values (as in Phase 1), so an
      * attempt's deadline stays consistent with its start.
@@ -263,8 +378,20 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         if (!$vrroomid) {
             return;
         }
-        $vrroom = $DB->get_record('vrroom', ['id' => $vrroomid], 'id, template, templateconfig');
-        if (!$vrroom || $vrroom->templateconfig === null || $vrroom->templateconfig === '') {
+        $vrroom = $DB->get_record('vrroom', ['id' => $vrroomid], '*', MUST_EXIST);
+        $this->remap_template_config($vrroom);
+        $this->check_room($vrroom);
+    }
+
+    /**
+     * Let the template remap the question bank entries named in its stored config.
+     *
+     * @param stdClass $vrroom The restored vrroom row (templateconfig is updated in place).
+     * @return void
+     */
+    protected function remap_template_config(stdClass $vrroom): void {
+        global $DB;
+        if ($vrroom->templateconfig === null || $vrroom->templateconfig === '') {
             return;
         }
         $config = json_decode($vrroom->templateconfig, false);
@@ -283,12 +410,216 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         );
         if ($changed) {
             // Same flags as instance_manager, so link markers awaiting decoding stay intact.
-            $DB->set_field(
-                'vrroom',
-                'templateconfig',
-                json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-                ['id' => $vrroomid]
+            $vrroom->templateconfig = json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $DB->set_field('vrroom', 'templateconfig', $vrroom->templateconfig, ['id' => $vrroom->id]);
+        }
+    }
+
+    /**
+     * Make sure the restored rooms and the current task graph pass the validators.
+     *
+     * The graph versions were validated one by one when read. When the activity's graph version
+     * names none of them, the activity's own graph copy (vrroom.graphjson) becomes a new version if
+     * it is valid, otherwise the latest restored version is used. When the rooms together fail
+     * scene_validator::validate_set() or no valid graph is left, the room is rebuilt from its
+     * template as the activity form would build it; without a template that compiles, a plain room
+     * with no tasks is stored instead. Attempts whose graph version was not restored are moved to
+     * the current version, so they can still be replayed.
+     *
+     * @param stdClass $vrroom The restored vrroom row.
+     * @return void
+     */
+    protected function check_room(stdClass $vrroom): void {
+        global $DB;
+
+        // The task graph.
+        $versions = $DB->get_records_menu('vrroom_graphs', ['vrroomid' => $vrroom->id], 'version ASC', 'version, graphjson');
+        $graphok = isset($versions[(int)$vrroom->graphversion]);
+        if (!$graphok && $vrroom->graphjson !== null && $vrroom->graphjson !== '') {
+            $graph = json_decode((string)$vrroom->graphjson, true);
+            if (is_array($graph) && !\mod_vrroom\local\graph\graph_validator::validate($graph)) {
+                $this->log('VR room graph version ' . $vrroom->graphversion . ' was not restored. Storing the ' .
+                    'activity\'s current graph as a new version', backup::LOG_WARNING);
+                $this->store_graph($vrroom, (string)$vrroom->graphjson);
+                $graphok = true;
+            }
+        }
+        if (!$graphok && $versions) {
+            $this->log('VR room graph version ' . $vrroom->graphversion . ' was not restored. Using version ' .
+                array_key_last($versions), backup::LOG_WARNING);
+            $vrroom->graphversion = (int)array_key_last($versions);
+            $graphok = true;
+        }
+        if ($graphok) {
+            // The activity's copy of the current graph is the stored version.
+            $vrroom->graphjson = $DB->get_field(
+                'vrroom_graphs',
+                'graphjson',
+                ['vrroomid' => $vrroom->id, 'version' => $vrroom->graphversion],
+                MUST_EXIST
+            );
+            $DB->update_record('vrroom', (object)[
+                'id' => $vrroom->id,
+                'graphjson' => $vrroom->graphjson,
+                'graphversion' => $vrroom->graphversion,
+            ]);
+        }
+
+        // The rooms.
+        $scenes = [];
+        foreach ($DB->get_records('vrroom_scenes', ['vrroomid' => $vrroom->id], 'sortorder ASC, id ASC') as $row) {
+            $scenes[] = json_decode($row->scenejson, true);
+        }
+        $errors = \mod_vrroom\local\scene\scene_validator::validate_set($scenes);
+        if ($errors) {
+            $this->log('VR room rooms are not valid (' . reset($errors) . ')', backup::LOG_WARNING);
+        }
+
+        if ($errors || !$graphok) {
+            if (!$this->rebuild_from_template($vrroom)) {
+                $this->store_plain_room($vrroom, (bool)$errors, !$graphok);
+            }
+        }
+
+        // Attempts played under a graph version that was not restored.
+        $moved = $DB->count_records_select(
+            'vrroom_attempts',
+            'vrroomid = :vrroomid AND graphversion NOT IN (SELECT version FROM {vrroom_graphs} WHERE vrroomid = :vrroomid2)',
+            ['vrroomid' => $vrroom->id, 'vrroomid2' => $vrroom->id]
+        );
+        if ($moved) {
+            $this->log('VR room: ' . $moved . ' attempt(s) named a graph version that was not restored. Moving them to ' .
+                'version ' . $vrroom->graphversion, backup::LOG_WARNING);
+            $DB->execute(
+                'UPDATE {vrroom_attempts} SET graphversion = :version
+                  WHERE vrroomid = :vrroomid
+                        AND graphversion NOT IN (SELECT version FROM {vrroom_graphs} WHERE vrroomid = :vrroomid2)',
+                ['version' => $vrroom->graphversion, 'vrroomid' => $vrroom->id, 'vrroomid2' => $vrroom->id]
             );
         }
+    }
+
+    /**
+     * Rebuild the rooms, the task graph and the question slots from the activity's template.
+     *
+     * The compiled activity is checked as instance_manager checks it before anything is written.
+     *
+     * @param stdClass $vrroom The restored vrroom row (graphjson and graphversion are updated in place).
+     * @return bool False when the template is not installed or does not give a valid room.
+     */
+    protected function rebuild_from_template(stdClass $vrroom): bool {
+        global $DB;
+        try {
+            $context = context_module::instance($this->task->get_moduleid());
+            $template = \mod_vrroom\local\template\registry::get((string)$vrroom->template);
+            $config = \mod_vrroom\local\instance_manager::decode_config($vrroom->templateconfig) ?? new stdClass();
+            $compiled = $template->compile($config, $context);
+        } catch (\Throwable $e) {
+            $this->log(
+                'VR room cannot be rebuilt from its template ' . $vrroom->template . ' (' . $e->getMessage() . ')',
+                backup::LOG_WARNING
+            );
+            return false;
+        }
+
+        $errors = \mod_vrroom\local\scene\scene_validator::validate_set(array_values($compiled->scenes));
+        $errors = array_merge($errors, \mod_vrroom\local\graph\graph_validator::validate($compiled->graph));
+        $seen = [];
+        foreach ($compiled->slots as $binding) {
+            $slot = (int)($binding['slot'] ?? 0);
+            $objectiveid = (string)($binding['objectiveid'] ?? '');
+            if (
+                $slot < 1 || isset($seen[$slot]) || (int)($binding['questionbankentryid'] ?? 0) <= 0
+                    || !preg_match(\mod_vrroom\local\scene\scene_validator::ID_PATTERN, $objectiveid)
+            ) {
+                $errors[] = 'question slot ' . $slot . ' is not valid';
+            }
+            $seen[$slot] = true;
+        }
+        if ($errors) {
+            $this->log(
+                'VR room template ' . $vrroom->template . ' gives no valid room (' . reset($errors) . ')',
+                backup::LOG_WARNING
+            );
+            return false;
+        }
+
+        if (!$DB->record_exists('vrroom_graphs', ['vrroomid' => $vrroom->id, 'version' => (int)$vrroom->graphversion])) {
+            // No valid graph is left: version 0 makes apply_compiled() store the template's graph.
+            $vrroom->graphversion = 0;
+        }
+        \mod_vrroom\local\instance_manager::apply_compiled($vrroom, $context, $compiled);
+        $DB->set_field('vrroom', 'customised', 0, ['id' => $vrroom->id]);
+        $this->log('VR room rebuilt from its template ' . $vrroom->template, backup::LOG_WARNING);
+        return true;
+    }
+
+    /**
+     * Store a plain room and an empty task graph, for an activity whose template cannot rebuild it.
+     *
+     * @param stdClass $vrroom The restored vrroom row (graphjson and graphversion are updated in place).
+     * @param bool $scenes Replace the rooms.
+     * @param bool $graph Store an empty task graph as a new version.
+     * @return void
+     * @throws restore_step_exception When even the plain room does not validate.
+     */
+    protected function store_plain_room(stdClass $vrroom, bool $scenes, bool $graph): void {
+        global $DB;
+        if ($scenes) {
+            $preset = \mod_vrroom\local\scene\presets::get('gallery-hall');
+            $scene = [
+                'schema' => \mod_vrroom\local\scene\scene_validator::SCHEMA,
+                'id' => \core\uuid::generate(),
+                'name' => trim((string)$vrroom->name) !== '' ? (string)$vrroom->name : 'VR room',
+                'environment' => ['type' => 'preset', 'preset' => 'gallery-hall', 'shape' => $preset['shape'] ?? null],
+                'spawn' => [['id' => 'start', 'position' => [0, 0, 0], 'yaw' => 0]],
+                'zones' => [],
+                'props' => [],
+                'interactables' => [],
+            ];
+            $errors = \mod_vrroom\local\scene\scene_validator::validate_set([$scene]);
+            if ($errors) {
+                throw new restore_step_exception('vrroom_invalid_scene', reset($errors));
+            }
+            $DB->delete_records('vrroom_scenes', ['vrroomid' => $vrroom->id]);
+            $DB->insert_record('vrroom_scenes', (object)[
+                'vrroomid' => $vrroom->id,
+                'idnumber' => $scene['id'],
+                'name' => core_text::substr($scene['name'], 0, 255),
+                'sortorder' => 0,
+                'scenejson' => json_encode($scene, \mod_vrroom\local\instance_manager::JSON_FLAGS),
+                'schemaversion' => \mod_vrroom\local\scene\scene_validator::SCHEMA,
+            ]);
+            // A plain room is no editor work: a later save of the form may build it from the template.
+            $DB->set_field('vrroom', 'customised', 0, ['id' => $vrroom->id]);
+            $this->log('VR room rooms replaced by a plain room', backup::LOG_WARNING);
+        }
+        if ($graph) {
+            $empty = ['schema' => \mod_vrroom\local\graph\graph_validator::SCHEMA, 'objectives' => []];
+            $this->store_graph($vrroom, json_encode($empty, \mod_vrroom\local\instance_manager::JSON_FLAGS));
+            $this->log('VR room task graph replaced by an empty one', backup::LOG_WARNING);
+        }
+    }
+
+    /**
+     * Store a graph as the activity's next graph version and make it the current one.
+     *
+     * @param stdClass $vrroom The restored vrroom row (graphjson and graphversion are updated in place).
+     * @param string $graphjson The graph document.
+     * @return void
+     */
+    protected function store_graph(stdClass $vrroom, string $graphjson): void {
+        global $DB;
+        $version = (int)$DB->get_field_sql('SELECT MAX(version) FROM {vrroom_graphs} WHERE vrroomid = ?', [$vrroom->id]);
+        $version = max($version, (int)$vrroom->graphversion) + 1;
+        $DB->insert_record('vrroom_graphs', (object)[
+            'vrroomid' => $vrroom->id,
+            'version' => $version,
+            'graphjson' => $graphjson,
+            'timecreated' => time(),
+        ]);
+        $vrroom->graphjson = $graphjson;
+        $vrroom->graphversion = $version;
+        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'graphjson' => $graphjson, 'graphversion' => $version]);
     }
 }
