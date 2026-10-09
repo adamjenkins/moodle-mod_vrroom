@@ -16,7 +16,9 @@
 
 namespace mod_vrroom\local\attempt;
 
+use mod_vrroom\external\helper;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\launch\config_builder;
 
 /**
  * Tests of the attempt manager and the event store.
@@ -156,6 +158,110 @@ final class attempt_manager_test extends \advanced_testcase {
         [$third] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, $userid);
         $this->assertSame(3, (int)$third->attempt);
         $this->assertSame(2, $DB->count_records('vrroom_attempts', ['vrroomid' => $fx->vrroom->id, 'userid' => $userid]));
+    }
+
+    /**
+     * Starting releases the start lock and leaves no transaction open, also when the start is refused.
+     *
+     * @return void
+     */
+    public function test_start_releases_lock_and_transaction(): void {
+        global $DB;
+        $fx = $this->setup_activity(['maxattempts' => 1]);
+        $userid = (int)$fx->student->id;
+        $factory = \core\lock\lock_config::get_lock_factory('mod_vrroom');
+        $resource = 'start_' . (int)$fx->vrroom->id . '_' . $userid;
+
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, $userid);
+        $this->assertFalse($DB->is_transaction_started());
+        $lock = $factory->get_lock($resource, 0);
+        $this->assertNotFalse($lock, 'The start lock was not released.');
+        $lock->release();
+
+        attempt_manager::finish($attempt);
+        try {
+            attempt_manager::start_or_resume($fx->cm, $fx->vrroom, $userid);
+            $this->fail('A second attempt must be refused');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errornomoreattempts', $e->errorcode);
+        }
+        $this->assertFalse($DB->is_transaction_started());
+        $lock = $factory->get_lock($resource, 0);
+        $this->assertNotFalse($lock, 'The start lock was not released after a refused start.');
+        $lock->release();
+    }
+
+    /**
+     * An attempt that is gone fails with errorattemptmissing, not with a database error.
+     *
+     * @return void
+     */
+    public function test_missing_attempt_is_friendly(): void {
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        attempt_manager::delete_attempt($attempt);
+
+        foreach (
+            [
+            fn() => attempt_manager::get_attempt((int)$attempt->id),
+            fn() => attempt_manager::require_own_open_attempt((int)$attempt->id, (int)$fx->student->id),
+            fn() => helper::context_for_attempt((int)$attempt->id),
+            fn() => helper::require_own_attempt((int)$attempt->id, (int)$fx->student->id),
+            ] as $call
+        ) {
+            try {
+                $call();
+                $this->fail('A deleted attempt must be refused');
+            } catch (\moodle_exception $e) {
+                $this->assertSame('errorattemptmissing', $e->errorcode);
+                $this->assertSame(get_string('errorattemptmissing', 'mod_vrroom'), $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Store a resume position directly.
+     *
+     * @param \stdClass $fx fixture
+     * @param int $userid user
+     * @param string $stateid state id
+     * @return void
+     */
+    private function store_resume(\stdClass $fx, int $userid, string $stateid): void {
+        global $DB;
+        $DB->insert_record('xapi_states', (object)[
+            'component' => 'mod_vrroom', 'userid' => $userid, 'itemid' => $fx->context->id,
+            'stateid' => $stateid, 'statedata' => '{}', 'registration' => null,
+            'timecreated' => time(), 'timemodified' => time(),
+        ]);
+    }
+
+    /**
+     * Finishing an attempt removes its resume position (and the legacy per-module one) only, so the
+     * next attempt starts at the start point; deleting a finished attempt removes its own too.
+     *
+     * @return void
+     */
+    public function test_finish_and_delete_remove_resume_states(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        $userid = (int)$fx->student->id;
+        $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, $userid);
+        [$otherattempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$other->id);
+        $this->store_resume($fx, $userid, config_builder::RESUME_STATEID);
+        $this->store_resume($fx, $userid, config_builder::resume_stateid((int)$attempt->id));
+        $this->store_resume($fx, (int)$other->id, config_builder::resume_stateid((int)$otherattempt->id));
+
+        $attempt = attempt_manager::finish($attempt);
+        $this->assertSame(0, $DB->count_records('xapi_states', ['component' => 'mod_vrroom', 'userid' => $userid]));
+        $this->assertSame(1, $DB->count_records('xapi_states', ['component' => 'mod_vrroom', 'userid' => $other->id]));
+
+        // A position saved late for the finished attempt goes with the attempt.
+        $this->store_resume($fx, $userid, config_builder::resume_stateid((int)$attempt->id));
+        attempt_manager::delete_attempt($attempt);
+        $this->assertSame(0, $DB->count_records('xapi_states', ['component' => 'mod_vrroom', 'userid' => $userid]));
+        $this->assertSame(1, $DB->count_records('xapi_states', ['component' => 'mod_vrroom', 'userid' => $other->id]));
     }
 
     /**

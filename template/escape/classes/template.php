@@ -65,6 +65,12 @@ class template extends \mod_vrroom\local\template\base {
     /** @var int Longest time limit, in seconds (seven days, the graph validator's limit). */
     public const MAX_TIMELIMIT = 604800;
 
+    /**
+     * @var float Most points a puzzle or a hint penalty can be: a puzzle's question slot stores its
+     *      points in vrroom_slots.maxmark, number(12,7), whose largest value is 99999.9999999.
+     */
+    public const MAX_POINTS = 99999.0;
+
     /** @var string Clue exhibit: text only. */
     public const MEDIA_NONE = 'none';
 
@@ -355,13 +361,22 @@ class template extends \mod_vrroom\local\template\base {
             return $errors;
         }
 
+        // Compared as floats: a huge value (1e30 weeks) must not wrap around as an integer. Core's
+        // duration element hands over whole seconds, already rounded with an integer cast that turns
+        // such a value into 0 (no limit), so the number as typed is checked too.
         $timelimit = $data['escape_timelimit'] ?? 0;
-        if (!is_numeric($timelimit) || (int)$timelimit < 0 || (int)$timelimit > self::MAX_TIMELIMIT) {
+        if (
+            !is_numeric($timelimit) || !is_finite((float)$timelimit)
+                || (float)$timelimit < 0 || (float)$timelimit > self::MAX_TIMELIMIT
+                || self::typed_timelimit() > self::MAX_TIMELIMIT
+        ) {
             $errors['escape_timelimit'] = get_string('errortimelimit', self::COMPONENT);
         }
         $penalty = $data['escape_hintpenalty'] ?? 0;
         if (!is_numeric($penalty) || (float)$penalty < 0) {
             $errors['escape_hintpenalty'] = get_string('errorhintpenalty', self::COMPONENT);
+        } else if (!self::points_in_range($penalty)) {
+            $errors['escape_hintpenalty'] = get_string('errorhintpenaltyrange', self::COMPONENT, format_float(self::MAX_POINTS, 0));
         }
 
         // Rows without a title but with other content are a mistake, not a blank row.
@@ -427,9 +442,20 @@ class template extends \mod_vrroom\local\template\base {
                 }
             }
 
+            // Longer hints would be cut short when saved.
+            foreach (['escape_hint1', 'escape_hint2'] as $field) {
+                $hint = trim(clean_param((string)($data[$field][$i] ?? ''), PARAM_TEXT));
+                if (\core_text::strlen($hint) > self::MAX_HINT_LENGTH) {
+                    $errors["{$field}[{$i}]"] = get_string('maximumchars', '', self::MAX_HINT_LENGTH);
+                }
+            }
+
             $points = $data['escape_points'][$i] ?? 1;
             if (!is_numeric($points) || (float)$points < 0) {
                 $errors["escape_points[{$i}]"] = get_string('errorpoints', self::COMPONENT);
+            } else if (!self::points_in_range($points)) {
+                $max = format_float(self::MAX_POINTS, 0);
+                $errors["escape_points[{$i}]"] = get_string('errorpointsrange', self::COMPONENT, $max);
             }
         }
 
@@ -1197,26 +1223,66 @@ class template extends \mod_vrroom\local\template\base {
     }
 
     /**
-     * A non-negative points value rounded to 7 decimals (0 for anything else).
+     * A non-negative points value rounded to 7 decimals, at most MAX_POINTS (0 for anything else).
      *
      * @param mixed $value submitted or stored value
      * @return float
      */
     private static function clean_points($value): float {
-        return is_numeric($value) ? max(0.0, round((float)$value, 7)) : 0.0;
+        if (!is_numeric($value) || !is_finite((float)$value)) {
+            return 0.0;
+        }
+        return min(self::MAX_POINTS, max(0.0, round((float)$value, 7)));
     }
 
     /**
-     * A time limit in whole seconds from 0 to MAX_TIMELIMIT (0 for anything else).
+     * Whether a non-negative points value can be stored as it was entered.
+     *
+     * It must be finite and at most MAX_POINTS, and a value above 0 must not round to 0 at the
+     * 7 decimals the question slot keeps (below 0.0000001).
+     *
+     * @param mixed $value submitted value, numeric and at least 0
+     * @return bool
+     */
+    private static function points_in_range($value): bool {
+        $value = (float)$value;
+        if (!is_finite($value) || $value > self::MAX_POINTS) {
+            return false;
+        }
+        return $value == 0 || round($value, 7) > 0;
+    }
+
+    /**
+     * The time limit as typed in the form (number times unit, in seconds), before core's duration
+     * element rounds it; 0 when the field is not enabled or not in this request.
+     *
+     * @return float
+     */
+    private static function typed_timelimit(): float {
+        $raw = optional_param_array('escape_timelimit', [], PARAM_RAW);
+        if (empty($raw['enabled']) || !isset($raw['number'], $raw['timeunit'])) {
+            return 0.0;
+        }
+        $number = str_replace(',', '.', (string)$raw['number']);
+        if (!is_numeric($number) || !is_numeric($raw['timeunit'])) {
+            return 0.0;
+        }
+        $seconds = (float)$number * (float)$raw['timeunit'];
+        return is_finite($seconds) ? $seconds : INF;
+    }
+
+    /**
+     * A time limit in whole seconds from 0 to MAX_TIMELIMIT (0 for anything not a number).
      *
      * @param mixed $value submitted or stored value
      * @return int
      */
     private static function clean_timelimit($value): int {
-        if (!is_numeric($value)) {
+        if (!is_numeric($value) || is_nan((float)$value)) {
             return 0;
         }
-        return min(self::MAX_TIMELIMIT, max(0, (int)$value));
+        // Clamped as a float first: casting a huge value to an integer would wrap around.
+        return (int)min((float)self::MAX_TIMELIMIT, max(0.0, (float)$value));
     }
 
     /**

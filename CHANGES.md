@@ -57,3 +57,18 @@ First release.
   stored actions per attempt now holds when several requests arrive at once.
 - The privacy export now includes the live-room messages addressed to a user (without their
   content) and a few more stored fields, all now described in the privacy metadata.
+- Fixed: saving an Empty room activity, or the settings of a room changed in the room editor,
+  failed with an error, and a failed new activity could break the whole course page.
+- Fixed: rooms could start inside a wall. Changing a room's surroundings in the room editor now
+  moves the start point and stations into the new room; a new attempt starts at the start point
+  instead of where the last one ended; a saved position is not used after the room changes; the
+  viewer finds a free spot near the start point; people joining a live room no longer start on
+  top of each other.
+- The question mode and penalty can no longer be changed once students have attempts, and a try
+  that can be repeated no longer shows the right answer.
+- An attempt with everything required done is finished and graded after a day without activity.
+- The room editor keeps things inside the room, moves a station's zone and information point
+  together, asks before deleting a room, refuses to delete what tasks or open attempts still need,
+  refuses files that are not real 3D models, and explains problems in plain words.
+- Clearer messages when an attempt was finished elsewhere, deleted or closed; live controls stay
+  available in fullscreen; question and story panels fit on phones.

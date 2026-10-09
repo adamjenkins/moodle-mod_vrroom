@@ -25,7 +25,7 @@
 import Templates from 'core/templates';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
-import {getStrings} from 'core/str';
+import {getString, getStrings} from 'core/str';
 import {displayName} from 'mod_vrroom/editor_inspector';
 
 /** Outline groups in display order: [group, selection kind, heading string]. */
@@ -68,7 +68,55 @@ const start = (container, model, context, headings) => {
     let renderid = 0;
 
     /**
-     * The template context for the current document.
+     * A readable name: the object's own, or "<kind> <number>" for an unnamed one (never its id).
+     *
+     * @param {Object} object Scene object or room.
+     * @param {string} kindlabel What it is, such as "Start point".
+     * @param {number} number Its place in its group, from 1.
+     * @returns {Promise<string>}
+     */
+    const nameOf = (object, kindlabel, number) => {
+        const name = displayName(object);
+        if (name !== '' && name !== String(object.id || '')) {
+            return Promise.resolve(name);
+        }
+        if (kindlabel === null) {
+            return getString('editornewscene', 'mod_vrroom', number);
+        }
+        return getString('editornewname', 'mod_vrroom', {kind: kindlabel, number: number});
+    };
+
+    /**
+     * Put readable names on the items of a template context.
+     *
+     * @param {Object} data From build().
+     * @returns {Promise<Object>} The same data.
+     */
+    const nameAll = (data) => {
+        const work = [];
+        data.scenes.forEach((scene) => {
+            work.push(nameOf(scene.object, null, scene.number).then((name) => {
+                scene.name = name;
+                return null;
+            }));
+            delete scene.object;
+        });
+        data.groups.forEach((group) => {
+            group.items.forEach((item) => {
+                if (item.object) {
+                    work.push(nameOf(item.object, group.heading, item.number).then((name) => {
+                        item.name = name;
+                        return null;
+                    }));
+                    delete item.object;
+                }
+            });
+        });
+        return Promise.all(work).then(() => data);
+    };
+
+    /**
+     * The template context for the current document (names still to be filled in by nameAll()).
      *
      * @returns {Object}
      */
@@ -92,12 +140,13 @@ const start = (container, model, context, headings) => {
                 } else if (kind === 'interactable') {
                     items = (Array.isArray(active.interactables) ? active.interactables : [])
                         .filter((item) => item && item.kind === group)
-                        .map((item) => ({kind: kind, id: item.id, name: displayName(item), selected: isSelected(kind, item.id)}));
+                        .map((item, n) => ({kind: kind, id: item.id, object: item, number: n + 1,
+                            selected: isSelected(kind, item.id)}));
                 } else {
                     const key = {spawn: 'spawn', zone: 'zones', prop: 'props'}[kind];
                     items = (Array.isArray(active[key]) ? active[key] : [])
                         .filter((object) => object && object.id)
-                        .map((object) => ({kind: kind, id: object.id, name: displayName(object),
+                        .map((object, n) => ({kind: kind, id: object.id, object: object, number: n + 1,
                             selected: isSelected(kind, object.id)}));
                 }
                 if (items.length) {
@@ -107,7 +156,7 @@ const start = (container, model, context, headings) => {
         }
 
         return {
-            scenes: scenes.map((scene, i) => ({id: scene.id, name: displayName(scene), active: i === index, start: i === 0})),
+            scenes: scenes.map((scene, i) => ({id: scene.id, object: scene, number: i + 1, active: i === index, start: i === 0})),
             canaddscene: scenes.length < maxscenes,
             canmoveup: index > 0,
             canmovedown: index >= 0 && index < scenes.length - 1,
@@ -125,7 +174,7 @@ const start = (container, model, context, headings) => {
         const focuskey = focused ? {action: focused.dataset.action, id: focused.dataset.id || focused.dataset.scene || ''} : null;
         const id = ++renderid;
         const pending = new Pending('mod_vrroom/editor_outline:render');
-        Templates.renderForPromise('mod_vrroom/editor_outline', build()).then(({html, js}) => {
+        nameAll(build()).then((data) => Templates.renderForPromise('mod_vrroom/editor_outline', data)).then(({html, js}) => {
             if (id !== renderid || destroyed) {
                 return null;
             }
@@ -173,7 +222,7 @@ const start = (container, model, context, headings) => {
                 break;
             case 'vrroom-editor-scene-delete':
                 if (active) {
-                    context.actions.deleteScene(active.id);
+                    context.actions.deleteScene(active.id, button);
                 }
                 break;
         }

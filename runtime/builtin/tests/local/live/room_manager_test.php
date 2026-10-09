@@ -507,6 +507,44 @@ final class room_manager_test extends \advanced_testcase {
     }
 
     /**
+     * The list does not count the asking user's own presence (another window), so a room is never
+     * shown full while it can be joined; a room made smaller than its occupancy is shown above
+     * capacity and not joinable.
+     */
+    public function test_list_counts_without_own_presence(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $activity = $this->create_activity(NOGROUPS, 3, null, 1, 2);
+        [$a, $attempta] = $this->learner($activity);
+        [$b, $attemptb] = $this->learner($activity);
+        [$c, $attemptc] = $this->learner($activity);
+        [$d, $attemptd] = $this->learner($activity);
+
+        $this->join($activity, $a, $attempta, 0, null, 1);
+        $this->join($activity, $b, $attemptb, 0, null, 1);
+        $this->join($activity, $c, $attemptc, 0, null, 1);
+
+        // A's other window: room 1 holds two other people and can be joined.
+        $rooma = room_manager::list_rooms($activity['vrroom'], 0, (int)$a->id, $this->now)['rooms'][0];
+        $this->assertSame(2, $rooma['count']);
+        $this->assertTrue($rooma['joinable']);
+        // Someone outside the room sees all three.
+        $roomd = room_manager::list_rooms($activity['vrroom'], 0, (int)$d->id, $this->now)['rooms'][0];
+        $this->assertSame(3, $roomd['count']);
+        $this->assertFalse($roomd['joinable']);
+
+        // The teacher lowers the room size to 2 with three people in: above capacity, not joinable.
+        $DB->set_field('vrroom', 'livemaxusers', 2, ['id' => $activity['vrroom']->id]);
+        $activity['vrroom'] = $DB->get_record('vrroom', ['id' => $activity['vrroom']->id], '*', MUST_EXIST);
+        $list = room_manager::list_rooms($activity['vrroom'], 0, (int)$d->id, $this->now);
+        $this->assertSame(2, $list['capacity']);
+        $this->assertSame(3, $list['rooms'][0]['count']);
+        $this->assertSame(2, $list['rooms'][0]['capacity']);
+        $this->assertFalse($list['rooms'][0]['joinable']);
+        $this->refused($activity, $d, $attemptd, 1, 'errorliveroomfull');
+    }
+
+    /**
      * Roster, signal targets and the newcomer interval are scoped to the room.
      */
     public function test_rooms_are_apart(): void {

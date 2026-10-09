@@ -37,6 +37,7 @@ $string['errorimagerequired'] = 'Upload an image, or choose a different exhibit.
 $string['errormodelrequired'] = 'Upload a model, or choose a different exhibit.';
 $string['errornostations'] = 'Add at least one station.';
 $string['errorpoints'] = 'Points must be zero or more.';
+$string['errorpointsrange'] = 'Points must be 0, or a number from 0.0000001 to {$a}.';
 $string['errortitlerequired'] = 'Give the station a title.';
 $string['errortoomanystations'] = 'The chosen environment has room for {$a} stations.';
 $string['galleryheading'] = 'Gallery walk';

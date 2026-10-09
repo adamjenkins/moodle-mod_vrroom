@@ -349,4 +349,51 @@ JSON
         $errors = scene_validator::validate_set([$first, $clash]);
         $this->assertSame(['id "z-1" is used in more than one room'], $errors);
     }
+
+    /**
+     * The walkable area: stored bounds first, else a preset's shape (as the viewer computes it), else unknown.
+     */
+    public function test_walkable_bounds(): void {
+        $scene = self::valid_scene();
+        $this->assertSame(
+            ['min' => [-5.6, 0.0, -14.6], 'max' => [5.6, 0.0, 14.6]],
+            scene_validator::walkable_bounds($scene['environment'])
+        );
+
+        // A preset without stored bounds: the hall's width and length, or the courtyard's radius less 1 m.
+        $environment = $scene['environment'];
+        unset($environment['bounds']);
+        $this->assertSame(['min' => [-6.0, 0.0, -15.0], 'max' => [6.0, 0.0, 15.0]], scene_validator::walkable_bounds($environment));
+        $environment['shape'] = ['kind' => 'courtyard', 'radius' => 10];
+        $this->assertSame(['min' => [-9.0, 0.0, -9.0], 'max' => [9.0, 0.0, 9.0]], scene_validator::walkable_bounds($environment));
+        $environment['shape'] = ['kind' => 'courtyard'];
+        $this->assertSame(
+            ['min' => [-13.0, 0.0, -13.0], 'max' => [13.0, 0.0, 13.0]],
+            scene_validator::walkable_bounds($environment)
+        );
+
+        // An uploaded room model is measured by the viewer only.
+        $file = ['area' => 'environment', 'itemid' => 0, 'filepath' => '/', 'filename' => 'r.glb'];
+        $model = ['type' => 'model', 'file' => $file];
+        $this->assertNull(scene_validator::walkable_bounds($model));
+        $model['bounds'] = ['min' => [-1, 0, -2], 'max' => [1, 0, 2]];
+        $this->assertSame(['min' => [-1.0, 0.0, -2.0], 'max' => [1.0, 0.0, 2.0]], scene_validator::walkable_bounds($model));
+        $model['bounds'] = ['min' => [-1, 0], 'max' => [1, 0, 2]];
+        $this->assertNull(scene_validator::walkable_bounds($model));
+        $this->assertNull(scene_validator::walkable_bounds(null));
+    }
+
+    /**
+     * Inside the walkable area means x and z within the bounds, edges included; height does not count.
+     */
+    public function test_inside_bounds(): void {
+        $bounds = ['min' => [-5.6, 0.0, -14.6], 'max' => [5.6, 0.0, 14.6]];
+        $this->assertTrue(scene_validator::inside_bounds([0, 0, 13], $bounds));
+        $this->assertTrue(scene_validator::inside_bounds([5.6, 40, -14.6], $bounds));
+        $this->assertFalse(scene_validator::inside_bounds([5.7, 0, 0], $bounds));
+        $this->assertFalse(scene_validator::inside_bounds([0, 0, -14.7], $bounds));
+        $this->assertFalse(scene_validator::inside_bounds([500, 0, -500], $bounds));
+        $this->assertFalse(scene_validator::inside_bounds([0, 0], $bounds));
+        $this->assertFalse(scene_validator::inside_bounds([0, 0, INF], $bounds));
+    }
 }

@@ -98,16 +98,16 @@
                         {{#actions}}
                         <li class="mb-2" data-action-index="{{index}}">
                             <div class="d-flex flex-wrap align-items-end gap-2">
-                                <div>
+                                <div class="mw-100">
                                     <label class="visually-hidden" for="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do">{{#str}}logicactionno, mod_vrroom, {{number}}{{/str}}</label>
-                                    <select class="form-select w-auto" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do" data-field="do">
+                                    <select class="form-select w-auto mw-100" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-do" data-field="do">
                                         {{#dooptions}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/dooptions}}
                                     </select>
                                 </div>
                                 {{#hastarget}}
-                                <div>
+                                <div class="mw-100">
                                     <label class="visually-hidden" for="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target">{{#str}}logicactiontarget, mod_vrroom, {{number}}{{/str}}</label>
-                                    <select class="form-select w-auto" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target" data-field="actiontarget">
+                                    <select class="form-select w-auto mw-100" id="vrroom-logic-{{uid}}-r{{ruleindex}}-a{{index}}-target" data-field="actiontarget">
                                         {{#targetgroups}}
                                         {{#label}}<optgroup label="{{label}}">{{/label}}
                                         {{#options}}<option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>{{/options}}

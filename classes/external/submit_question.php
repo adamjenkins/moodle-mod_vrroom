@@ -33,7 +33,8 @@ use mod_vrroom\local\questions\usage;
  * When the answer leaves the objective open after the server's replay (below the objective's
  * pass_fraction, or not fully correct when the activity's question mode is retry), the question is
  * restarted in place so the student can try again (Phase 2 contract §4.2.3); the response then
- * carries retry = true and the feedback HTML of the try that fell short.
+ * carries retry = true and the feedback HTML of the try that fell short, without the right answer
+ * or the general feedback (they would make the next try trivial).
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -100,14 +101,15 @@ class submit_question extends external_api {
                 'maxmark' => (float)$outcome['maxmark'],
             ]);
             $result = attempt_manager::recompute($attempt);
-            [$html, $javascript] = usage::render($attempt, $slot, true);
-            $retry = false;
             $objectivestatus = (string)($result->objectives[(string)$objective['id']]['status'] ?? '');
-            if ($objectivestatus === evaluator::OBJECTIVE_AVAILABLE) {
-                // The replay left the objective open (below its pass_fraction, or not fully correct in the
-                // activity's retry question mode): keep the graded try and start a fresh one in the same slot.
+            // The replay left the objective open (below its pass_fraction, or not fully correct in the
+            // activity's retry question mode): the student tries again, so the feedback must not reveal
+            // the right answer.
+            $retry = $objectivestatus === evaluator::OBJECTIVE_AVAILABLE;
+            [$html, $javascript] = usage::render($attempt, $slot, true, !$retry);
+            if ($retry) {
+                // Keep the graded try and start a fresh one in the same slot.
                 usage::restart($attempt, $slot, time());
-                $retry = true;
             }
             $events = event_store::get_events((int)$attempt->id);
             $state = attempt_manager::build_state(

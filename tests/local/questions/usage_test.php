@@ -278,5 +278,32 @@ final class usage_test extends \advanced_testcase {
         $this->assertSame(\question_display_options::VISIBLE, $feedback->generalfeedback);
         $this->assertSame(\question_display_options::VISIBLE, $feedback->rightanswer);
         $this->assertSame(\question_display_options::HIDDEN, $feedback->flags);
+
+        // A try that can be tried again shows its own feedback but not the answer.
+        $retry = usage::display_options(true, false);
+        $this->assertTrue($retry->readonly);
+        $this->assertSame(\question_display_options::VISIBLE, $retry->correctness);
+        $this->assertSame(\question_display_options::VISIBLE, $retry->feedback);
+        $this->assertSame(\question_display_options::HIDDEN, $retry->generalfeedback);
+        $this->assertSame(\question_display_options::HIDDEN, $retry->rightanswer);
+
+        // The attempt view hides everything whatever the second argument says.
+        $attemptview = usage::display_options(false, true);
+        $this->assertSame(\question_display_options::HIDDEN, $attemptview->rightanswer);
+    }
+
+    /**
+     * The feedback view of a wrong answer shows the right answer unless told not to.
+     */
+    public function test_render_feedback_hides_right_answer_on_request(): void {
+        $attempt = $this->make_attempt();
+        usage::submit($attempt, 2, $this->responses($attempt, 2, '0'), time());
+
+        [$revealed] = usage::render($attempt, 2, true);
+        $this->assertStringContainsString('rightanswer', $revealed);
+
+        [$hidden] = usage::render($attempt, 2, true, false);
+        $this->assertStringNotContainsString('rightanswer', $hidden);
+        $this->assertStringNotContainsString('generalfeedback', $hidden);
     }
 }

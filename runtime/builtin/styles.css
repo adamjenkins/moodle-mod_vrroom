@@ -171,6 +171,11 @@
     font-weight: bold;
 }
 
+/* The question engine's own Check button would duplicate "Submit answer" in the room. */
+.vrroom-question-form .que .im-controls {
+    display: none;
+}
+
 .vrroom-xr-status {
     position: absolute;
     top: 3rem;
@@ -260,13 +265,43 @@
     }
 }
 
+/* On a phone a panel is a sheet at the bottom of the visible screen: above Moodle's sticky footer
+   (Previous/Next) and the safe area, below the navigation bar, scrolling inside what is visible. */
 @media (max-width: 575.98px) {
+    /* Moodle pages do not use viewport-fit=cover, so there are no safe-area insets to leave out. */
     .vrroom-overlay {
+        position: fixed;
         top: auto;
         right: 0;
         bottom: 0;
         left: 0;
+        z-index: 1031;
         width: 100%;
-        max-height: 60%;
+        max-width: none;
+        max-height: calc(100vh - 4.5rem);
+        overscroll-behavior: contain;
+    }
+
+    .hasstickyfooter .vrroom-overlay {
+        bottom: 80px;
+        max-height: calc(100vh - 80px - 4.5rem);
+    }
+
+    /* Fullscreen: no navigation bar and no footer. */
+    .vrroom-viewport:fullscreen .vrroom-overlay {
+        bottom: 0;
+        max-height: calc(100vh - 1rem);
+    }
+
+    /* The board texts and panels of the room never make the page wider than the screen. */
+    .vrroom-panel {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .vrroom-panel img,
+    .vrroom-panel video {
+        max-width: 100%;
+        height: auto;
     }
 }

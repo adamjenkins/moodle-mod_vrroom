@@ -68,8 +68,17 @@ $PAGE->activityheader->disable();
 // Delete an attempt: confirmation page, then the deletion itself (POST with sesskey).
 if ($deleteid) {
     require_capability('mod/vrroom:deleteattempts', $context);
-    // The id comes from the request: it must name an attempt of THIS activity.
-    $attempt = $DB->get_record('vrroom_attempts', ['id' => $deleteid, 'vrroomid' => $vrroom->id], '*', MUST_EXIST);
+    // The id comes from the request: it must name an attempt of THIS activity. One that is gone was
+    // deleted already (Back, then Delete again; or another teacher was quicker).
+    $attempt = $DB->get_record('vrroom_attempts', ['id' => $deleteid, 'vrroomid' => $vrroom->id]);
+    if (!$attempt) {
+        redirect(
+            $baseurl,
+            get_string('reportattemptalreadydeleted', 'mod_vrroom'),
+            null,
+            \core\output\notification::NOTIFY_INFO
+        );
+    }
     report_overview::require_attempt_in_groups($course, $cm, $attempt);
 
     if ($confirm) {
@@ -107,7 +116,16 @@ $attempt = null;
 if ($attemptid) {
     // The id comes from the request: it must name an attempt of THIS activity, and in separate
     // groups one of a person the teacher shares a group with. Checked before any output.
-    $attempt = $DB->get_record('vrroom_attempts', ['id' => $attemptid, 'vrroomid' => $vrroom->id], '*', MUST_EXIST);
+    $attempt = $DB->get_record('vrroom_attempts', ['id' => $attemptid, 'vrroomid' => $vrroom->id]);
+    if (!$attempt) {
+        // A stale link to an attempt that was deleted since.
+        redirect(
+            $baseurl,
+            get_string('reportattemptalreadydeleted', 'mod_vrroom'),
+            null,
+            \core\output\notification::NOTIFY_INFO
+        );
+    }
     report_overview::require_attempt_in_groups($course, $cm, $attempt);
 }
 

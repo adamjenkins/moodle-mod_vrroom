@@ -20,7 +20,6 @@ use core\output\renderable;
 use core\output\renderer_base;
 use core\output\templatable;
 use mod_vrroom\local\attempt\event_store;
-use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\questions\mode;
@@ -49,6 +48,9 @@ class report_attempt implements renderable, templatable {
 
     /** @var array<string, string> question slot => objective title (raw). */
     protected array $slottitles = [];
+
+    /** @var array<string, array{0: string, 1: int}> hint id => [objective title (raw), hint number]. */
+    protected array $hintnames = [];
 
     /**
      * Constructor.
@@ -99,7 +101,7 @@ class report_attempt implements renderable, templatable {
             'user' => $fullname,
             'state' => report_overview::state_label((string)$this->attempt->state),
             'score' => report_overview::format_score($score),
-            'grade' => grader::format_grade($this->vrroom, $score),
+            'grade' => report_overview::format_attempt_grade($this->vrroom, (string)$this->attempt->state, $score),
             'timestart' => $this->attempt->timestart ? userdate((int)$this->attempt->timestart) : '-',
             'timefinish' => $this->attempt->timefinish ? userdate((int)$this->attempt->timefinish) : '-',
             'hasobjectives' => !empty($objectives),
@@ -138,7 +140,7 @@ class report_attempt implements renderable, templatable {
                 'statuslabel' => get_string('status_' . $status, 'mod_vrroom'),
                 'badgeclass' => match ($status) {
                     evaluator::OBJECTIVE_COMPLETED => 'bg-success',
-                    evaluator::OBJECTIVE_AVAILABLE => 'bg-info text-dark',
+                    evaluator::OBJECTIVE_AVAILABLE => 'text-bg-info',
                     default => 'bg-secondary',
                 },
                 'required' => !empty($objective['required']),
@@ -205,6 +207,13 @@ class report_attempt implements renderable, templatable {
             if (($objective['type'] ?? '') === 'answer_question' && isset($objective['slot'])) {
                 $this->slottitles[(string)$objective['slot']] = $title;
             }
+            $number = 0;
+            foreach (($objective['hints'] ?? []) as $hint) {
+                $number++;
+                if (is_array($hint) && isset($hint['id'])) {
+                    $this->hintnames[(string)$hint['id']] = [$title, $number];
+                }
+            }
         }
     }
 
@@ -234,6 +243,17 @@ class report_attempt implements renderable, templatable {
                 break;
             case 'objective':
                 $raw = $this->objectivetitles[(string)$objectid] ?? null;
+                break;
+            case 'hint':
+                if (isset($this->hintnames[(string)$objectid])) {
+                    [$title, $number] = $this->hintnames[(string)$objectid];
+                    // The title is made HTML-safe before it goes into the (plain) string.
+                    return get_string(
+                        'reporthintname',
+                        'mod_vrroom',
+                        (object)['objective' => $this->format_name($title), 'number' => $number]
+                    );
+                }
                 break;
         }
         if ($raw === null || $raw === '') {

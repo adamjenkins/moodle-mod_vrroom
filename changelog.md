@@ -71,6 +71,37 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Fixed
 
+- `lib.php` loads `questionlib.php`: core's `edit_module_post_actions()` calls
+  `question_get_default_category()` for `FEATURE_USES_QUESTIONS` modules, which failed for the Blank
+  template and customised rooms (their forms never loaded the question library), and a failed add left
+  a course modinfo cache naming a deleted course module (invalidcoursemodule on the course page).
+  `instance_manager::add_instance()`/`update_instance()` also clear the course cache when they fail.
+- Spawning inside walls: per-attempt resume states (`config_builder::resume_stateid()`,
+  `vrroom-resume-<attempt id in the letters a to j>` because core takes state ids as PARAM_ALPHAEXT, validated by the xAPI handler against the user's own open attempt,
+  removed on finish and delete), resume ignored when the room layout changed, a free-spot search near
+  the start point (`vrroomruntime_builtin/spawn`, `controls.findStart()`), a per-person spread in live
+  rooms, and the room editor resets the start point to the new surroundings' own start.
+- Question mode and retry penalty locked once attempts exist; the right answer and general feedback
+  are hidden on a try that can be repeated.
+- Attempt start under a per-user lock (concurrent starts resume one attempt); `errorattemptmissing`
+  and `errorattemptbusy`; deleting an already deleted attempt redirects with a notice.
+- Gallery and Escape numbers validated as finite and storable (points and hint penalty up to
+  99999), the time limit capped, over-long hints refused.
+- Room editor: unchanged saves no longer mark the room customised; saves under a per-activity lock;
+  start points and zone centres must lie inside the room; saves that would strand open attempts are
+  refused; uploaded and referenced models must be real glTF 2.0 binaries; teacher-facing messages.
+- Live mode: controls inside fullscreen, live-off and finished-attempt states, focus kept when muting,
+  counts that leave out the user's own presence.
+- Shared materials no longer stay double-sided after a collision check; an ordered gallery no longer
+  credits a locked station when teleporting; panels fit phone screens.
+- `$plugin->version` 2026100900 (no schema change; new strings, scripts and the scheduled task's
+  extra pass).
+
+### Added
+
+- The scheduled task finishes attempts that have every required objective done and no activity for
+  24 hours (`attempt_manager::close_if_abandoned()`).
+
 - Restore validates scenes (`scene_validator::validate_set()`), graph versions
   (`graph_validator::validate()`) and settings like the form; invalid or duplicate scenes, graphs,
   slots and attempts are skipped with a restore-log warning, non-UUID statement ids are replaced,

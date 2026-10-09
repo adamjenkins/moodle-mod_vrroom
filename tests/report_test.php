@@ -16,7 +16,9 @@
 
 namespace mod_vrroom;
 
+use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\template\compiled_activity;
 use mod_vrroom\output\report_attempt;
 use mod_vrroom\output\report_overview;
 
@@ -268,6 +270,89 @@ final class report_test extends \advanced_testcase {
             );
             report_overview::require_attempt_in_groups($course, $cm, $attemptb);
         }
+    }
+
+    /**
+     * An attempt in progress shows its running score but no grade until it is finished.
+     */
+    public function test_in_progress_attempt_has_no_grade(): void {
+        global $PAGE;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$vrroom, $cm, $context, , $attempt] = $this->create_setup();
+        $output = $PAGE->get_renderer('core');
+        $attempt = attempt_manager::get_attempt((int)$attempt->id);
+        $this->assertNotNull($attempt->score);
+
+        $row = (new report_overview($vrroom, $cm, $context))->export_for_template($output)['attempts'][0];
+        $this->assertSame('-', $row['grade']);
+        $this->assertNotSame('-', $row['score']);
+        $details = (new report_attempt($vrroom, $cm, $context, $attempt))->export_for_template($output);
+        $this->assertSame('-', $details['grade']);
+
+        $attempt = attempt_manager::finish($attempt);
+        $row = (new report_overview($vrroom, $cm, $context))->export_for_template($output)['attempts'][0];
+        $this->assertNotSame('-', $row['grade']);
+        $details = (new report_attempt($vrroom, $cm, $context, $attempt))->export_for_template($output);
+        $this->assertNotSame('-', $details['grade']);
+    }
+
+    /**
+     * A hint request is shown with its objective's title and the hint's number, not its id.
+     */
+    public function test_hint_statement_is_named(): void {
+        global $DB, $PAGE;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $generator = $this->getDataGenerator();
+        $course = $generator->create_course();
+        $module = $generator->create_module('vrroom', [
+            'course' => $course->id,
+            'template' => 'gallery',
+            'stations' => [
+                ['title' => 'Vase', 'text' => '<p>Vase</p>', 'questionbankentryid' => 0, 'required' => 1, 'points' => 1,
+                    'mediatype' => 'none'],
+            ],
+        ]);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        [, $cm] = get_course_and_cm_from_cmid($module->cmid, 'vrroom');
+        $context = \context_module::instance($cm->id);
+        $scene = instance_manager::get_scenes((int)$vrroom->id)[0];
+        $graph = [
+            'schema' => 'vrroom-graph/1',
+            'hidden' => [],
+            'objectives' => [
+                ['id' => 'v-1', 'type' => 'visit_zone', 'title' => 'Find the <b>key</b>',
+                    'zone' => (string)$scene['zones'][0]['id'], 'points' => 1, 'required' => true,
+                    'hints' => [
+                        ['id' => 'hn-abc-1', 'text' => 'Look left', 'penalty' => 0.5],
+                        ['id' => 'hn-abc-2', 'text' => 'Look down', 'penalty' => 0.5],
+                    ]],
+            ],
+            'rules' => [],
+        ];
+        instance_manager::apply_compiled($vrroom, $context, new compiled_activity([$scene], $graph, []));
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+
+        $student = $generator->create_and_enrol($course, 'student');
+        /** @var \mod_vrroom_generator $vrroomgen */
+        $vrroomgen = $generator->get_plugin_generator('mod_vrroom');
+        $attempt = $vrroomgen->create_attempt((int)$vrroom->id, (int)$student->id);
+        $vrroomgen->record_event($attempt, 'requested', 'hint', null, 'hn-abc-2', false, ['penalty' => 0.5,
+            'objective' => 'v-1']);
+
+        $data = (new report_attempt($vrroom, $cm, $context, $attempt))->export_for_template($PAGE->get_renderer('core'));
+        $hints = array_values(array_filter(
+            $data['statements'],
+            fn($s) => $s['objecttype'] === get_string('objecttype_hint', 'mod_vrroom')
+        ));
+        $this->assertCount(1, $hints);
+        $expected = get_string('reporthintname', 'mod_vrroom', (object)[
+            'objective' => format_string('Find the <b>key</b>', true, ['context' => $context]),
+            'number' => 2,
+        ]);
+        $this->assertSame($expected, $hints[0]['objectname']);
+        $this->assertStringNotContainsString('hn-abc', $hints[0]['objectname']);
     }
 
     /**

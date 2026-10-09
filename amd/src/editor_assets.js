@@ -23,6 +23,9 @@
  */
 
 import ModalForm from 'core_form/modalform';
+import ModalEvents from 'core/modal_events';
+import ModalSaveCancel from 'core/modal_save_cancel';
+import Templates from 'core/templates';
 import {getString} from 'core/str';
 
 /** Upload kind => the areas whose files of that kind fit. */
@@ -156,3 +159,67 @@ export const upload = (cmid, kind, assets, returnfocus) => new Promise((resolve)
         }
     });
 });
+
+/**
+ * Ask which file a new object uses: one of the activity's files of that kind, or a new upload.
+ *
+ * Nothing is chosen until the teacher picks a file (a new object never silently reuses the last
+ * upload). With no file of the kind yet, the upload form opens straight away.
+ *
+ * @param {number} cmid Course module id.
+ * @param {string} kind model, image, audio or video.
+ * @param {Array} assets The asset list; an uploaded asset is added to it.
+ * @param {string[]} areas Allowed areas.
+ * @param {HTMLElement|null} returnfocus Element to focus when the dialogue closes.
+ * @returns {Promise<Object|null>} The asset, or null when nothing was chosen.
+ */
+export const choose = (cmid, kind, assets, areas, returnfocus) => {
+    const existing = assetsOfKind(assets, kind, areas);
+    if (!existing.length) {
+        return upload(cmid, kind, assets, returnfocus);
+    }
+    const id = `vrroom-chooser-${Date.now()}`;
+    return ModalSaveCancel.create({
+        title: getString('editorchoosefile', 'mod_vrroom'),
+        body: Templates.render('mod_vrroom/editor_assetchooser', {
+            id: id,
+            options: existing.map((asset) => ({value: refKey(asset), label: asset.filename})),
+        }),
+        buttons: {save: getString('editorusefile', 'mod_vrroom')},
+        removeOnClose: true,
+        show: true,
+        returnElement: returnfocus || null,
+    }).then((modal) => new Promise((resolve) => {
+        let done = false;
+        const finish = (value) => {
+            if (!done) {
+                done = true;
+                resolve(value);
+            }
+        };
+        const root = modal.getRoot();
+        root.on(ModalEvents.save, (e) => {
+            const select = root[0].querySelector(`#${id}`);
+            const key = select ? select.value : '';
+            if (!key && select) {
+                // Nothing chosen yet: the dialogue stays open and points at the list.
+                e.preventDefault();
+                select.classList.add('is-invalid');
+                select.focus();
+                return;
+            }
+            finish(key ? existing.find((asset) => refKey(asset) === key) || null : null);
+        });
+        root.on(ModalEvents.cancel, () => finish(null));
+        root.on(ModalEvents.hidden, () => finish(null));
+        root.on('click', '[data-action="vrroom-chooser-upload"]', (e) => {
+            e.preventDefault();
+            if (done) {
+                return;
+            }
+            done = true;
+            modal.destroy();
+            resolve(upload(cmid, kind, assets, returnfocus));
+        });
+    }));
+};

@@ -112,13 +112,16 @@ class handler extends \core_xapi\handler {
     }
 
     /**
-     * Validate a state request: only the resume state of a VR room module the user can attempt.
+     * Validate a state request: only the resume state of the user's own open attempt, in a VR room
+     * module the user can attempt.
      *
      * @param state $state
      * @return bool
      */
     protected function validate_state(state $state): bool {
-        if ($state->get_state_id() !== config_builder::RESUME_STATEID) {
+        global $DB;
+        $attemptid = config_builder::attemptid_from_resume_stateid($state->get_state_id());
+        if ($attemptid === null) {
             return false;
         }
         $activityid = $state->get_activity_id();
@@ -134,7 +137,13 @@ class handler extends \core_xapi\handler {
             return false;
         }
         $userid = (int)$state->get_user()->id;
-        return has_capability('mod/vrroom:attempt', $context, $userid) && $this->can_access($cm, $userid);
+        $owned = $DB->record_exists('vrroom_attempts', [
+            'id' => $attemptid,
+            'vrroomid' => $cm->instance,
+            'userid' => $userid,
+            'state' => attempt_manager::STATE_INPROGRESS,
+        ]);
+        return $owned && has_capability('mod/vrroom:attempt', $context, $userid) && $this->can_access($cm, $userid);
     }
 
     /**

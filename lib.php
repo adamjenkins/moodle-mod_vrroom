@@ -29,6 +29,13 @@ use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\reset;
 
+defined('MOODLE_INTERNAL') || die();
+
+// The activity declares FEATURE_USES_QUESTIONS, so core's edit_module_post_actions() calls
+// question_get_default_category() after every add and update; the question library must be loaded
+// for that whatever the template's form loaded (as mod_quiz does).
+require_once($CFG->libdir . '/questionlib.php');
+
 /**
  * The user preferences of VR room: reversed drag-to-look directions and the up/down lock in the 3D view.
  *

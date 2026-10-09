@@ -97,7 +97,8 @@ final class editor_services_test extends \advanced_testcase {
         $this->assertSame(1, $result['graphversion']);
         $this->assertFalse($result['scenesupdated']);
         $this->assertFalse($result['graphupdated']);
-        $this->assertGreaterThan(0, $result['customised']);
+        // Saving what was loaded does not customise the room.
+        $this->assertSame(0, $result['customised']);
     }
 
     /**

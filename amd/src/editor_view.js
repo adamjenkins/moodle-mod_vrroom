@@ -37,6 +37,7 @@ import {getString} from 'core/str';
 import {COLLECTIONS, clone, findRef, findScene} from 'mod_vrroom/editor_model';
 import {findAsset} from 'mod_vrroom/editor_assets';
 import {displayName} from 'mod_vrroom/editor_inspector';
+import {boundsOf, keepInside, moveStation} from 'mod_vrroom/editor_layout';
 
 /** Gizmo modes each kind of thing allows. */
 const MODES = Object.freeze({
@@ -53,6 +54,18 @@ const CLICKSLOP = 5;
 
 /** Selection outline colour. */
 const SELECTIONCOLOUR = 0x2f80ed;
+
+/** Metres around a start point that should be free of walls and furniture. */
+const CLEARANCE = 0.5;
+
+/** Heights (metres above the start point) of the rays that look for walls around it: knee and chest. */
+const CLEARANCEHEIGHTS = [0.5, 1.2];
+
+/** Eye height (metres) of the ray that looks for furniture under a start point. */
+const EYEHEIGHT = 1.6;
+
+/** Highest surface (metres above the start point) that still counts as the floor. */
+const FLOORTOLERANCE = 0.4;
 
 /**
  * Whether the browser can create a WebGL context.
@@ -100,22 +113,31 @@ const vec3 = (value, fallback) => (Array.isArray(value) && value.length === 3 &&
 /**
  * Write a gizmo transform into the selected thing of a draft document.
  *
+ * The thing stays inside the room's bounds, and a zone takes its station (the objects that name
+ * it) along.
+ *
  * @param {Object} draft Draft document.
  * @param {Object} ref Selection.
  * @param {Object} t {position, rotation, scale} from readTransform().
  * @param {string} mode Gizmo mode that made the change.
+ * @param {Object} report Filled in: {clamped: whether the thing had to be kept inside the room}.
  * @returns {boolean} Whether anything could be written.
  */
-const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complexity
+const writeTransform = (draft, ref, t, mode, report) => { // eslint-disable-line complexity
     const object = findRef(draft, ref);
     if (!object || ref.kind === 'environment') {
         return false;
     }
+    const scene = findScene(draft, ref.scene);
+    const bounds = boundsOf(scene);
     const position = t.position.map(r3);
     const rotation = t.rotation.map((v) => Math.round(v * 10) / 10);
     const scale = t.scale.map((v) => Math.max(0.01, Math.abs(v)));
     if (ref.kind === 'zone') {
+        const before = vec3(object.center, position);
         object.center = position;
+        report.clamped = keepInside('zone', object, bounds);
+        moveStation(scene, object.id, object.center.map((v, i) => v - before[i]), bounds);
         if (mode === 'scale') {
             object.size = scale.map((v) => Math.max(0.05, r3(v)));
         }
@@ -124,11 +146,13 @@ const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complex
     if (ref.kind === 'spawn') {
         object.position = position;
         object.yaw = Math.round(rotation[1] * 10) / 10;
+        report.clamped = keepInside('spawn', object, bounds);
         return true;
     }
     if (ref.kind === 'prop') {
         object.position = position;
         object.rotation = rotation;
+        report.clamped = keepInside('prop', object, bounds);
         if (mode === 'scale') {
             const size = vec3(object.size, [1, 1, 1]);
             object.size = size.map((v, i) => Math.max(0.01, r3(v * scale[i])));
@@ -137,6 +161,7 @@ const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complex
     }
     // Interactables.
     object.position = position;
+    report.clamped = keepInside('interactable', object, bounds);
     if (object.kind !== 'hotspot') {
         object.rotation = rotation;
     }
@@ -174,7 +199,8 @@ const writeTransform = (draft, ref, t, mode) => { // eslint-disable-line complex
  *
  * @param {HTMLElement} stage The stage region (holds the canvas).
  * @param {Object} model The editor model.
- * @param {Object} context Editor context ({assets, actions: {deleteSelection, onMode, showMessage}}).
+ * @param {Object} context Editor context ({assets, actions: {deleteSelection, onMode, showMessage, keptInside,
+ *     onClearance}}).
  * @returns {Object} {setMode(mode), getMode(), getPlacement(), frame(), destroy()}
  */
 export const init = (stage, model, context) => {
@@ -373,6 +399,78 @@ export const init = (stage, model, context) => {
     };
 
     /**
+     * How close a start point is to the room's walls, furniture or blocks.
+     *
+     * Rays at knee and chest height in eight directions, and one down from eye height (a counter
+     * or a table under the start point). Cheap enough to run after every change.
+     *
+     * @param {Object} spawn Start point document.
+     * @returns {number|null} Metres to the nearest surface within CLEARANCE, 0 when standing on
+     *     furniture, or null when nothing is that close.
+     */
+    const clearanceOf = (spawn) => {
+        if (!handle || !handle.environment || !handle.environment.group) {
+            return null;
+        }
+        const targets = [handle.environment.group];
+        handle.props.forEach((record) => {
+            if (record && record.mesh && record.mesh.visible) {
+                targets.push(record.mesh);
+            }
+        });
+        handle.root.updateMatrixWorld(true);
+        const p = vec3(spawn.position, [0, 0, 0]);
+        const ray = new THREE.Raycaster();
+        let nearest = null;
+        CLEARANCEHEIGHTS.forEach((height) => {
+            const origin = new THREE.Vector3(p[0], p[1] + height, p[2]);
+            for (let i = 0; i < 8; i++) {
+                const angle = i * Math.PI / 4;
+                ray.set(origin, new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle)));
+                ray.far = CLEARANCE;
+                const hit = ray.intersectObjects(targets, true)[0];
+                if (hit && (nearest === null || hit.distance < nearest)) {
+                    nearest = hit.distance;
+                }
+            }
+        });
+        ray.set(new THREE.Vector3(p[0], p[1] + EYEHEIGHT, p[2]), new THREE.Vector3(0, -1, 0));
+        ray.far = EYEHEIGHT - FLOORTOLERANCE;
+        if (ray.intersectObjects(targets, true).length) {
+            nearest = 0;
+        }
+        return nearest;
+    };
+
+    // The last cramped start points told to the editor.
+    let lastclearance = '';
+
+    /** Tell the editor which start points of the drawn room are cramped, when that changes. */
+    const checkClearance = () => {
+        const scene = model.getActiveScene();
+        if (!scene || !handle || !context.actions.onClearance) {
+            return;
+        }
+        const cramped = [];
+        (Array.isArray(scene.spawn) ? scene.spawn : []).forEach((spawn, index) => {
+            if (!spawn) {
+                return;
+            }
+            const distance = clearanceOf(spawn);
+            if (distance !== null) {
+                // An unnamed start point is named by its number in the outline, never by its id.
+                const name = typeof spawn.name === 'string' ? spawn.name.trim() : '';
+                cramped.push({id: spawn.id, name: name, number: index + 1, distance: r3(distance)});
+            }
+        });
+        const key = JSON.stringify([scene.id, cramped]);
+        if (key !== lastclearance) {
+            lastclearance = key;
+            context.actions.onClearance(cramped);
+        }
+    };
+
+    /**
      * Draw the active room from scratch.
      *
      * @param {boolean} movecamera Whether to put the camera at the room's start.
@@ -419,6 +517,7 @@ export const init = (stage, model, context) => {
                 placeCamera(scene);
             }
             attachGizmo();
+            checkClearance();
             return null;
         });
     };
@@ -443,12 +542,18 @@ export const init = (stage, model, context) => {
         }
         const now = snapshot(scene);
         const work = [];
+        const selection = model.getSelection();
         now.forEach((json, key) => {
             if (built.objects.get(key) !== json) {
                 const [kind, ...rest] = key.split(':');
                 const id = rest.join(':');
                 const object = findRef(model.getDocument(), {scene: scene.id, kind: kind, id: id});
                 if (object) {
+                    if (selection && selection.kind === kind && selection.id === id) {
+                        // The gizmo must not hold an object that leaves the scene graph (a new file
+                        // replaces the whole object); attachGizmo() puts it on the new one.
+                        gizmo.detach();
+                    }
                     work.push(handle.addOrUpdate(kind, clone(object)));
                 }
             }
@@ -467,9 +572,10 @@ export const init = (stage, model, context) => {
             handle.setHidden(hidden);
         }
         return Promise.all(work).then(() => {
-            if (!destroyed) {
+            if (!destroyed && handle) {
                 handle.setHidden(hiddenSet());
                 attachGizmo();
+                checkClearance();
             }
             return null;
         });
@@ -493,12 +599,16 @@ export const init = (stage, model, context) => {
         const t = readTransform(object);
         const gizmomode = mode;
         const target = findRef(model.getDocument(), ref);
+        const report = {clamped: false};
         getString('editorchange_move', 'mod_vrroom', displayName(target)).then((label) => {
-            const changed = model.transact(label, (draft) => writeTransform(draft, ref, t, gizmomode));
+            const changed = model.transact(label, (draft) => writeTransform(draft, ref, t, gizmomode, report));
             if (!changed) {
                 // Nothing moved after all: redraw the object where the document has it.
                 built.objects.delete(`${ref.kind}:${ref.id}`);
                 scheduleUpdate();
+            }
+            if (report.clamped && context.actions.keptInside) {
+                context.actions.keptInside([displayName(target)]);
             }
             return null;
         }).catch(Notification.exception);
@@ -645,12 +755,15 @@ export const init = (stage, model, context) => {
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     resize();
-    const clock = new THREE.Clock();
-    renderer.setAnimationLoop(() => {
-        const dt = clock.getDelta();
+    // THREE.Timer, not the deprecated THREE.Clock; it also skips the time a hidden tab was away.
+    const timer = new THREE.Timer();
+    timer.connect(document);
+    renderer.setAnimationLoop((time) => {
+        timer.update(time);
+        const dt = timer.getDelta();
         orbit.update();
         if (handle) {
-            handle.update(dt, clock.elapsedTime);
+            handle.update(dt, timer.getElapsed());
         }
         if (selectionbox) {
             selectionbox.update();
@@ -678,6 +791,7 @@ export const init = (stage, model, context) => {
             destroyed = true;
             unsubscribers.forEach((u) => u());
             renderer.setAnimationLoop(null);
+            timer.dispose();
             observer.disconnect();
             canvas.removeEventListener('pointerdown', onPointerDown);
             canvas.removeEventListener('pointerup', onPointerUp);

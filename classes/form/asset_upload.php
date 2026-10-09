@@ -54,6 +54,35 @@ class asset_upload extends \core_form\dynamic_form {
     }
 
     /**
+     * A model that is not a real binary glTF 2.0 file is a field error, shown in the form.
+     *
+     * @param array $data Submitted data.
+     * @param array $files Files.
+     * @return array errors
+     */
+    public function validation($data, $files) {
+        global $USER;
+        $errors = parent::validation($data, $files);
+        if ($this->get_kind() !== 'model' || empty($data['assetfile'])) {
+            return $errors;
+        }
+        $draft = get_file_storage()->get_area_files(
+            \context_user::instance($USER->id)->id,
+            'user',
+            'draft',
+            (int)$data['assetfile'],
+            'id',
+            false
+        );
+        foreach ($draft as $file) {
+            if (!editor_manager::is_glb($file)) {
+                $errors['assetfile'] = get_string('erroreditorbadglb', 'mod_vrroom', s($file->get_filename()));
+            }
+        }
+        return $errors;
+    }
+
+    /**
      * The module context of the activity named by cmid.
      *
      * @return \context
@@ -124,6 +153,11 @@ class asset_upload extends \core_form\dynamic_form {
             $name = $file ? $file->get_filename() : '';
             $fs->delete_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid);
             throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', s($name !== '' ? $name : 'file'));
+        }
+        // A file renamed to .glb would be stored and only fail later, in the student's room.
+        if ($kind === 'model' && !editor_manager::is_glb($file)) {
+            $fs->delete_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid);
+            throw new \moodle_exception('erroreditorbadglb', 'mod_vrroom', '', s($file->get_filename()));
         }
         return editor_manager::asset_entry($file);
     }

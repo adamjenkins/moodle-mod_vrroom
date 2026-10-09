@@ -141,6 +141,9 @@ if ($runtime !== null) {
         'hasinprogress' => $hasinprogress,
         'canstart' => $canstart,
         'attemptsleft' => $attemptsleft,
+        // The page already explains why the room cannot be opened (no attempts left, or no
+        // permission), so the client does not add a second, vaguer notice of its own.
+        'hasmessage' => $message !== '' && !$canstart && !$canpreview,
     ];
     $entry = $runtime->client_entry();
     $PAGE->requires->js_call_amd($entry['module'], $entry['function'], [$boot]);

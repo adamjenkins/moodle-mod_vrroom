@@ -126,7 +126,7 @@ export const createPanels = (stageroot, session, options = {}) => {
                 }
                 return undefined;
             })
-            .catch(Notification.exception)
+            .catch((error) => session.reportError(error))
             .then(() => pending.resolve());
     };
 
@@ -394,7 +394,7 @@ const buildProgress = (host, session, options, strings) => {
                     announce(root, nomorehints);
                     return render();
                 }
-                return Notification.exception(error);
+                return session.reportError(error);
             })
             .then(() => pending.resolve())
             .catch(() => pending.resolve());
@@ -412,7 +412,7 @@ const buildProgress = (host, session, options, strings) => {
         return Promise.resolve(options.onFinish ? options.onFinish() : null)
             .catch((error) => {
                 button.disabled = false;
-                Notification.exception(error);
+                return session.reportError(error);
             })
             .then(() => pending.resolve());
     };

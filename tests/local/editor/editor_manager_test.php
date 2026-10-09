@@ -123,6 +123,7 @@ final class editor_manager_test extends \advanced_testcase {
      * @param int $itemid item id
      * @param string $filename file name
      * @param string $component component
+     * @param string|null $content file content; null for a line of text naming the file
      * @return \stored_file
      */
     private static function store_file(
@@ -130,7 +131,8 @@ final class editor_manager_test extends \advanced_testcase {
         string $area,
         int $itemid,
         string $filename,
-        string $component = 'mod_vrroom'
+        string $component = 'mod_vrroom',
+        ?string $content = null
     ): \stored_file {
         return get_file_storage()->create_file_from_string([
             'contextid' => $context->id,
@@ -139,7 +141,17 @@ final class editor_manager_test extends \advanced_testcase {
             'itemid' => $itemid,
             'filepath' => '/',
             'filename' => $filename,
-        ], 'content of ' . $filename);
+        ], $content ?? 'content of ' . $filename);
+    }
+
+    /**
+     * A real binary glTF 2.0 model.
+     *
+     * @return string
+     */
+    private static function glb(): string {
+        global $CFG;
+        return file_get_contents($CFG->dirroot . '/mod/vrroom/tests/fixtures/cube.glb');
     }
 
     /**
@@ -238,6 +250,11 @@ final class editor_manager_test extends \advanced_testcase {
             'credit' => 'Someone',
             'missing' => false,
         ];
+        // The start point and the zones move into the smaller room, as the editor does when the room changes.
+        $document['scenes'][0]['spawn'][0]['position'] = environment_registry::get('testpack/a')['spawn']['position'];
+        foreach ($document['scenes'][0]['zones'] as $z => $zone) {
+            $document['scenes'][0]['zones'][$z]['center'] = [-6.0 + 4 * $z, 1.5, 0.0];
+        }
         $result = $this->save_document($fx, $document);
         $this->assertTrue($result['scenesupdated']);
         $stored = instance_manager::get_scenes($fx->vrroomid)[0]['environment'];
@@ -261,7 +278,8 @@ final class editor_manager_test extends \advanced_testcase {
     }
 
     /**
-     * Saving the unchanged document changes nothing but marks the room customised.
+     * Saving the unchanged document changes nothing, and does not mark the room customised (which
+     * would lock its template).
      */
     public function test_save_unchanged_round_trip(): void {
         global $DB;
@@ -277,9 +295,12 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertFalse($result['scenesupdated']);
         $this->assertFalse($result['graphupdated']);
         $this->assertSame((int)$before->graphversion, $result['graphversion']);
-        $this->assertGreaterThan(0, $result['customised']);
+        $this->assertSame(0, $result['customised']);
+        $this->assertSame($document['revision'], $result['revision']);
         $this->assertSame(editor_manager::revision($this->vrroom($fx), $fx->context), $result['revision']);
-        $this->assertSame($result['customised'], (int)$DB->get_field('vrroom', 'customised', ['id' => $fx->vrroomid]));
+        $after = $this->vrroom($fx);
+        $this->assertEquals(0, $after->customised);
+        $this->assertEquals($before->timemodified, $after->timemodified);
         $this->assertSame(1, $DB->count_records('vrroom_graphs', ['vrroomid' => $fx->vrroomid]));
         foreach ($events as $event) {
             $this->assertNotInstanceOf(\mod_vrroom\event\scene_updated::class, $event);
@@ -454,8 +475,13 @@ final class editor_manager_test extends \advanced_testcase {
         self::store_file(\context_module::instance($other->cmid), 'assets', 1, 'skull.glb');
         $this->assert_save_fails($fx, $broken, 'erroreditorasset');
 
-        // A runtime URL is stripped, and with the file in place the save goes through.
+        // A text file named .glb is not a model.
         self::store_file($fx->context, 'assets', 1, 'skull.glb');
+        $this->assert_save_fails($fx, $broken, 'erroreditorbadglb', 'skull.glb');
+        get_file_storage()->delete_area_files($fx->context->id, 'mod_vrroom', 'assets', 1);
+
+        // A runtime URL is stripped, and with the file in place the save goes through.
+        self::store_file($fx->context, 'assets', 1, 'skull.glb', 'mod_vrroom', self::glb());
         self::store_file($fx->context, 'assets', 2, 'unused.png');
         $this->assertSame(3, editor_manager::next_asset_itemid($fx->context));
         $broken['scenes'][0]['interactables'][count($broken['scenes'][0]['interactables']) - 1]['file']['url'] =
@@ -614,5 +640,220 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertSame('audio', editor_manager::asset_kind('tape.m4a'));
         $this->assertSame('video', editor_manager::asset_kind('film.webm'));
         $this->assertSame('other', editor_manager::asset_kind('notes.txt'));
+    }
+
+    /**
+     * Two saves made from the same revision: the second is refused even when its caller read the
+     * vrroom row before the first save (the row is read again under the activity's lock).
+     */
+    public function test_conflict_with_stale_row(): void {
+        $fx = $this->setup_activity();
+        $stalerow = $this->vrroom($fx);
+        $document = $this->load_document($fx);
+        $stale = $document;
+
+        // Only the tasks change, so only the vrroom row's graph differs afterwards.
+        $document['graph']['objectives'][0]['title'] = 'First save';
+        $this->save_document($fx, $document);
+
+        $stale['graph']['objectives'][0]['title'] = 'Second save';
+        $payload = json_encode([
+            'schema' => $stale['schema'],
+            'revision' => $stale['revision'],
+            'scenes' => $stale['scenes'],
+            'graph' => $stale['graph'],
+            'bindings' => $stale['bindings'],
+        ], JSON_THROW_ON_ERROR);
+        try {
+            editor_manager::save($fx->cm, $fx->context, $stalerow, $payload);
+            $this->fail('A save over another save was accepted.');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('erroreditorconflict', $e->errorcode);
+        }
+        $this->assertSame('First save', instance_manager::get_graph($fx->vrroomid)['objectives'][0]['title']);
+    }
+
+    /**
+     * Start points and zone centres outside the room's walkable area are refused by name; what was
+     * stored like that before stays saveable while the room's area does not change.
+     */
+    public function test_bounds(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        $document = $this->load_document($fx);
+        $room = $document['scenes'][0]['name'];
+
+        // A start point far outside the gallery hall.
+        $broken = $document;
+        $broken['scenes'][0]['spawn'][0]['position'] = [500, 0, -500];
+        $broken['scenes'][0]['spawn'][0]['name'] = 'Entrance';
+        $expected = get_string('erroreditorspawnoutside', 'mod_vrroom', (object)['name' => 'Entrance', 'room' => $room]);
+        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', s($expected));
+        unset($broken['scenes'][0]['spawn'][0]['name']);
+        $expected = get_string('erroreditorspawnoutsideunnamed', 'mod_vrroom', (object)['name' => '', 'room' => $room]);
+        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', s($expected));
+
+        // A zone whose centre is outside, named by its name and not its id.
+        $broken = $document;
+        $zone = $broken['scenes'][0]['zones'][0];
+        $broken['scenes'][0]['zones'][0]['center'] = [200, 1.5, 200];
+        $expected = get_string('erroreditorzoneoutside', 'mod_vrroom', (object)['name' => $zone['name'], 'room' => $room]);
+        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', s($expected));
+
+        // A zone that does not reach down to the floor can never be entered.
+        $broken = $document;
+        $broken['scenes'][0]['zones'][0]['center'] = [5.6, 40, -14.6];
+        $this->assert_save_fails($fx, $broken, 'erroreditorinvalid', s($expected));
+
+        // The edge of the area is inside, and a zone may reach above and below the floor.
+        $half = abs((float)$zone['size'][1]) / 2;
+        $document['scenes'][0]['zones'][0]['center'] = [5.6, $half, -14.6];
+        $this->save_document($fx, $document);
+
+        // A start point stored outside before this check: the room can still be saved unchanged in that respect.
+        $row = $DB->get_record('vrroom_scenes', ['vrroomid' => $fx->vrroomid], '*', IGNORE_MULTIPLE);
+        $scene = json_decode($row->scenejson, true);
+        $scene['spawn'][0]['position'] = [40, 0, 40];
+        $DB->set_field('vrroom_scenes', 'scenejson', json_encode($scene), ['id' => $row->id]);
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['name'] = 'Renamed';
+        $this->save_document($fx, $document);
+
+        // But not once the room's area changes.
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['environment'] = environment_registry::get('courtyard')['environment'];
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', 'outside the area students can walk in');
+    }
+
+    /**
+     * A room model uploaded without bounds is not checked for bounds, but must be a real GLB file.
+     */
+    public function test_model_environment(): void {
+        $fx = $this->setup_activity();
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['environment'] = [
+            'type' => 'model',
+            'file' => ['area' => 'environment', 'itemid' => 0, 'filepath' => '/', 'filename' => 'hall.glb'],
+        ];
+        $document['scenes'][0]['spawn'][0]['position'] = [40, 0, 40];
+
+        self::store_file($fx->context, 'environment', 0, 'hall.glb', 'mod_vrroom', "glTF\x01\x00\x00\x00" . str_repeat("\0", 20));
+        $this->assert_save_fails($fx, $document, 'erroreditorbadglb', 'hall.glb');
+
+        get_file_storage()->delete_area_files($fx->context->id, 'mod_vrroom', 'environment');
+        self::store_file($fx->context, 'environment', 0, 'hall.glb', 'mod_vrroom', self::glb());
+        $result = $this->save_document($fx, $document);
+        $this->assertTrue($result['scenesupdated']);
+    }
+
+    /**
+     * Only binary glTF 2.0 files whose header length fits the file count as GLB.
+     */
+    public function test_is_glb(): void {
+        $this->resetAfterTest();
+        $context = \context_system::instance();
+        $this->assertTrue(editor_manager::is_glb(self::store_file($context, 'test', 1, 'a.glb', 'mod_vrroom', self::glb())));
+        $this->assertFalse(editor_manager::is_glb(self::store_file($context, 'test', 2, 'b.glb')));
+        $this->assertFalse(editor_manager::is_glb(self::store_file($context, 'test', 3, 'c.glb', 'mod_vrroom', 'glTF')));
+        $v1 = 'glTF' . pack('V', 1) . pack('V', 12);
+        $this->assertFalse(editor_manager::is_glb(self::store_file($context, 'test', 4, 'd.glb', 'mod_vrroom', $v1)));
+        $toolong = 'glTF' . pack('V', 2) . pack('V', 4000);
+        $this->assertFalse(editor_manager::is_glb(self::store_file($context, 'test', 5, 'e.glb', 'mod_vrroom', $toolong)));
+        $headeronly = 'glTF' . pack('V', 2) . pack('V', 12);
+        $this->assertTrue(editor_manager::is_glb(self::store_file($context, 'test', 6, 'f.glb', 'mod_vrroom', $headeronly)));
+    }
+
+    /**
+     * A task that refers to something deleted is explained with the objective's title, not ids.
+     */
+    public function test_teacher_messages(): void {
+        $fx = $this->setup_activity();
+        $document = $this->load_document($fx);
+        $zoneid = $document['scenes'][0]['zones'][0]['id'];
+        $objective = array_values(array_filter(
+            $document['graph']['objectives'],
+            fn($o) => ($o['type'] ?? null) === 'visit_zone' && $o['zone'] === $zoneid
+        ))[0];
+
+        // The zone goes; the objects in it are left without a zone.
+        array_shift($document['scenes'][0]['zones']);
+        foreach ($document['scenes'][0]['interactables'] as $j => $item) {
+            if (($item['zone'] ?? null) === $zoneid) {
+                $document['scenes'][0]['interactables'][$j]['zone'] = null;
+            }
+        }
+        $expected = get_string('erroreditorobjectivezone', 'mod_vrroom', $objective['title']);
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s($expected));
+        try {
+            $this->save_document($fx, $document);
+        } catch (\moodle_exception $e) {
+            // The id is in the debug information only (PHPUnit appends it to the message).
+            $this->assertStringContainsString($zoneid, $e->debuginfo);
+            $this->assertStringNotContainsString($zoneid, $e->a);
+        }
+
+        // A portal into a room that is gone.
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['interactables'][] = ['id' => 'pt-x', 'kind' => 'portal', 'name' => 'Cellar door',
+            'position' => [0, 0, 0], 'target' => ['scene' => 'gone', 'spawn' => 's-gone']];
+        $a = (object)['name' => 'Cellar door', 'room' => $document['scenes'][0]['name']];
+        $expected = get_string('erroreditorportaltarget', 'mod_vrroom', $a);
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s($expected));
+
+        // No rooms at all.
+        $document = $this->load_document($fx);
+        $document['scenes'] = [];
+        $expected = get_string('erroreditorroomcount', 'mod_vrroom', 20);
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s($expected));
+    }
+
+    /**
+     * Rooms that an attempt in progress still needs cannot be removed: the graph version of every
+     * open attempt must still find its zones in the new rooms.
+     */
+    public function test_attempts_in_progress(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        $student = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
+        $vrroom = $this->vrroom($fx);
+        $attemptid = $DB->insert_record('vrroom_attempts', (object)[
+            'vrroomid' => $fx->vrroomid,
+            'userid' => $student->id,
+            'attempt' => 1,
+            'state' => 'inprogress',
+            'uniqueid' => 0,
+            'slotmap' => '{}',
+            'graphversion' => (int)$vrroom->graphversion,
+            'requireddone' => 0,
+            'timestart' => time(),
+            'timefinish' => 0,
+            'timedue' => 0,
+            'timemodified' => time(),
+        ]);
+
+        // The second station's zone gets a new id everywhere: the new tasks are consistent, but the
+        // attempt's tasks still name the old zone.
+        $document = $this->load_document($fx);
+        $zone = $document['scenes'][0]['zones'][1];
+        $changed = json_decode(str_replace(
+            json_encode($zone['id']),
+            json_encode('z-renamed'),
+            json_encode($document, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        ), true);
+        $changed['revision'] = $document['revision'];
+        $expected = get_string('erroreditorinprogressone', 'mod_vrroom', (object)['count' => 1, 'name' => $zone['name']]);
+        $this->assert_save_fails($fx, $changed, 'erroreditorinvalid', s($expected));
+
+        // Moving the zone is fine.
+        $moved = $document;
+        $moved['scenes'][0]['zones'][1]['center'][0] -= 0.5;
+        $this->save_document($fx, $moved);
+
+        // An attempt whose time is up does not hold the room.
+        $DB->set_field('vrroom_attempts', 'timedue', time() - 60, ['id' => $attemptid]);
+        $changed['revision'] = $this->load_document($fx)['revision'];
+        $changed['scenes'][0]['zones'][1]['center'] = $moved['scenes'][0]['zones'][1]['center'];
+        $this->save_document($fx, $changed);
+        $this->assertSame('z-renamed', instance_manager::get_scenes($fx->vrroomid)[0]['zones'][1]['id']);
     }
 }

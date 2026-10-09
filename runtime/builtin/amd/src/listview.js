@@ -233,13 +233,25 @@ export const start = (root, session, config) => {
             return session.isZoneLocked(zoneid) ? 'locked' : 'available';
         };
 
+        // A visited station is only done once the questions it holds are answered too.
+        const stationStatus = (zoneid, slots) => {
+            const status = zoneStatus(zoneid);
+            if (status !== 'completed') {
+                return status;
+            }
+            const open = slots.some((slot) => {
+                const objective = session.getObjectiveForSlot(slot);
+                return !!objective && objective.status !== 'completed';
+            });
+            return open ? 'available' : status;
+        };
+
         const stations = [];
         const others = [];
         scenes.forEach((scene, index) => {
             const zones = Array.isArray(scene.zones) ? scene.zones : [];
             const interactables = Array.isArray(scene.interactables) ? scene.interactables : [];
             zones.forEach((zone) => {
-                const status = zoneStatus(zone.id);
                 const items = interactables.filter((i) => i.zone === zone.id)
                     .map((i) => itemContext(i, scene, state.hidden, usable));
                 const slots = [];
@@ -248,6 +260,7 @@ export const start = (root, session, config) => {
                         slots.push({slot: ctx.slot});
                     }
                 });
+                const status = stationStatus(zone.id, slots.map((s) => s.slot));
                 allitems.push(...items);
                 stations.push({
                     zoneid: zone.id,
@@ -409,9 +422,15 @@ export const start = (root, session, config) => {
             // Keep badges, hidden items and questions in step with the state.
             const update = (message) => {
                 const current = message.state;
+                if (message.unlocked.length) {
+                    // A station may be open now: "Visit the previous station first." goes.
+                    clearMessage(root, stationlocked);
+                }
                 listview.querySelectorAll('[data-region="vrroom-station"]').forEach((station) => {
                     const zoneid = station.dataset.zone;
-                    const status = zoneStatus(zoneid);
+                    const slots = Array.from(station.querySelectorAll('[data-region="vrroom-question"][data-slot]'))
+                        .map((qhost) => Number(qhost.dataset.slot));
+                    const status = stationStatus(zoneid, slots);
                     const badge = station.querySelector('[data-region="vrroom-station-status"]');
                     if (badge.dataset.status !== status) {
                         badge.dataset.status = status;

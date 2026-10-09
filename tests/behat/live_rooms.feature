@@ -53,7 +53,7 @@ Feature: A student chooses a live room of a VR room activity
     And the VR room room is ready
     Then I should see "1 of 2" in the "[data-region='vrroom-live-room'][data-room='1']" "css_element"
     And the "disabled" attribute of "Start a new room" "button" should be set
-    And I should see "The limit of 1 rooms is reached." in the "[data-region='vrroom-live-startreason']" "css_element"
+    And I should see "No more rooms can be opened (the most allowed at once: 1)." in the "[data-region='vrroom-live-startreason']" "css_element"
     And I click on "[data-region='vrroom-live-room'][data-room='1'] [data-action='vrroom-live-joinroom']" "css_element"
     And I should see "You are in Room 1." in the "[data-region='vrroom-live-current']" "css_element"
 

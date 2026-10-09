@@ -25,6 +25,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+import Ajax from 'core/ajax';
 import Notification from 'core/notification';
 import Pending from 'core/pending';
 import {getStrings} from 'core/str';
@@ -33,6 +34,7 @@ import {createMeshTransport} from 'vrroomruntime_builtin/live/mesh';
 import {createVoice} from 'vrroomruntime_builtin/live/voice';
 import {fetchRooms} from 'vrroomruntime_builtin/live/signalling';
 import {createPanel} from 'vrroomruntime_builtin/live/panel';
+import {attemptEnded, roomRemoved, listCapacity, mutePeerOf} from 'vrroomruntime_builtin/live/roomstatus';
 import {region, announce, plainText, startScene} from 'vrroomruntime_builtin/util';
 
 /** Strings of the live room (all in vrroomruntime_builtin). */
@@ -45,6 +47,7 @@ const STRINGS = [
     'livemutepeer', 'liveparticipants', 'livepeerjoined', 'livepeerleft', 'livereconnecting',
     'livereplaced', 'liveroomslistfailed', 'liveunmute', 'liveunmutepeer', 'livewhere3d', 'livewherear',
     'livewherelist', 'livewheremr', 'livewhereroom', 'livewherevr', 'liveyou',
+    'liveoff', 'liveattemptended', 'liveroomremoved',
 ];
 
 /** Transports by config.live.transport. */
@@ -192,6 +195,17 @@ class LiveController extends Emitter {
         this.roomsfailed = false;
         this.failureshown = false;
         this.roomname = '';
+        // The room joined ({groupid, number}), and the one just closed for this user (its cause is
+        // looked for in the next list of rooms).
+        this.room = null;
+        this.closedroom = null;
+        // The room asked for in the running join, and the last list of rooms (for the current room size).
+        this.joinroom = 0;
+        this.lastrooms = null;
+        // Joining is not offered (the string key says why); with lockoutretry the list is still
+        // asked for now and then, and joining comes back when live mode is turned on again.
+        this.lockout = '';
+        this.lockoutretry = false;
 
         this.voice.on('micstate', () => {
             this.sendState();
@@ -242,6 +256,10 @@ class LiveController extends Emitter {
 
         this.onVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
+                if (!this.joined && !this.joining && !this.lockout) {
+                    // The attempt may have been finished in another window meanwhile.
+                    this.checkAttempt();
+                }
                 this.refreshRooms();
             } else {
                 this.stopRoomsTimer();
@@ -303,6 +321,11 @@ class LiveController extends Emitter {
             return this.panel.render();
         }).then(() => {
             this.updateVoiceControls();
+            if (this.lockout) {
+                // Found out before the panel was there.
+                this.setStatus(this.lockout);
+                this.showJoining(false);
+            }
             this.refreshRooms();
             pending.resolve();
             return undefined;
@@ -321,6 +344,9 @@ class LiveController extends Emitter {
         if (!this.roomlist || !this.panel || this.destroyed || this.joined || this.joining || !this.liveconfig.canjoin) {
             return;
         }
+        if (this.lockout && !this.lockoutretry) {
+            return;
+        }
         if (document.visibilityState && document.visibilityState !== 'visible') {
             // Loaded again when the page is shown (visibilitychange).
             return;
@@ -335,6 +361,19 @@ class LiveController extends Emitter {
                 return undefined;
             }
             interval = roomsInterval(answer ? answer.interval : 0);
+            if (this.lockout) {
+                // Live mode is on again.
+                this.unlock();
+            }
+            this.lastrooms = answer || null;
+            if (this.closedroom) {
+                // Moved out because the teacher lowered the number of rooms: say so instead of "closed".
+                const removed = roomRemoved(answer, this.closedroom);
+                this.closedroom = null;
+                if (removed && this.statuskey === 'liveclosed') {
+                    this.setStatus('liveroomremoved');
+                }
+            }
             if (this.roomsfailed) {
                 this.roomsfailed = false;
                 if (this.statuskey === '' && this.panel) {
@@ -342,8 +381,27 @@ class LiveController extends Emitter {
                 }
             }
             return this.panel.setRooms(answer || {});
-        }).catch(() => {
+        }).catch((error) => {
             if (!current()) {
+                return undefined;
+            }
+            const code = error && error.errorcode ? String(error.errorcode) : '';
+            if (code === 'errorlivedisabled') {
+                // The teacher turned live mode off: no stale list with Join buttons. Asked again
+                // now and then (lockOut() schedules it), in case it is turned on again.
+                if (this.lockout !== 'liveoff') {
+                    this.lockOut('liveoff', true);
+                }
+                interval = ROOMS_MAX_INTERVAL;
+                return undefined;
+            }
+            if (code === 'errorlivenotallowed') {
+                this.lockOut('errorlivenotallowed', false);
+                return undefined;
+            }
+            if (this.lockout) {
+                // Already explained; keep asking quietly.
+                interval = ROOMS_MAX_INTERVAL;
                 return undefined;
             }
             // Shown on the status line only when it holds nothing else (a join failure stays); the
@@ -355,7 +413,7 @@ class LiveController extends Emitter {
             }
             return undefined;
         }).then(() => {
-            if (current()) {
+            if (current() && (!this.lockout || this.lockoutretry)) {
                 this.scheduleRooms(interval);
             }
             pending.resolve();
@@ -398,11 +456,13 @@ class LiveController extends Emitter {
      * @returns {Promise}
      */
     join(room) {
-        if (this.destroyed || this.joined || this.joining || !this.liveconfig.canjoin) {
+        if (this.destroyed || this.joined || this.joining || !this.liveconfig.canjoin || this.lockout) {
             return Promise.resolve();
         }
         const number = Number(room);
         const roomnumber = isFinite(number) && number > 0 ? Math.floor(number) : 0;
+        this.joinroom = roomnumber;
+        this.closedroom = null;
         // Answers of the list that are on their way no longer matter.
         this.stopRoomsTimer();
         this.roomsseq++;
@@ -470,6 +530,7 @@ class LiveController extends Emitter {
             if (result && result.room && result.room.name) {
                 this.roomname = String(result.room.name);
             }
+            this.rememberRoom(result ? result.room : null);
             this.onJoined();
             return undefined;
         }).catch((error) => {
@@ -691,7 +752,11 @@ class LiveController extends Emitter {
             this.setStatus('livereconnecting');
         } else if (state === 'left') {
             const keys = {closed: 'liveclosed', replaced: 'livereplaced'};
+            const room = this.room;
             this.teardown(keys[reason] || 'liveleft');
+            if (reason === 'closed') {
+                this.explainClosed(room);
+            }
         } else if (state === 'failed') {
             this.onFailed(reason);
         }
@@ -721,6 +786,7 @@ class LiveController extends Emitter {
             if (info && info.room && info.room.name) {
                 this.roomname = String(info.room.name);
             }
+            this.rememberRoom(info ? info.room : null);
         }
         if (this.panel) {
             this.panel.setBusy(false);
@@ -749,9 +815,12 @@ class LiveController extends Emitter {
     onFailed(reason) {
         let text;
         if (reason === 'full') {
-            text = this.str('livefull', Number(this.liveconfig.maxpeers) || 0);
+            // The size the teacher set now (from the last list of rooms), not the one of page load.
+            const size = listCapacity(this.lastrooms, this.joinroom) || Number(this.liveconfig.maxpeers) || 0;
+            text = this.str('livefull', size);
         } else if (reason === 'limit') {
-            text = this.str('errorliveroomlimit', Number(this.liveconfig.maxrooms) || 0);
+            const most = Number(this.lastrooms ? this.lastrooms.maxrooms : 0) || Number(this.liveconfig.maxrooms) || 0;
+            text = this.str('errorliveroomlimit', most);
         } else if (reason === 'roomgone') {
             text = this.str('errorliveroomgone');
         } else if (FAILURES[reason]) {
@@ -761,11 +830,131 @@ class LiveController extends Emitter {
         }
         this.teardown('');
         this.statuskey = '';
-        this.failureshown = true;
         this.roomsfailed = false;
+        if (reason === 'disabled') {
+            this.lockOut('liveoff', true);
+            return;
+        }
+        if (reason === 'limit' && this.roomlist) {
+            // The list of rooms, loaded again by teardown(), shows the limit under "Start a new room":
+            // say it once to screen readers here, not a second time on the status line.
+            this.failureshown = false;
+            announce(this.root, text);
+            return;
+        }
+        this.failureshown = true;
         if (this.panel) {
             this.panel.setStatus(text);
         }
+        if (reason === 'notallowed' || reason === 'error') {
+            // Perhaps the attempt was finished in another window.
+            this.checkAttempt();
+        }
+    }
+
+    /**
+     * Remember the room joined.
+     *
+     * @param {Object|null} room Transport room {groupid, number, name, maxpeers}.
+     */
+    rememberRoom(room) {
+        if (!room || typeof room !== 'object') {
+            return;
+        }
+        const number = Number(room.number);
+        if (isFinite(number) && number > 0) {
+            this.room = {groupid: Number(room.groupid) || 0, number: Math.floor(number)};
+        }
+    }
+
+    /**
+     * The server closed the room for this user: find out why, where it can be told. A finished
+     * attempt ends joining; a room the teacher removed is named on the status line by the next
+     * list of rooms; anything else keeps "The live room has been closed.".
+     *
+     * @param {Object|null} room {groupid, number} of the room that was closed.
+     */
+    explainClosed(room) {
+        this.closedroom = room;
+        this.checkAttempt();
+    }
+
+    /**
+     * Ask the server whether the attempt of this launch is still open; when it is not, joining is
+     * no longer offered. A preview has no attempt and is never asked about.
+     *
+     * @returns {Promise}
+     */
+    checkAttempt() {
+        const attemptid = Number(this.liveconfig.attemptid) || 0;
+        if (!attemptid || this.destroyed) {
+            return Promise.resolve();
+        }
+        const pending = new Pending('vrroomruntime_builtin/live/controller:attempt');
+        return Promise.resolve(Ajax.call([{
+            methodname: 'mod_vrroom_get_attempt_state',
+            args: {attemptid: attemptid},
+        }])[0]).then((state) => {
+            if (attemptEnded(state) && !this.destroyed && !this.joined && !this.joining) {
+                this.lockOut('liveattemptended', false);
+            }
+            return undefined;
+        }).catch(() => {
+            // Unknown: the general message stays.
+            return undefined;
+        }).then(() => {
+            pending.resolve();
+            return undefined;
+        });
+    }
+
+    /**
+     * Stop offering to join, with the reason on the status line.
+     *
+     * @param {string} key String key of the reason.
+     * @param {boolean} retry Keep asking for the list of rooms now and then (live mode may come back).
+     */
+    lockOut(key, retry) {
+        this.lockout = key;
+        this.lockoutretry = !!retry;
+        this.closedroom = null;
+        // Answers of the list that are on their way no longer matter.
+        this.stopRoomsTimer();
+        this.roomsseq++;
+        this.setStatus(key);
+        this.showJoining(false);
+        if (this.lockoutretry && !this.destroyed) {
+            this.scheduleRooms(ROOMS_MAX_INTERVAL);
+        }
+    }
+
+    /**
+     * Offer joining again (live mode was turned on again).
+     */
+    unlock() {
+        const key = this.lockout;
+        this.lockout = '';
+        this.lockoutretry = false;
+        this.showJoining(true);
+        if (key && this.statuskey === key) {
+            this.setStatus('');
+        }
+    }
+
+    /**
+     * Show or hide the ways to join (the list of rooms, or the single Join button). The hidden
+     * attribute is used, so the panel's own showing and hiding (d-none, by joined state) is kept.
+     *
+     * @param {boolean} show Show.
+     */
+    showJoining(show) {
+        const container = region(this.root, 'vrroom-liveroom');
+        if (!container) {
+            return;
+        }
+        container.querySelectorAll('[data-region="vrroom-live-rooms"], [data-action="vrroom-live-join"]').forEach((el) => {
+            el.hidden = !show;
+        });
     }
 
     /**
@@ -798,6 +987,7 @@ class LiveController extends Emitter {
         this.peerstates.clear();
         this.firstseen.clear();
         this.roomname = '';
+        this.room = null;
         if (this.panel) {
             this.panel.setBusy(false);
             this.panel.setJoined(false);
@@ -1169,8 +1359,46 @@ class LiveController extends Emitter {
                 release();
                 return;
             }
-            this.panel.setParticipants(this.participants()).catch(Notification.exception).finally(release);
+            const focused = this.focusedMutePeer();
+            this.panel.setParticipants(this.participants()).then(() => {
+                this.refocusMutePeer(focused);
+                return undefined;
+            }).catch(Notification.exception).finally(release);
         }, 100);
+    }
+
+    /**
+     * The person whose "Mute for me" button has the keyboard focus, or ''.
+     *
+     * @returns {string} Peer id.
+     */
+    focusedMutePeer() {
+        const container = region(this.root, 'vrroom-liveroom');
+        const active = document.activeElement;
+        return container && active && container.contains(active) ? mutePeerOf(active) : '';
+    }
+
+    /**
+     * Give the focus back to a person's "Mute for me" button after the list was drawn again, when
+     * the focus was lost with the old button (and nothing else took it meanwhile).
+     *
+     * @param {string} peerid Peer id from focusedMutePeer().
+     */
+    refocusMutePeer(peerid) {
+        if (!peerid) {
+            return;
+        }
+        const active = document.activeElement;
+        if (active && active !== document.body) {
+            return;
+        }
+        const container = region(this.root, 'vrroom-liveroom');
+        // The peer id is 32 hex characters (checked by mutePeerOf), safe in a selector.
+        const button = container
+            ? container.querySelector(`[data-peerid="${peerid}"] [data-action="vrroom-live-mutepeer"]`) : null;
+        if (button) {
+            button.focus();
+        }
     }
 
     /**

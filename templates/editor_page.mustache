@@ -28,9 +28,10 @@
     * data-action="vrroom-editor-add" with data-kind (and data-media for audio and video)
     * data-action="vrroom-editor-mode" with data-mode
     * data-action="vrroom-editor-undo", "vrroom-editor-redo", "vrroom-editor-save", "vrroom-editor-tab" with data-tab
+    * data-action="vrroom-editor-note-close"
     * data-region="vrroom-editor-status", "vrroom-editor-attempts", "vrroom-editor-room", "vrroom-editor-outline",
       "vrroom-editor-stage", "vrroom-editor-canvas", "vrroom-editor-message", "vrroom-editor-inspector",
-      "vrroom-editor-tasks", "vrroom-editor-logic", "vrroom-editor-live"
+      "vrroom-editor-tasks", "vrroom-editor-logic", "vrroom-editor-live", "vrroom-editor-note", "vrroom-editor-notetext"
 
     Context variables required for this template:
     * rootid - id of the editor's root element
@@ -79,6 +80,12 @@
         <span class="ms-2" data-region="vrroom-editor-status" role="status">{{#str}}editorloading, mod_vrroom{{/str}}</span>
     </div>
     <div class="alert alert-info d-none" data-region="vrroom-editor-attempts">{{#str}}editorattemptsexist, mod_vrroom{{/str}}</div>
+    <div class="alert alert-warning d-none" data-region="vrroom-editor-note">
+        <div class="d-flex align-items-start gap-2">
+            <span class="flex-grow-1" data-region="vrroom-editor-notetext"></span>
+            <button type="button" class="btn-close" data-action="vrroom-editor-note-close" aria-label="{{#str}}closebuttontitle, core{{/str}}"></button>
+        </div>
+    </div>
     <ul class="nav nav-tabs mb-2" role="tablist">
         <li class="nav-item" role="presentation">
             <button type="button" class="nav-link active" id="vrroom-editor-tab-room-{{cmid}}" role="tab" aria-selected="true"

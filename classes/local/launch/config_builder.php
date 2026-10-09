@@ -42,7 +42,7 @@ final class config_builder {
     /** @var string Launch config schema. */
     public const SCHEMA = 'vrroom-launch/1';
 
-    /** @var string xAPI state id of the resume position. */
+    /** @var string xAPI state id of the resume position before it was kept per attempt; resume_stateid() gives the current one. */
     public const RESUME_STATEID = 'vrroom-resume';
 
     /** @var string[] File areas a scene may reference. */
@@ -135,7 +135,9 @@ final class config_builder {
             'questions' => $questions,
             'resume' => [
                 'activityid' => \core_xapi\iri::generate((string)$context->id, 'activity'),
-                'stateid' => self::RESUME_STATEID,
+                // Per attempt: a new attempt starts at the start point, not where the last one ended.
+                // A preview saves no position.
+                'stateid' => $preview ? '' : self::resume_stateid((int)$attempt->id),
             ],
             'finishurl' => (new \moodle_url('/mod/vrroom/view.php', ['id' => $cm->id]))->out(false),
             'questionmode' => [
@@ -148,6 +150,34 @@ final class config_builder {
                 'locky' => (bool)get_user_preferences('mod_vrroom_locky', 0, $user),
             ],
         ];
+    }
+
+    /**
+     * The xAPI state id of an attempt's resume position (where the student last stood in the 3D room).
+     *
+     * One state per attempt, so a new attempt never starts where an earlier one ended; the state is
+     * removed when its attempt is finished or deleted. Core's state web services take the state id
+     * as PARAM_ALPHAEXT (letters, '-' and '_' only), so the attempt id is written with the letters
+     * a to j for the digits 0 to 9: attempt 244 is 'vrroom-resume-cee'.
+     *
+     * @param int $attemptid attempt id
+     * @return string
+     */
+    public static function resume_stateid(int $attemptid): string {
+        return self::RESUME_STATEID . '-' . strtr((string)$attemptid, '0123456789', 'abcdefghij');
+    }
+
+    /**
+     * The attempt id of a resume state id made by resume_stateid().
+     *
+     * @param string $stateid xAPI state id
+     * @return int|null the attempt id, or null when the state id is not one of an attempt's resume position
+     */
+    public static function attemptid_from_resume_stateid(string $stateid): ?int {
+        if (!preg_match('/^' . preg_quote(self::RESUME_STATEID, '/') . '-([b-j][a-j]{0,9})$/', $stateid, $matches)) {
+            return null;
+        }
+        return (int)strtr($matches[1], 'abcdefghij', '0123456789');
     }
 
     /**

@@ -27,6 +27,7 @@
  */
 
 import * as THREE from 'vrroomruntime_builtin/three';
+import {findSpot, insideBounds} from 'vrroomruntime_builtin/spawn';
 
 /** Walking speed in metres per second. */
 const WALK = 2.5;
@@ -47,8 +48,27 @@ const CLICK = 5;
 const MARGIN = 0.3;
 /** @var {number} How close (metres) the walker's centre gets to a wall or piece of furniture. */
 const RADIUS = 0.3;
+
+/** @var {number} Free space a known position (saved or last walked to) needs around it (m). */
+const STANDCLEARANCE = 0.1;
 /** @var {number[]} Heights (metres above the floor) of the rays that look for obstacles: knee and chest. */
 const STEPHEIGHTS = [0.4, 1.1];
+/** @var {number} Free space a start spot needs around the body (m): a little more than RADIUS, so the walker can move. */
+const CLEARANCE = 0.35;
+/** @var {number} A start spot whose chest-height rays all hit something this close is enclosed (m). */
+const ENCLOSED = 1;
+/** @var {number} Highest floor under a start spot (m): anything higher is furniture. */
+const FLOORTOP = 0.35;
+/** @var {number} Lowest thing allowed above a start spot (m): lower is a table top or a shelf. */
+const HEADROOM = 1.8;
+/** @var {number} A start spot faces somewhere else when a wall is closer than this ahead (m). */
+const FACEFREE = 1;
+/** @var {number} How far the facing rays look (m). */
+const FACEREACH = 20;
+/** @var {number} How close a start spot may be to another person in a live room (m). */
+const PERSONAL = 0.7;
+/** @var {number} Most candidate spots tested in one search pass. */
+const BUDGET = 500;
 
 /** Radius of the virtual stick's travel (px). */
 const STICK = 60;
@@ -79,8 +99,8 @@ const TURNS = {
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
  * @param {Object} options Options.
- * @returns {Object} {update(dt), teleport(position, yaw), getPosition(), getYaw(), setBounds(bounds),
- *     setInvert(x, y), setLockY(locked), setEnabled(enabled), detach()}
+ * @returns {Object} {update(dt), teleport(position, yaw), findStart(position, yaw, opts), canStand(position),
+ *     getPosition(), getYaw(), setBounds(bounds), setInvert(x, y), setLockY(locked), setEnabled(enabled), detach()}
  */
 export const attach = (camera, canvas, options = {}) => {
     const eye = Number.isFinite(options.eyeHeight) ? options.eyeHeight : 1.6;
@@ -129,6 +149,36 @@ export const attach = (camera, canvas, options = {}) => {
     };
 
     /**
+     * Run fn with every material of the meshes double-sided, then give each material its own side back.
+     *
+     * Sides are saved per material, not per mesh: meshes often share a material, and saving per mesh
+     * would save the already-changed side of a shared material and leave it double-sided for good.
+     *
+     * @param {Object[]} meshes THREE.Mesh list.
+     * @param {Function} fn Called with a Map material → original side; its result is returned.
+     * @returns {*}
+     */
+    const withDoubleSided = (meshes, fn) => {
+        const originals = new Map();
+        meshes.forEach((mesh) => {
+            const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            materials.forEach((material) => {
+                if (material && !originals.has(material)) {
+                    originals.set(material, material.side);
+                    material.side = THREE.DoubleSide;
+                }
+            });
+        });
+        try {
+            return fn(originals);
+        } finally {
+            originals.forEach((side, material) => {
+                material.side = side;
+            });
+        }
+    };
+
+    /**
      * The nearest obstacle within reach along a horizontal direction, at knee or chest height.
      *
      * Faces count from both sides, so single-sided walls stop the walker from either side.
@@ -145,30 +195,18 @@ export const attach = (camera, canvas, options = {}) => {
         }
         direction.set(dirx, 0, dirz);
         ray.far = reach;
-        const sides = meshes.map((mesh) => {
-            const side = mesh.material && mesh.material.side;
-            if (mesh.material && !Array.isArray(mesh.material)) {
-                mesh.material.side = THREE.DoubleSide;
-            }
-            return side;
-        });
-        let best = null;
-        try {
+        const best = withDoubleSided(meshes, () => {
+            let nearest = null;
             STEPHEIGHTS.forEach((height) => {
                 origin.set(position.x, height, position.z);
                 ray.set(origin, direction);
                 const hit = ray.intersectObjects(meshes, false)[0];
-                if (hit && hit.face && (!best || hit.distance < best.distance)) {
-                    best = hit;
+                if (hit && hit.face && (!nearest || hit.distance < nearest.distance)) {
+                    nearest = hit;
                 }
             });
-        } finally {
-            meshes.forEach((mesh, i) => {
-                if (mesh.material && !Array.isArray(mesh.material)) {
-                    mesh.material.side = sides[i];
-                }
-            });
-        }
+            return nearest;
+        });
         if (!best) {
             return null;
         }
@@ -222,6 +260,200 @@ export const attach = (camera, canvas, options = {}) => {
             return allowed > 1e-4 || free > 1e-4;
         }
         return allowed > 1e-4;
+    };
+
+    // Start spots: probes of their own, so a search never disturbs the walking rays.
+    const probe = new THREE.Raycaster();
+    const probeorigin = new THREE.Vector3();
+    const probedir = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
+    const down = new THREE.Vector3(0, -1, 0);
+
+    /**
+     * The nearest hit of one ray against the obstacles (made double-sided by the caller).
+     *
+     * @param {Object[]} meshes Obstacles.
+     * @param {number} x Origin x.
+     * @param {number} y Origin height.
+     * @param {number} z Origin z.
+     * @param {Object} dir Unit THREE.Vector3.
+     * @param {number} far How far to look (m).
+     * @returns {Object|null} three.js intersection
+     */
+    const firstHit = (meshes, x, y, z, dir, far) => {
+        probeorigin.set(x, y, z);
+        probe.set(probeorigin, dir);
+        probe.near = 0;
+        probe.far = far;
+        return probe.intersectObjects(meshes, false)[0] || null;
+    };
+
+    /**
+     * Whether a ray hit the back of a single-sided face: it started inside a solid, or outside a room's shell.
+     *
+     * @param {Object} hit three.js intersection.
+     * @param {Object} dir The ray's direction.
+     * @param {Map} originals material → its own side (from withDoubleSided).
+     * @returns {boolean}
+     */
+    const isBackHit = (hit, dir, originals) => {
+        if (!hit.face) {
+            return false;
+        }
+        const material = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex] : hit.object.material;
+        if (!material || originals.get(material) !== THREE.FrontSide) {
+            return false;
+        }
+        return hit.face.normal.clone().transformDirection(hit.object.matrixWorld).dot(dir) > 0;
+    };
+
+    /**
+     * Whether a person fits on a floor spot: a floor under it (not a table top or a bed of rock),
+     * nothing low overhead, free space around the body, not boxed in and not behind single-sided
+     * faces (inside a solid or outside the room's walls).
+     *
+     * @param {Object[]} meshes Obstacles, double-sided meanwhile.
+     * @param {Map} originals material → its own side.
+     * @param {number} x Spot x.
+     * @param {number} z Spot z.
+     * @param {boolean} needfloor Whether a floor must be found under the spot.
+     * @param {number} clearance Free space needed around the body (m).
+     * @param {boolean} [checkback] Whether to refuse spots that see the back of single-sided faces.
+     *     Only for spots nobody chose: some rooms are built of single-sided faces seen from behind
+     *     everywhere (a pack room's own start point does), so a walked-to or authored spot skips it.
+     * @returns {boolean}
+     */
+    const roomToStand = (meshes, originals, x, z, needfloor, clearance, checkback = true) => {
+        const below = firstHit(meshes, x, eye, z, down, eye + 1);
+        if (below) {
+            if (eye - below.distance > FLOORTOP) {
+                return false;
+            }
+        } else if (needfloor) {
+            return false;
+        }
+        const knee = STEPHEIGHTS[0];
+        const chest = STEPHEIGHTS[STEPHEIGHTS.length - 1];
+        if (firstHit(meshes, x, knee, z, up, HEADROOM - knee)) {
+            return false;
+        }
+        let enclosed = 0;
+        let back = 0;
+        for (let i = 0; i < 8; i++) {
+            const angle = i * Math.PI / 4;
+            probedir.set(Math.sin(angle), 0, Math.cos(angle));
+            if (firstHit(meshes, x, knee, z, probedir, clearance)) {
+                return false;
+            }
+            const hit = firstHit(meshes, x, chest, z, probedir, FACEREACH);
+            if (!hit) {
+                continue;
+            }
+            if (hit.distance < clearance) {
+                return false;
+            }
+            if (hit.distance < ENCLOSED) {
+                enclosed++;
+            }
+            if (isBackHit(hit, probedir, originals)) {
+                back++;
+            }
+        }
+        return enclosed < 8 && (!checkback || back < 2);
+    };
+
+    /**
+     * A view direction from a spot that does not stare at a nearby wall: the given yaw when it is open,
+     * otherwise the most open of the eight directions around it (into the room).
+     *
+     * @param {Object[]} meshes Obstacles, double-sided meanwhile.
+     * @param {number} x Spot x.
+     * @param {number} z Spot z.
+     * @param {number} yawdeg Wanted yaw in degrees.
+     * @returns {number} Yaw in degrees.
+     */
+    const openYaw = (meshes, x, z, yawdeg) => {
+        const chest = STEPHEIGHTS[STEPHEIGHTS.length - 1];
+        const openness = (deg) => {
+            const rad = deg * Math.PI / 180;
+            // Yaw θ looks toward (−sin θ, 0, −cos θ).
+            probedir.set(-Math.sin(rad), 0, -Math.cos(rad));
+            const hit = firstHit(meshes, x, chest, z, probedir, FACEREACH);
+            return hit ? hit.distance : FACEREACH;
+        };
+        if (openness(yawdeg) >= FACEFREE) {
+            return yawdeg;
+        }
+        let best = yawdeg;
+        let bestdistance = -1;
+        for (let i = 1; i < 8; i++) {
+            const distance = openness(yawdeg + i * 45);
+            if (distance > bestdistance + 1e-6) {
+                best = yawdeg + i * 45;
+                bestdistance = distance;
+            }
+        }
+        return ((best % 360) + 360) % 360;
+    };
+
+    /**
+     * The nearest spot to a start point where a person fits, inside the bounds, facing into the room.
+     *
+     * Options: avoid [[x, z]] (other people: keep PERSONAL metres away), from [x, z] (the spot must be
+     * in sight of this point at chest height, so a spread never lands behind a wall), maxradius (m).
+     * Passes: floor found and clear of others; then without the floor test; then ignoring the others.
+     *
+     * @param {number[]} pos Start [x, y, z].
+     * @param {number} yawdeg Start yaw in degrees.
+     * @param {Object} [opts] Options.
+     * @returns {Object} {position: [x, 0, z], yaw, free (false: nothing fits, the clamped start is returned)}
+     */
+    const findStart = (pos, yawdeg, opts = {}) => {
+        const start = clamp(new THREE.Vector3(Number(pos && pos[0]) || 0, 0, Number(pos && pos[2]) || 0));
+        const yawin = Number.isFinite(Number(yawdeg)) ? Number(yawdeg) : 0;
+        const avoid = Array.isArray(opts.avoid) ? opts.avoid.filter((a) => Array.isArray(a) && a.length >= 2) : [];
+        const from = Array.isArray(opts.from) && opts.from.length >= 2 ? opts.from : null;
+        const search = {maxradius: opts.maxradius, budget: BUDGET};
+        const inside = (x, z) => insideBounds(bounds, x, z, MARGIN);
+        const clearOf = (x, z) => avoid.every((a) => Math.hypot(Number(a[0]) - x, Number(a[1]) - z) >= PERSONAL);
+        const meshes = obstacles() || [];
+        if (!meshes.length) {
+            const spot = findSpot(start.x, start.z, (x, z) => inside(x, z) && clearOf(x, z), search);
+            const chosen = spot || [start.x, start.z];
+            return {position: [chosen[0], 0, chosen[1]], yaw: yawin, free: !!spot};
+        }
+        return withDoubleSided(meshes, (originals) => {
+            const inSight = (x, z) => {
+                if (!from) {
+                    return true;
+                }
+                const dx = x - from[0];
+                const dz = z - from[1];
+                const distance = Math.hypot(dx, dz);
+                if (distance < 1e-6) {
+                    return true;
+                }
+                probedir.set(dx / distance, 0, dz / distance);
+                return !firstHit(meshes, from[0], STEPHEIGHTS[STEPHEIGHTS.length - 1], from[1], probedir, distance + CLEARANCE);
+            };
+            // The start point as authored, when a person fits there and nobody else stands on it.
+            if (inside(start.x, start.z) && clearOf(start.x, start.z) && inSight(start.x, start.z)
+                    && roomToStand(meshes, originals, start.x, start.z, true, CLEARANCE, false)) {
+                return {position: [start.x, 0, start.z], yaw: openYaw(meshes, start.x, start.z, yawin), free: true};
+            }
+            const passes = [{floor: true, others: true}, {floor: false, others: true}];
+            if (avoid.length) {
+                passes.push({floor: true, others: false});
+            }
+            for (const pass of passes) {
+                const spot = findSpot(start.x, start.z, (x, z) => inside(x, z) && (!pass.others || clearOf(x, z)) &&
+                    inSight(x, z) && roomToStand(meshes, originals, x, z, pass.floor, CLEARANCE), search);
+                if (spot) {
+                    return {position: [spot[0], 0, spot[1]], yaw: openYaw(meshes, spot[0], spot[1], yawin), free: true};
+                }
+            }
+            return {position: [start.x, 0, start.z], yaw: yawin, free: false};
+        });
     };
 
     const apply = () => {
@@ -467,6 +699,43 @@ export const attach = (camera, canvas, options = {}) => {
             }
             target = null;
             apply();
+        },
+
+        /**
+         * Find where a person fits nearest to a start point (see findStart), without moving there.
+         *
+         * @param {number[]} pos Start [x, y, z].
+         * @param {number} yawdeg Start yaw in degrees.
+         * @param {Object} [opts] {avoid: [[x, z]], from: [x, z], maxradius}
+         * @returns {Object} {position: [x, 0, z], yaw, free}
+         */
+        findStart(pos, yawdeg, opts) {
+            return findStart(pos, yawdeg, opts || {});
+        },
+
+        /**
+         * Whether a person fits at a floor position: inside the bounds, and not in or right against
+         * a wall, a piece of furniture or a model (a saved position is checked with this).
+         *
+         * @param {number[]} pos [x, y, z]
+         * @returns {boolean}
+         */
+        canStand(pos) {
+            if (!Array.isArray(pos) || pos.length !== 3) {
+                return false;
+            }
+            const x = Number(pos[0]);
+            const z = Number(pos[2]);
+            if (!Number.isFinite(x) || !Number.isFinite(z) || !insideBounds(bounds, x, z, 0)) {
+                return false;
+            }
+            const meshes = obstacles() || [];
+            if (!meshes.length) {
+                return true;
+            }
+            // Walking keeps the body radius only along the direction of travel, so a walked-to spot
+            // can be closer than that to the side: only a spot in or right against geometry is refused.
+            return withDoubleSided(meshes, (originals) => roomToStand(meshes, originals, x, z, false, STANDCLEARANCE, false));
         },
 
         /**

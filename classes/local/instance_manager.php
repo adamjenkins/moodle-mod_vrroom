@@ -106,6 +106,12 @@ final class instance_manager {
 
             $transaction->allow_commit();
         } catch (\Throwable $e) {
+            // Anything above that builds the course's module info (question bank lookups, grade
+            // updates) caches it with the new course module, and with a cache revision that the
+            // rollback lowers again. The cache is not part of the transaction and would outlive the
+            // course module that core deletes after a failed add, breaking the course page
+            // (invalidcoursemodule). Drop it, so the next page builds it from the database.
+            rebuild_course_cache((int)$data->course, true);
             $transaction->rollback($e);
         }
 
@@ -120,7 +126,8 @@ final class instance_manager {
      * template, whatever the form sent. While the room has been changed in the room editor
      * (vrroom.customised > 0), only the activity's own settings are saved and the room is not
      * rebuilt, unless the form asks for it with vrroom_rebuild, which recompiles the room from the
-     * template's settings and clears the customised flag.
+     * template's settings and clears the customised flag. The question mode and the retry penalty
+     * stay as stored once the activity has attempts (has_attempts()).
      *
      * @param \stdClass $data Form data; $data->instance and $data->coursemodule are set by core.
      * @param \moodleform_mod|null $form The form, when there is one.
@@ -163,11 +170,16 @@ final class instance_manager {
         if (property_exists($data, 'maxattempts')) {
             $vrroom->maxattempts = max(0, (int)$data->maxattempts);
         }
-        if (property_exists($data, 'questionmode')) {
-            $vrroom->questionmode = mode::clean($data->questionmode);
-        }
-        if (property_exists($data, 'retrypenalty')) {
-            $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty);
+        // Once there are attempts the question mode stays as it is: open attempts were started
+        // under it and finished ones are graded with it, so another mode would leave answered
+        // questions unanswerable or re-grade them (the form shows both fields frozen).
+        if (!self::has_attempts((int)$vrroom->id)) {
+            if (property_exists($data, 'questionmode')) {
+                $vrroom->questionmode = mode::clean($data->questionmode);
+            }
+            if (property_exists($data, 'retrypenalty')) {
+                $vrroom->retrypenalty = mode::clean_penalty($data->retrypenalty);
+            }
         }
         $vrroom->completionobjectives = empty($data->completionobjectives) ? 0 : 1;
         $multi = live_settings::runtime_has_multirooms($vrroom->runtime);
@@ -239,6 +251,9 @@ final class instance_manager {
 
             $transaction->allow_commit();
         } catch (\Throwable $e) {
+            // As in add_instance(): module info cached above with the changes would outlive the
+            // rollback. Drop it, so the next page builds it from the database.
+            rebuild_course_cache((int)$vrroom->course, true);
             $transaction->rollback($e);
         }
 
@@ -546,14 +561,26 @@ final class instance_manager {
      * @return string|null 'edited', 'attempts' or null.
      */
     public static function template_lock_reason(\stdClass $vrroom): ?string {
-        global $DB;
         if ((int)($vrroom->customised ?? 0) > 0) {
             return 'edited';
         }
-        if (!empty($vrroom->id) && $DB->record_exists('vrroom_attempts', ['vrroomid' => (int)$vrroom->id])) {
+        if (!empty($vrroom->id) && self::has_attempts((int)$vrroom->id)) {
             return 'attempts';
         }
         return null;
+    }
+
+    /**
+     * Whether an activity has attempts (in progress or finished, of any student).
+     *
+     * The question mode and the retry penalty can no longer be changed then.
+     *
+     * @param int $vrroomid The vrroom id.
+     * @return bool
+     */
+    public static function has_attempts(int $vrroomid): bool {
+        global $DB;
+        return $vrroomid > 0 && $DB->record_exists('vrroom_attempts', ['vrroomid' => $vrroomid]);
     }
 
     /**

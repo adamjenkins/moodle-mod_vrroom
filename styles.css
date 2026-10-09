@@ -77,3 +77,8 @@
 .vrroom-envpreview {
     max-width: 640px;
 }
+
+/* The room editor's note, when scrolled into view, stays clear of Moodle's fixed navigation bar. */
+[data-region="vrroom-editor-note"] {
+    scroll-margin-top: 5rem;
+}

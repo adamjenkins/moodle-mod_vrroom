@@ -70,13 +70,22 @@ final class helper {
     /**
      * Module context of an attempt (for validate_context before any ownership check).
      *
+     * An attempt that is gone (a teacher deleted it, or the whole activity, while the student was in
+     * the room) fails with errorattemptmissing, which tells the student what happened, instead of
+     * the database error. An activity that was hidden or restricted meanwhile fails in the caller's
+     * validate_context() with core's requireloginerror.
+     *
      * @param int $attemptid
      * @return \context_module
+     * @throws \moodle_exception errorattemptmissing
      */
     public static function context_for_attempt(int $attemptid): \context_module {
         global $DB;
-        $vrroomid = $DB->get_field('vrroom_attempts', 'vrroomid', ['id' => $attemptid], MUST_EXIST);
-        $cm = get_coursemodule_from_instance('vrroom', $vrroomid, 0, false, MUST_EXIST);
+        $vrroomid = $DB->get_field('vrroom_attempts', 'vrroomid', ['id' => $attemptid]);
+        $cm = $vrroomid ? get_coursemodule_from_instance('vrroom', $vrroomid, 0, false, IGNORE_MISSING) : false;
+        if (!$cm) {
+            throw new \moodle_exception('errorattemptmissing', 'mod_vrroom');
+        }
         return \context_module::instance($cm->id);
     }
 
@@ -89,7 +98,7 @@ final class helper {
      * @param int $attemptid
      * @param int $userid
      * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, vrroom, cm, context]
-     * @throws \moodle_exception errornotyourattempt or a missing capability
+     * @throws \moodle_exception errorattemptmissing, errornotyourattempt or a missing capability
      */
     public static function require_own_attempt(int $attemptid, int $userid): array {
         $attempt = attempt_manager::get_attempt($attemptid);

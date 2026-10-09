@@ -17,7 +17,10 @@
  * The bar under the 3D room: a fullscreen toggle, the reversed drag directions and the vertical lock.
  *
  * Fullscreen covers the whole viewport (the room and this bar), so the HUD buttons, panels and
- * the bar stay usable. The drag settings are the user preferences mod_vrroom_invertx,
+ * the bar stay usable. The live room panel sits above the viewport on the page; while the viewport
+ * is fullscreen it is moved in under the bar (a strip of at most a third of the screen that
+ * scrolls), so leaving, the microphone and the people in the room stay in reach, and put back
+ * when fullscreen ends. The drag settings are the user preferences mod_vrroom_invertx,
  * mod_vrroom_inverty and mod_vrroom_locky, so they apply in every VR room activity.
  *
  * @module     vrroomruntime_builtin/stagebar
@@ -36,6 +39,10 @@ const PREFX = 'mod_vrroom_invertx';
 const PREFY = 'mod_vrroom_inverty';
 /** @var {string} Preference that stops up/down dragging. */
 const PREFLOCK = 'mod_vrroom_locky';
+/** @var {string[]} Bootstrap classes of the live room panel while it is inside the fullscreen viewport. */
+const LIVE_FULLSCREEN_CLASSES = ['bg-body', 'text-body', 'overflow-auto', 'flex-shrink-0', 'rounded-0', 'm-0'];
+/** @var {string} Most height of the live room panel inside the fullscreen viewport. */
+const LIVE_FULLSCREEN_HEIGHT = '33vh';
 
 /**
  * The element shown fullscreen right now, with the WebKit fallback.
@@ -91,6 +98,9 @@ export const createStagebar = (root, controls, look) => {
     const boxy = bar.querySelector('[data-action="vrroom-inverty"]');
     const boxlock = bar.querySelector('[data-action="vrroom-locky"]');
     const labels = {enter: button ? button.textContent : '', exit: ''};
+    const liveroom = region(root, 'vrroom-liveroom');
+    // Where the live room panel goes back to after fullscreen.
+    let liveplace = null;
 
     // Reversed and locked dragging: start from the stored preferences.
     const invert = {x: !!(look && look.invertx), y: !!(look && look.inverty)};
@@ -134,12 +144,42 @@ export const createStagebar = (root, controls, look) => {
     };
     bar.addEventListener('change', onChange);
 
+    // The live room panel: inside the viewport while it is fullscreen, in its place otherwise.
+    const placeLive = (inside) => {
+        if (!liveroom) {
+            return;
+        }
+        if (inside && !liveplace && liveroom.parentNode) {
+            liveplace = document.createComment('vrroom-liveroom');
+            liveroom.parentNode.insertBefore(liveplace, liveroom);
+            // After the bar: the tab order runs room, bar, live panel.
+            viewport.appendChild(liveroom);
+            liveroom.classList.add(...LIVE_FULLSCREEN_CLASSES);
+            liveroom.style.maxHeight = LIVE_FULLSCREEN_HEIGHT;
+        } else if (!inside && liveplace) {
+            // Moving an element drops the focus inside it: give it back.
+            const active = document.activeElement;
+            const refocus = active && liveroom.contains(active) ? active : null;
+            if (liveplace.parentNode) {
+                liveplace.parentNode.insertBefore(liveroom, liveplace);
+                liveplace.parentNode.removeChild(liveplace);
+            }
+            liveplace = null;
+            liveroom.classList.remove(...LIVE_FULLSCREEN_CLASSES);
+            liveroom.style.maxHeight = '';
+            if (refocus && typeof refocus.focus === 'function') {
+                refocus.focus();
+            }
+        }
+    };
+
     // Fullscreen.
     const showLabel = () => {
+        const on = fullscreenElement() === viewport;
+        placeLive(on);
         if (!button) {
             return;
         }
-        const on = fullscreenElement() === viewport;
         button.setAttribute('aria-pressed', on ? 'true' : 'false');
         button.textContent = on && labels.exit ? labels.exit : labels.enter;
     };
@@ -177,6 +217,7 @@ export const createStagebar = (root, controls, look) => {
             if (fullscreenElement() === viewport) {
                 exitFullscreen().catch((error) => Log.debug(error));
             }
+            placeLive(false);
             if (button) {
                 button.classList.add('d-none');
             }

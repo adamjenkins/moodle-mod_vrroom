@@ -25,7 +25,6 @@
  */
 
 import Fragment from 'core/fragment';
-import Notification from 'core/notification';
 import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString} from 'core/str';
@@ -80,7 +79,7 @@ const wireRetry = (host, session, slot) => {
                 html.focus({preventScroll: false});
             }
             return undefined;
-        }).catch(Notification.exception);
+        }).catch((error) => session.reportError(error));
     });
 };
 
@@ -112,7 +111,7 @@ const wire = (host, session, slot) => {
                 if (button) {
                     button.disabled = false;
                 }
-                Notification.exception(error);
+                return session.reportError(error);
             })
             .finally(() => pending.resolve());
     });
@@ -221,7 +220,7 @@ export const renderQuestion = (host, session, slot) => {
                     return notice(host, n, 'questionlocked');
                 }
                 host.dataset.vrroomQuestionState = 'error';
-                return Notification.exception(error);
+                return session.reportError(error);
             });
     }
     return promise.then(() => {

@@ -94,7 +94,8 @@ const changed = (a, b) => {
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} options Options.
- * @returns {Object} AvatarLayer {setRoom(roomroot, sceneid), setMode(mode), update(dt, nowms), dispose()}
+ * @returns {Object} AvatarLayer {setRoom(roomroot, sceneid), setMode(mode), update(dt, nowms), getPeerPositions(),
+ *     dispose()}
  */
 export const createAvatarLayer = (THREE, options) => {
     const live = options.live;
@@ -114,7 +115,7 @@ export const createAvatarLayer = (THREE, options) => {
         isXr: () => mode !== '3d',
     });
 
-    // Peer id → {avatar|null, interpolator, scene, mode, mic}.
+    // Peer id → {avatar|null, interpolator, scene, mode, mic, lastpos ([x, z] last drawn, or null)}.
     const peers = new Map();
     const unsubscribers = [];
 
@@ -129,6 +130,7 @@ export const createAvatarLayer = (THREE, options) => {
                 scene: '',
                 mode: '',
                 mic: 'off',
+                lastpos: null,
             };
             peers.set(peerid, entry);
         }
@@ -334,8 +336,10 @@ export const createAvatarLayer = (THREE, options) => {
                 const pose = drawn ? entry.interpolator.sample(now) : null;
                 entry.avatar.object.visible = !!pose;
                 if (!pose) {
+                    entry.lastpos = null;
                     return;
                 }
+                entry.lastpos = [Number(pose.h[0]) || 0, Number(pose.h[2]) || 0];
                 entry.avatar.setPose(pose, entry.mode);
                 entry.avatar.setMicState(entry.mic);
                 if (v) {
@@ -345,6 +349,25 @@ export const createAvatarLayer = (THREE, options) => {
                     entry.avatar.setSpeaking(0);
                 }
             });
+        },
+
+        /**
+         * Where the others shown in the current room stand, so a start spot can keep clear of them.
+         *
+         * @returns {number[][]} [[x, z], ...] in room coordinates
+         */
+        getPeerPositions() {
+            const list = [];
+            if (disposed) {
+                return list;
+            }
+            const now = clockNow();
+            peers.forEach((entry) => {
+                if (entry.lastpos && isDrawn(entry, now)) {
+                    list.push(entry.lastpos.slice());
+                }
+            });
+            return list;
         },
 
         /** Remove every avatar and stop listening. */

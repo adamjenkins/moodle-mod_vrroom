@@ -317,6 +317,24 @@ export const createModel = (initial) => {
         getRevision: () => revision,
 
         /**
+         * Forget the undo and redo steps whose document fails a test (each step is a whole
+         * document, so the others still undo and redo correctly).
+         *
+         * @param {Function} unusable Called with a step's document; true drops the step.
+         * @returns {number} How many steps were dropped.
+         */
+        pruneHistory: (unusable) => {
+            const before = past.length + future.length;
+            past = past.filter((step) => !unusable(step.doc));
+            future = future.filter((step) => !unusable(step.doc));
+            const dropped = before - past.length - future.length;
+            if (dropped) {
+                emit('saved', {revision: revision});
+            }
+            return dropped;
+        },
+
+        /**
          * A new object id that no room uses yet.
          *
          * @param {string} prefix Short prefix such as 'h' or 'z'.

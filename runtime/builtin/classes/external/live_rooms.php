@@ -110,7 +110,7 @@ class live_rooms extends external_api {
         return new external_single_structure([
             'number' => new external_value(PARAM_INT, 'Room number, 1 upwards'),
             'name' => new external_value(PARAM_TEXT, 'Plain name of the room, made by the server'),
-            'count' => new external_value(PARAM_INT, 'People in the room now, the user included'),
+            'count' => new external_value(PARAM_INT, 'People in the room now, not counting the user'),
             'capacity' => new external_value(PARAM_INT, 'Most people in the room'),
             'joinable' => new external_value(PARAM_BOOL, 'Whether the user can join the room now'),
         ]);

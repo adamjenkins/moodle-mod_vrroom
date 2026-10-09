@@ -19,11 +19,16 @@ namespace mod_vrroom\task;
 use mod_vrroom\local\attempt\attempt_manager;
 
 /**
- * Finishes attempts whose time ran out while nobody was sending anything for them.
+ * Finishes attempts whose time ran out while nobody was sending anything for them, and attempts
+ * that were left complete.
  *
  * An attempt with a time limit is also finished the moment its student's browser next talks to
  * the server; this task catches the attempts that were simply left open (a closed tab, a lost
  * connection), so their grades and completion do not wait for the student to come back.
+ *
+ * An attempt whose required objectives are all done but whose student closed the tab instead of
+ * finishing would otherwise stay in progress for good, with no grade. Once nothing has happened in
+ * it for attempt_manager::ABANDON_AFTER seconds it is finished and graded like a normal finish.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -39,11 +44,12 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
      * @return string
      */
     public function get_name() {
-        return get_string('taskfinishoverdue', 'mod_vrroom');
+        return get_string('taskfinishattempts', 'mod_vrroom');
     }
 
     /**
-     * Finish every overdue attempt in progress, oldest deadline first.
+     * Finish every overdue attempt in progress, oldest deadline first; then every attempt left
+     * complete, longest idle first.
      *
      * @return void
      */
@@ -73,6 +79,29 @@ class finish_overdue_attempts extends \core\task\scheduled_task {
         }
         if ($finished > 0) {
             mtrace('VR room: finished ' . $finished . ' overdue attempt(s).');
+        }
+
+        $rows = $DB->get_records_select(
+            'vrroom_attempts',
+            'state = :state AND requireddone = 1 AND timemodified < :idlesince',
+            ['state' => attempt_manager::STATE_INPROGRESS, 'idlesince' => $now - attempt_manager::ABANDON_AFTER],
+            'timemodified ASC, id ASC',
+            'id',
+            0,
+            self::BATCH
+        );
+        $finished = 0;
+        foreach ($rows as $row) {
+            try {
+                if (attempt_manager::close_if_abandoned($row, $now)) {
+                    $finished++;
+                }
+            } catch (\Throwable $e) {
+                mtrace('VR room: could not finish attempt left complete ' . (int)$row->id . ': ' . $e->getMessage());
+            }
+        }
+        if ($finished > 0) {
+            mtrace('VR room: finished ' . $finished . ' attempt(s) left complete.');
         }
     }
 }

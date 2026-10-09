@@ -97,6 +97,12 @@ class mod_vrroom_mod_form extends moodleform_mod {
                 $mform->addHelpButton('template', 'template', 'vrroom');
                 $mform->addElement('submit', 'vrroom_choosetemplate', get_string('choosetemplatebutton', 'vrroom'));
                 $PAGE->requires->js_call_amd('mod_vrroom/template_select', 'init', ['id_template', 'id_vrroom_choosetemplate']);
+                // Which template's fields this page shows: a Save pressed after changing the select
+                // without the reload button (no JavaScript) keeps these fields and what was typed in
+                // them, and validation() asks for the reload instead of saving.
+                $mform->addElement('hidden', 'vrroom_formtemplate', $name);
+                $mform->setType('vrroom_formtemplate', PARAM_PLUGIN);
+                $mform->setConstant('vrroom_formtemplate', $name);
             } else {
                 // Students have attempts, or the room was edited in the room editor: changing the
                 // template would rebuild the room and lose that work.
@@ -155,15 +161,31 @@ class mod_vrroom_mod_form extends moodleform_mod {
         );
         $mform->setDefault('questionmode', mode::ONCE);
         $mform->addHelpButton('questionmode', 'questionmode', 'vrroom');
-        $mform->addElement(
-            'select',
-            'retrypenalty',
-            get_string('retrypenalty', 'vrroom'),
-            mode::penalty_options()
-        );
-        $mform->setDefault('retrypenalty', (string)mode::DEFAULT_PENALTY);
-        $mform->addHelpButton('retrypenalty', 'retrypenalty', 'vrroom');
-        $mform->hideIf('retrypenalty', 'questionmode', 'neq', mode::RETRY);
+        // Once students have attempts the question mode is fixed: open attempts were started under
+        // it, and finished ones are graded with it (instance_manager::update_instance() keeps the
+        // stored values too). A hard-frozen field shows the stored value and submits it unchanged.
+        $questionslocked = $this->_instance && instance_manager::has_attempts((int)$this->_instance);
+        if ($questionslocked) {
+            $mform->hardFreeze('questionmode');
+        }
+        if (!$questionslocked || mode::clean($this->current->questionmode ?? null) === mode::RETRY) {
+            $mform->addElement(
+                'select',
+                'retrypenalty',
+                get_string('retrypenalty', 'vrroom'),
+                mode::penalty_options()
+            );
+            $mform->setDefault('retrypenalty', (string)mode::DEFAULT_PENALTY);
+            $mform->addHelpButton('retrypenalty', 'retrypenalty', 'vrroom');
+            if ($questionslocked) {
+                $mform->hardFreeze('retrypenalty');
+            } else {
+                $mform->hideIf('retrypenalty', 'questionmode', 'neq', mode::RETRY);
+            }
+        }
+        if ($questionslocked) {
+            $mform->addElement('static', 'questionmodelocked', '', get_string('questionmodelockedattempts', 'vrroom'));
+        }
 
         $this->standard_grading_coursemodule_elements();
 
@@ -181,6 +203,11 @@ class mod_vrroom_mod_form extends moodleform_mod {
      */
     public function data_preprocessing(&$defaultvalues) {
         parent::data_preprocessing($defaultvalues);
+
+        if (isset($defaultvalues['retrypenalty'])) {
+            // The stored number ("0.5000000") as the key of its choice ("0.5"), so a frozen field shows it.
+            $defaultvalues['retrypenalty'] = (string)mode::clean_penalty($defaultvalues['retrypenalty']);
+        }
 
         $name = $this->resolve_template();
         if ($name === null || $this->is_customised()) {
@@ -220,6 +247,12 @@ class mod_vrroom_mod_form extends moodleform_mod {
         if ($name === null) {
             $errors['name'] = get_string('notemplates', 'vrroom');
             return $errors;
+        }
+        if (isset($data['template']) && (string)$data['template'] !== $name) {
+            // The select was changed but the page still shows the fields of the template it was
+            // loaded with (Save pressed instead of the reload button): saving would build the new
+            // template from the old one's fields.
+            $errors['template'] = get_string('errortemplatenotshown', 'vrroom', get_string('choosetemplatebutton', 'vrroom'));
         }
         if ($this->is_customised()) {
             // The template's fields are not on the form, so there is nothing of it to validate.
@@ -387,6 +420,12 @@ class mod_vrroom_mod_form extends moodleform_mod {
         $all = template_registry::get_all();
         $name = null;
         $requested = optional_param('template', '', PARAM_PLUGIN);
+        $shown = optional_param('vrroom_formtemplate', '', PARAM_PLUGIN);
+        if ($shown !== '' && isset($all[$shown]) && optional_param('vrroom_choosetemplate', '', PARAM_RAW) === '') {
+            // A submission other than the reload button keeps the fields the page showed, so what
+            // the teacher typed in them survives; validation() then asks for the reload.
+            $requested = $shown;
+        }
         if ($this->_instance) {
             $current = (string)($this->current->template ?? '');
             $name = isset($all[$current]) ? $current : null;

@@ -23,6 +23,7 @@ use core_xapi\local\statement\item_agent;
 use core_xapi\xapi_exception;
 use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\launch\config_builder;
 use mod_vrroom\local\xapi\iri;
 
 /**
@@ -469,7 +470,7 @@ final class handler_test extends \advanced_testcase {
         $this->assertSame([0 => false], $result);
         $this->assertSame(0, $this->client_rows((int)$attempt->id));
 
-        $this->assert_state_refused($handler, $fx);
+        $this->assert_state_refused($handler, $fx, (int)$attempt->id);
     }
 
     /**
@@ -494,7 +495,7 @@ final class handler_test extends \advanced_testcase {
         $this->assertSame([0 => false], $result);
         $this->assertSame(0, $this->client_rows((int)$attempt->id));
 
-        $this->assert_state_refused($handler, $fx);
+        $this->assert_state_refused($handler, $fx, (int)$attempt->id);
     }
 
     /**
@@ -502,14 +503,15 @@ final class handler_test extends \advanced_testcase {
      *
      * @param handler $handler
      * @param \stdClass $fx fixture
+     * @param int $attemptid the user's attempt
      * @return void
      */
-    private function assert_state_refused(handler $handler, \stdClass $fx): void {
+    private function assert_state_refused(handler $handler, \stdClass $fx, int $attemptid): void {
         global $USER;
         $state = new state(
             item_agent::create_from_user($USER),
             item_activity::create_from_id((string)$fx->context->id),
-            'vrroom-resume',
+            config_builder::resume_stateid($attemptid),
             (object) ['scene' => $fx->sceneid, 'position' => [0, 0, 1], 'yaw' => 0],
             null
         );
@@ -610,7 +612,8 @@ final class handler_test extends \advanced_testcase {
     }
 
     /**
-     * The resume state is accepted only with its state id, on a VR room module, for a user who can attempt.
+     * The resume state is accepted only with the state id of the user's own open attempt, on a VR room
+     * module, for a user who can attempt.
      *
      * @return void
      */
@@ -618,24 +621,32 @@ final class handler_test extends \advanced_testcase {
         $fx = $this->setup_activity();
         $handler = handler::create('mod_vrroom');
         $data = (object) ['scene' => $fx->sceneid, 'position' => [0, 0, 1], 'yaw' => 12.5];
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
+        [$otherattempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$other->id);
+        $stateid = config_builder::resume_stateid((int)$attempt->id);
+        $modulecontext = (string)$fx->context->id;
 
         $this->setUser($fx->student);
         $agent = item_agent::create_from_user($fx->student);
-        $ok = new state($agent, item_activity::create_from_id((string)$fx->context->id), 'vrroom-resume', $data, null);
+        $ok = new state($agent, item_activity::create_from_id($modulecontext), $stateid, $data, null);
         $this->assertTrue($handler->save_state($ok));
         $loaded = $handler->load_state($ok);
         $this->assertEquals(12.5, $loaded->get_state_data()->yaw);
 
+        $coursecontext = (string)\context_course::instance($fx->course->id)->id;
         $rejected = [
-            new state($agent, item_activity::create_from_id((string)$fx->context->id), 'other', $data, null),
+            new state($agent, item_activity::create_from_id($modulecontext), 'other', $data, null),
+            new state($agent, item_activity::create_from_id($modulecontext), config_builder::RESUME_STATEID, $data, null),
             new state(
                 $agent,
-                item_activity::create_from_id((string)\context_course::instance($fx->course->id)->id),
-                'vrroom-resume',
+                item_activity::create_from_id($modulecontext),
+                config_builder::resume_stateid((int)$otherattempt->id),
                 $data,
                 null
             ),
-            new state($agent, item_activity::create_from_id('999999999'), 'vrroom-resume', $data, null),
+            new state($agent, item_activity::create_from_id($coursecontext), $stateid, $data, null),
+            new state($agent, item_activity::create_from_id('999999999'), $stateid, $data, null),
         ];
         foreach ($rejected as $state) {
             try {
@@ -646,18 +657,60 @@ final class handler_test extends \advanced_testcase {
             }
         }
 
+        // A finished attempt has no resume state any more.
+        attempt_manager::finish($attempt);
+        try {
+            $handler->save_state($ok);
+            $this->fail('State of a finished attempt must be refused');
+        } catch (xapi_exception $e) {
+            $this->assertStringContainsString('not accepted', $e->getMessage());
+        }
+
         // A teacher cannot attempt, so has no resume state.
         $teacher = $this->getDataGenerator()->create_and_enrol($fx->course, 'editingteacher');
         $this->setUser($teacher);
         $state = new state(
             item_agent::create_from_user($teacher),
-            item_activity::create_from_id((string)$fx->context->id),
-            'vrroom-resume',
+            item_activity::create_from_id($modulecontext),
+            $stateid,
             $data,
             null
         );
         $this->expectException(xapi_exception::class);
         $handler->save_state($state);
+    }
+
+    /**
+     * The resume position is saved and loaded through core's own state web services, whose
+     * parameter checks (the state id is PARAM_ALPHAEXT) run before the handler.
+     *
+     * @return void
+     */
+    public function test_resume_state_through_web_services(): void {
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $this->setUser($fx->student);
+        $params = [
+            'component' => 'mod_vrroom',
+            'activityId' => item_activity::create_from_id((string)$fx->context->id)->get_data()->id,
+            'agent' => json_encode(item_agent::create_from_user($fx->student)->get_data()),
+            'stateId' => config_builder::resume_stateid((int)$attempt->id),
+        ];
+        $data = ['scene' => $fx->sceneid, 'position' => [1, 0, 2], 'yaw' => 30];
+        // The web service layer reads the sesskey from the request, as the AJAX call carries it.
+        $_POST['sesskey'] = sesskey();
+
+        $saved = \core_external\external_api::call_external_function(
+            'core_xapi_post_state',
+            $params + ['stateData' => json_encode($data)]
+        );
+        $this->assertFalse($saved['error'], json_encode($saved['exception'] ?? null));
+        $this->assertTrue($saved['data']);
+
+        $loaded = \core_external\external_api::call_external_function('core_xapi_get_state', $params);
+        $this->assertFalse($loaded['error'], json_encode($loaded['exception'] ?? null));
+        $this->assertEquals($data, json_decode($loaded['data'], true));
+        unset($_POST['sesskey']);
     }
 
     /**

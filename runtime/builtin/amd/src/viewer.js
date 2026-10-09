@@ -39,6 +39,7 @@ import {createXrInput} from 'vrroomruntime_builtin/xrinput';
 import {createXrPanels} from 'vrroomruntime_builtin/xrpanel';
 import {createAvatarLayer} from 'vrroomruntime_builtin/live/avatars';
 import {createStagebar} from 'vrroomruntime_builtin/stagebar';
+import {layoutKey, spreadOffset} from 'vrroomruntime_builtin/spawn';
 import {region, plainText, announce, showMessage, clearMessage, startScene} from 'vrroomruntime_builtin/util';
 
 /** Distance within which Enter activates the object in the middle of the screen (m). */
@@ -52,6 +53,23 @@ const MESSAGE_TIME = 4000;
 
 /** How often the wrist panel is refreshed (s). */
 const WRIST_INTERVAL = 0.5;
+
+/** Vertical field of view on a landscape screen (degrees). */
+const FOV = 70;
+
+/** Narrowest horizontal field of view: a portrait phone widens its view to keep this (degrees). */
+const MIN_HFOV = 72;
+
+/** Widest vertical field of view a portrait screen gets (degrees). */
+const MAX_FOV = 110;
+
+/**
+ * Where each session's walker last stood in the 3D room, so switching to the list view and back
+ * keeps the place (in a live room the start point may be taken by someone else meanwhile).
+ *
+ * @type {WeakMap<Object, Object>} session → {scene, position, yaw, key}
+ */
+const lastplaces = new WeakMap();
 
 /**
  * Whether the browser can create a WebGL context.
@@ -126,7 +144,7 @@ const prepareRoom = (base, values) => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.xr.enabled = true;
     const scene3 = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, 16 / 9, 0.05, 300);
+    const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.05, 300);
     const rig = new THREE.Group();
     rig.name = 'vrroom-rig';
     rig.add(camera);
@@ -154,10 +172,15 @@ const prepareRoom = (base, values) => {
 
     let doc = null;
     let resumestate = null;
-    return session.loadResume().then((resume) => {
+    // The place left when the 3D room last closed in this page, else the saved resume position.
+    const remembered = lastplaces.get(session) || null;
+    const resumeload = remembered ? Promise.resolve(remembered) : session.loadResume();
+    return resumeload.then((resume) => {
         const resumed = resume ? scenes.find((s) => s.id === resume.scene) : null;
-        doc = resumed || startScene(config);
-        resumestate = resumed ? resume : null;
+        // A position saved before the room's surroundings or start point changed is not used again.
+        const usable = resumed && resume.key === layoutKey(resumed);
+        doc = usable ? resumed : startScene(config);
+        resumestate = usable ? resume : null;
         return buildScene(THREE, doc, roomOptions());
     }).then((handle) => run({
         root, session, config, scenes, stage, canvas, renderer, scene3, camera, rig, strings, roomOptions,
@@ -224,6 +247,8 @@ const run = (p) => {
     const refreshObstaclesWhenLoaded = (handle) => {
         Promise.resolve(handle.ready).then(() => {
             obstacleversion++;
+            // Declared further down; this runs after the room has started.
+            recheckSpawn(handle);
             return undefined;
         }).catch(() => {
             obstacleversion++;
@@ -522,13 +547,92 @@ const run = (p) => {
         }
     };
 
+    // A free spot at a start point of the current room, facing into the room. In a live room with
+    // other people in it, each person gets their own place on a ring around the start point (the same
+    // one every time), in sight of it and away from the others; someone alone starts at the start point.
+    const safeSpawn = (spawnid) => {
+        const spawn = firstSpawn(current.doc, spawnid);
+        const base = vec3(spawn.position, [0, 0, 0]);
+        const yaw = Number(spawn.yaw) || 0;
+        current.handle.root.updateMatrixWorld(true);
+        const avoid = avatars ? avatars.getPeerPositions() : [];
+        const others = avoid.length > 0 || (p.live && p.live.isJoined() && p.live.getPeers().length > 0);
+        if (p.live && others) {
+            const offset = spreadOffset(String((p.config && p.config.userid) || ''));
+            const spread = controls.findStart([base[0] + offset[0], 0, base[2] + offset[1]], yaw, {
+                avoid: avoid,
+                from: [base[0], base[2]],
+                maxradius: 1,
+            });
+            if (spread.free) {
+                return spread;
+            }
+        }
+        return controls.findStart(base, yaw, {avoid: avoid});
+    };
+
+    // A walker put at a start point while nobody else was in the live room yet: once others are there
+    // (they joined, or this person pressed Join after entering), they get their own place on the ring
+    // around the start point, unless they have already moved.
+    let atstart = null;
+    let spreadclock = 0;
+    const markAtStart = (spawnid) => {
+        const position = controls.getPosition();
+        atstart = p.live ? {x: position[0], z: position[2], spawnid: spawnid} : null;
+    };
+    const spreadIfJoined = (dt) => {
+        spreadclock += dt;
+        if (!atstart || spreadclock < 0.5) {
+            return;
+        }
+        spreadclock = 0;
+        const position = controls.getPosition();
+        if (xrmode || Math.abs(position[0] - atstart.x) > 1e-3 || Math.abs(position[2] - atstart.z) > 1e-3) {
+            atstart = null;
+            return;
+        }
+        if (!p.live.isJoined() || !p.live.getPeers().length) {
+            return;
+        }
+        const spawnid = atstart.spawnid;
+        atstart = null;
+        current.handle.root.updateMatrixWorld(true);
+        const spot = safeSpawn(spawnid);
+        controls.teleport(spot.position, spot.yaw);
+    };
+
+    // Where the walker was put, until they move: models still loading can block the spot, and it is
+    // checked again once they are in.
+    let placedat = null;
+    const rememberSpawn = (spawnid, saved) => {
+        const position = controls.getPosition();
+        placedat = {handle: current.handle, x: position[0], z: position[2], spawnid: spawnid, saved: saved};
+    };
+    const recheckSpawn = (handle) => {
+        if (stopped || xrmode || !placedat || placedat.handle !== handle || handle !== current.handle) {
+            return;
+        }
+        const position = controls.getPosition();
+        if (Math.abs(position[0] - placedat.x) > 1e-3 || Math.abs(position[2] - placedat.z) > 1e-3) {
+            placedat = null;
+            return;
+        }
+        const saved = placedat.saved;
+        const spawnid = placedat.spawnid;
+        placedat = null;
+        handle.root.updateMatrixWorld(true);
+        if (controls.canStand(position)) {
+            return;
+        }
+        const spot = safeSpawn(saved ? null : spawnid);
+        controls.teleport(spot.position, spot.yaw);
+    };
+
     // Put the player (or, in mixed reality, the room) at a start point of the current room.
     const placeAtSpawn = (spawnid) => {
-        const spawn = firstSpawn(current.doc, spawnid);
-        const position = vec3(spawn.position, [0, 0, 0]);
-        const yaw = Number(spawn.yaw) || 0;
         if (xrmode === 'vr' && xrinput) {
-            xrinput.moveHeadTo(position, yaw);
+            const spot = safeSpawn(spawnid);
+            xrinput.moveHeadTo(spot.position, spot.yaw);
         } else if (xrmode === 'mr') {
             if (placed) {
                 placeAt(feetPoint(), spawnid);
@@ -541,7 +645,10 @@ const run = (p) => {
                 applyPlacement();
             }
         } else {
-            controls.teleport(position, yaw);
+            const spot = safeSpawn(spawnid);
+            controls.teleport(spot.position, spot.yaw);
+            rememberSpawn(spawnid, null);
+            markAtStart(spawnid);
         }
     };
 
@@ -732,32 +839,51 @@ const run = (p) => {
     });
     // The bar under the room: fullscreen and reversed dragging (the user's preferences).
     const stagebar = createStagebar(root, controls, (p.config && p.config.look) || {});
-    if (resume) {
-        controls.teleport(resume.position, resume.yaw);
-    } else {
-        const spawn = firstSpawn(current.doc, null);
-        controls.teleport(vec3(spawn.position, [0, 0, 0]), Number(spawn.yaw) || 0);
-    }
+    // The first place: the saved one when a person still fits there, else a free spot at the start point.
+    const placeFirst = (place) => {
+        current.handle.root.updateMatrixWorld(true);
+        if (place && controls.canStand(vec3(place.position, [0, 0, 0]))) {
+            controls.teleport(place.position, place.yaw);
+            rememberSpawn(null, place);
+            return;
+        }
+        const spot = safeSpawn(null);
+        controls.teleport(spot.position, spot.yaw);
+        rememberSpawn(null, null);
+        markAtStart(null);
+    };
+    // After the look and the hidden objects are applied: hidden objects are no obstacles.
     applyLook();
     applyState();
+    placeFirst(resume);
 
-    // Zones, each frame: from the walking position, or the head in VR and mixed reality.
-    const testZones = () => {
-        let p;
+    // Where zones are tested from: the walking position, or the head in VR and mixed reality (null: no zones now).
+    const zonePoint = () => {
         if (!xrmode) {
-            p = controls.getPosition();
-        } else if (xrmode === 'vr' || (xrmode === 'mr' && placed)) {
+            return controls.getPosition();
+        }
+        if (xrmode === 'vr' || (xrmode === 'mr' && placed)) {
             const head = camera.getWorldPosition(new THREE.Vector3());
             current.handle.root.worldToLocal(head);
-            p = [head.x, 0, head.z];
-        } else {
+            return [head.x, 0, head.z];
+        }
+        return null;
+    };
+    const zoneContains = (zone, p) => {
+        const c = vec3(zone.center, [0, 0, 0]);
+        const s = vec3(zone.size, [0, 0, 0]);
+        return Math.abs(p[0] - c[0]) <= s[0] / 2 && Math.abs(p[2] - c[2]) <= s[2] / 2 &&
+            p[1] >= c[1] - s[1] / 2 && p[1] <= c[1] + s[1] / 2;
+    };
+
+    // Zones, each frame.
+    const testZones = () => {
+        const p = zonePoint();
+        if (!p) {
             return;
         }
         zonesOf(current.doc).forEach((zone) => {
-            const c = vec3(zone.center, [0, 0, 0]);
-            const s = vec3(zone.size, [0, 0, 0]);
-            const isinside = Math.abs(p[0] - c[0]) <= s[0] / 2 && Math.abs(p[2] - c[2]) <= s[2] / 2 &&
-                p[1] >= c[1] - s[1] / 2 && p[1] <= c[1] + s[1] / 2;
+            const isinside = zoneContains(zone, p);
             if (isinside && !inside.has(zone.id)) {
                 inside.add(zone.id);
                 enterZone(zone);
@@ -887,6 +1013,10 @@ const run = (p) => {
         const height = Math.max(1, canvas.clientHeight);
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
+        // A portrait phone keeps a useful width of view, so a board ahead (the story of an escape
+        // room) is not cut off at both sides.
+        const keepwidth = 2 * Math.atan(Math.tan(MIN_HFOV * DEG / 2) / camera.aspect) / DEG;
+        camera.fov = Math.min(MAX_FOV, Math.max(FOV, keepwidth));
         camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize);
@@ -1066,13 +1196,27 @@ const run = (p) => {
         applyState();
         panels.refresh();
         updateWrist();
+        if (message.unlocked.length) {
+            // Whatever was locked may be open now: the "visit the previous station" message goes.
+            clearMessage(root, strings.locked);
+            if (xrstatus && xrstatus.textContent === strings.locked) {
+                xrstatus.textContent = '';
+                xrstatus.classList.add('d-none');
+            }
+        }
+        // A zone unlocked while the walker stands in it is entered now. Where the walker stands is
+        // read again: this message can arrive in the middle of testZones (entering one zone unlocks
+        // the next), when the set of zones the walker is in is not up to date yet, and a teleport
+        // must not credit a zone left behind.
+        const point = zonePoint();
         message.unlocked.forEach((objective) => {
-            if (objective.type === 'visit_zone' && objective.zone && inside.has(objective.zone) &&
-                    !enteredrecorded.has(objective.zone)) {
-                const zone = zonesOf(current.doc).find((z) => z.id === objective.zone);
-                if (zone) {
-                    enterZone(zone);
-                }
+            if (!point || objective.type !== 'visit_zone' || !objective.zone || !inside.has(objective.zone) ||
+                    enteredrecorded.has(objective.zone)) {
+                return;
+            }
+            const zone = zonesOf(current.doc).find((z) => z.id === objective.zone);
+            if (zone && zoneContains(zone, point)) {
+                enterZone(zone);
             }
         });
         message.effects.forEach((effect) => {
@@ -1089,10 +1233,12 @@ const run = (p) => {
         });
     });
 
-    // Frame loop.
-    const clock = new THREE.Clock();
+    // Frame loop. THREE.Timer (not the deprecated THREE.Clock) skips the time a hidden tab was away.
+    const timer = new THREE.Timer();
+    timer.connect(document);
     renderer.setAnimationLoop((time, frame) => {
-        const dt = clock.getDelta();
+        timer.update(time);
+        const dt = timer.getDelta();
         if (!xrmode) {
             controls.update(dt);
         } else {
@@ -1116,7 +1262,8 @@ const run = (p) => {
             }
         }
         testZones();
-        current.handle.update(dt, clock.elapsedTime);
+        spreadIfJoined(dt);
+        current.handle.update(dt, timer.getElapsed());
         if (avatars) {
             avatars.update(dt, performance.now());
         }
@@ -1124,7 +1271,9 @@ const run = (p) => {
     });
 
     session.start('builtin-3d', sceneid());
-    session.startResume(() => (xrmode ? null : {scene: sceneid(), position: controls.getPosition(), yaw: controls.getYaw()}));
+    // The layout key ties the saved position to the room's surroundings and start point (see prepareRoom).
+    const here = () => ({scene: sceneid(), position: controls.getPosition(), yaw: controls.getYaw(), key: layoutKey(current.doc)});
+    session.startResume(() => (xrmode ? null : here()));
     clearMessage(root, strings.loading);
 
     // Behat hooks.
@@ -1162,12 +1311,16 @@ const run = (p) => {
             if (stopped) {
                 return;
             }
+            if (!xrmode) {
+                lastplaces.set(session, here());
+            }
             stopped = true;
             p.setStopped();
             if (xr.mode) {
                 xr.exit();
             }
             renderer.setAnimationLoop(null);
+            timer.dispose();
             observer.disconnect();
             controls.detach();
             stagebar.dispose();

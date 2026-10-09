@@ -156,8 +156,10 @@ final class question_retry_test extends \advanced_testcase {
         $this->assertEqualsWithDelta(0.0, $result['fraction'], 1e-6);
         $this->assertSame('available', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
-        // The feedback of the graded try comes back before the restart.
+        // The feedback of the graded try comes back before the restart, without giving the answer away.
         $this->assertStringContainsString('q' . $fx->attempt->uniqueid . ':', $result['html']);
+        $this->assertStringNotContainsString('rightanswer', $result['html']);
+        $this->assertStringNotContainsString('generalfeedback', $result['html']);
         $this->assertCount(1, $DB->get_records('vrroom_events', ['attemptid' => $fx->attemptid, 'verb' => 'answered']));
 
         // The slot map is unchanged; the usage slot now holds a fresh attempt, the old try moved.
@@ -206,6 +208,7 @@ final class question_retry_test extends \advanced_testcase {
         $this->assertTrue($result['retry']);
         $this->assertSame('available', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
+        $this->assertStringNotContainsString('rightanswer', $result['html']);
 
         $result = external_api::clean_returnvalue(
             submit_question::execute_returns(),
@@ -230,6 +233,8 @@ final class question_retry_test extends \advanced_testcase {
         $this->assertFalse($result['retry']);
         $this->assertSame('completed', $this->objective_status($result['state'], 'q-1'));
         $this->assertEqualsWithDelta(0.0, $result['state']['earnedpoints'], 1e-6);
+        // A final answer in once mode may show the right answer.
+        $this->assertStringContainsString('rightanswer', $result['html']);
         $qa = usage::get_question_attempt(attempt_manager::get_attempt($fx->attemptid), $fx->slot);
         $this->assertTrue($qa->get_state()->is_finished());
 

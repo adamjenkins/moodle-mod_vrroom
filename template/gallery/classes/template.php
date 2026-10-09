@@ -65,6 +65,12 @@ class template extends \mod_vrroom\local\template\base {
     /** @var int Longest station title, in characters. */
     public const MAX_TITLE_LENGTH = 255;
 
+    /**
+     * @var float Most points a station can be worth: a station's question slot stores its points in
+     *      vrroom_slots.maxmark, number(12,7), whose largest value is 99999.9999999.
+     */
+    public const MAX_POINTS = 99999.0;
+
     /** @var string[] Image types a station accepts (all are served inline by vrroom_pluginfile). */
     public const IMAGE_TYPES = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
 
@@ -375,6 +381,9 @@ class template extends \mod_vrroom\local\template\base {
             $points = $data['gallery_points'][$i] ?? 1;
             if (!is_numeric($points) || (float)$points < 0) {
                 $errors["gallery_points[{$i}]"] = get_string('errorpoints', self::COMPONENT);
+            } else if (!self::points_in_range($points)) {
+                $max = format_float(self::MAX_POINTS, 0);
+                $errors["gallery_points[{$i}]"] = get_string('errorpointsrange', self::COMPONENT, $max);
             }
 
             $qbeid = (int)($data['gallery_question'][$i] ?? 0);
@@ -456,8 +465,7 @@ class template extends \mod_vrroom\local\template\base {
                 $format = FORMAT_HTML;
             }
 
-            $points = $data['gallery_points'][$i] ?? 1;
-            $points = is_numeric($points) ? max(0.0, round((float)$points, 7)) : 0.0;
+            $points = self::clean_points($data['gallery_points'][$i] ?? 1);
 
             $stations[] = (object)[
                 'id' => $id,
@@ -700,7 +708,7 @@ class template extends \mod_vrroom\local\template\base {
             }
 
             $qbeid = (int)($station->questionbankentryid ?? 0);
-            $points = max(0.0, (float)($station->points ?? 0));
+            $points = self::clean_points($station->points ?? 0);
             $required = !empty($station->required);
             $questionslot = null;
             if ($qbeid > 0) {
@@ -989,6 +997,36 @@ class template extends \mod_vrroom\local\template\base {
      */
     private static function row_title(array $data, int $i): string {
         return trim(clean_param((string)($data['gallery_title'][$i] ?? ''), PARAM_TEXT));
+    }
+
+    /**
+     * A non-negative points value rounded to 7 decimals, at most MAX_POINTS (0 for anything else).
+     *
+     * @param mixed $value submitted or stored value
+     * @return float
+     */
+    private static function clean_points($value): float {
+        if (!is_numeric($value) || !is_finite((float)$value)) {
+            return 0.0;
+        }
+        return min(self::MAX_POINTS, max(0.0, round((float)$value, 7)));
+    }
+
+    /**
+     * Whether a non-negative points value can be stored as it was entered.
+     *
+     * It must be finite and at most MAX_POINTS, and a value above 0 must not round to 0 at the
+     * 7 decimals the question slot keeps (below 0.0000001).
+     *
+     * @param mixed $value submitted value, numeric and at least 0
+     * @return bool
+     */
+    private static function points_in_range($value): bool {
+        $value = (float)$value;
+        if (!is_finite($value) || $value > self::MAX_POINTS) {
+            return false;
+        }
+        return $value == 0 || round($value, 7) > 0;
     }
 
     /**

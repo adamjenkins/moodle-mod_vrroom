@@ -807,6 +807,104 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
+     * Numbers that cannot be stored (infinite, too large, too small to keep, an overflowing time
+     * limit) and over-long hints are validation errors, never a failed save.
+     */
+    public function test_validation_number_ranges_and_hint_length(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+        $courseid = (int)$course->id;
+        $template = new template();
+        $component = 'vrroomtemplate_escape';
+        $max = format_float(template::MAX_POINTS, 0);
+
+        $data = [
+            'escape_environment' => 'escape-room',
+            'escape_title' => ['Inf', 'Big', 'Tiny', 'Max', 'Small', 'Zero', 'Hints'],
+            'escape_clue' => array_fill(0, 7, ['text' => '', 'format' => FORMAT_HTML]),
+            'escape_cluemedia' => array_fill(0, 7, 'none'),
+            'escape_clueimage' => array_fill(0, 7, 0),
+            'escape_cluemodel' => array_fill(0, 7, 0),
+            'escape_locktype' => array_fill(0, 7, 'none'),
+            'escape_question' => array_fill(0, 7, 0),
+            'escape_hint1' => array_fill(0, 7, ''),
+            'escape_hint2' => array_fill(0, 7, ''),
+            'escape_points' => ['1e309', 100000, 0.00000001, 99999, 0.0000001, 0, 1],
+            'escape_timelimit' => 1e30 * WEEKSECS,
+            'escape_hintpenalty' => INF,
+        ];
+        $data['escape_hint1'][6] = str_repeat('a', template::MAX_HINT_LENGTH);
+        $data['escape_hint2'][6] = str_repeat('b', template::MAX_HINT_LENGTH + 1);
+        $errors = $template->validation($data, [], $courseid);
+
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['escape_points[0]']);
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['escape_points[1]']);
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['escape_points[2]']);
+        $this->assertArrayNotHasKey('escape_points[3]', $errors);
+        $this->assertArrayNotHasKey('escape_points[4]', $errors);
+        $this->assertArrayNotHasKey('escape_points[5]', $errors);
+        $this->assertSame(get_string('errortimelimit', $component), $errors['escape_timelimit']);
+        $this->assertSame(get_string('errorhintpenaltyrange', $component, $max), $errors['escape_hintpenalty']);
+        $this->assertArrayNotHasKey('escape_hint1[6]', $errors);
+        $this->assertSame(get_string('maximumchars', '', template::MAX_HINT_LENGTH), $errors['escape_hint2[6]']);
+
+        // A huge penalty is out of range too; the largest time limit is fine.
+        $data['escape_hintpenalty'] = 100000;
+        $data['escape_timelimit'] = template::MAX_TIMELIMIT;
+        $errors = $template->validation($data, [], $courseid);
+        $this->assertSame(get_string('errorhintpenaltyrange', $component, $max), $errors['escape_hintpenalty']);
+        $this->assertArrayNotHasKey('escape_timelimit', $errors);
+
+        // Core's duration element has already turned "1e30 weeks" into 0 seconds: the typed number
+        // is what shows the mistake.
+        $data['escape_timelimit'] = 0;
+        $_POST['escape_timelimit'] = ['number' => '1e30', 'timeunit' => (string)WEEKSECS, 'enabled' => '1'];
+        try {
+            $errors = $template->validation($data, [], $courseid);
+        } finally {
+            unset($_POST['escape_timelimit']);
+        }
+        $this->assertSame(get_string('errortimelimit', $component), $errors['escape_timelimit']);
+        $_POST['escape_timelimit'] = ['number' => '7', 'timeunit' => (string)DAYSECS, 'enabled' => '1'];
+        try {
+            $data['escape_timelimit'] = 7 * DAYSECS;
+            $errors = $template->validation($data, [], $courseid);
+        } finally {
+            unset($_POST['escape_timelimit']);
+        }
+        $this->assertArrayNotHasKey('escape_timelimit', $errors);
+    }
+
+    /**
+     * Without the form's validation (a generator or a web service), numbers that cannot be stored
+     * are clamped, so the config always encodes and an overflowing time limit is not "no limit".
+     */
+    public function test_extract_config_clamps_numbers(): void {
+        $this->resetAfterTest();
+        $formdata = (object)[
+            'escape_environment' => 'escape-room',
+            'escape_timelimit' => 1e30 * WEEKSECS,
+            'escape_hintpenalty' => INF,
+            'escape_puzzlecount' => 2,
+            'escape_title' => ['One', 'Two'],
+            'escape_clue' => array_fill(0, 2, ['text' => '', 'format' => FORMAT_HTML]),
+            'escape_cluemedia' => ['none', 'none'],
+            'escape_locktype' => ['none', 'none'],
+            'escape_points' => [NAN, 1e12],
+        ];
+
+        $config = (new template())->extract_config($formdata);
+
+        $this->assertSame(template::MAX_TIMELIMIT, $config->timelimit);
+        // Not a number that can be stored at all: no penalty, as for any other bad value.
+        $this->assertSame(0.0, $config->hintpenalty);
+        $this->assertSame(0.0, $config->puzzles[0]->points);
+        $this->assertSame(template::MAX_POINTS, $config->puzzles[1]->points);
+        $this->assertIsString(json_encode($config, JSON_THROW_ON_ERROR));
+    }
+
+    /**
      * Restore remapping replaces the puzzles' question bank entry ids.
      */
     public function test_remap_question_entries(): void {

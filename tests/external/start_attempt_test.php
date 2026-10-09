@@ -78,7 +78,8 @@ final class start_attempt_test extends \advanced_testcase {
         $this->assertSame($CFG->wwwroot, $config['actor']['account']['homePage']);
         $this->assertSame((string)$fx->student->id, $config['actor']['account']['name']);
         $this->assertSame($CFG->wwwroot . '/mod/vrroom/xapi/' . $fx->module->cmid, $config['activityiri']);
-        $this->assertSame('vrroom-resume', $config['resume']['stateid']);
+        $stateid = \mod_vrroom\local\launch\config_builder::resume_stateid($result['attemptid']);
+        $this->assertSame($stateid, $config['resume']['stateid']);
         $this->assertNotEmpty($config['scenes']);
         $this->assertSame($config['scenes'][0]['id'], $config['startscene']);
         $this->assertSame('vrroom-graph/1', $config['graph']['schema']);

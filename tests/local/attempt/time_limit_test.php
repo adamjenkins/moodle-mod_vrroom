@@ -336,7 +336,7 @@ final class time_limit_test extends \advanced_testcase {
         $DB->set_field('vrroom_attempts', 'timedue', time() - 1, ['id' => $grace->id]);
 
         $task = new finish_overdue_attempts();
-        $this->assertSame(get_string('taskfinishoverdue', 'mod_vrroom'), $task->get_name());
+        $this->assertSame(get_string('taskfinishattempts', 'mod_vrroom'), $task->get_name());
         ob_start();
         $task->execute();
         $output = ob_get_clean();
@@ -355,6 +355,60 @@ final class time_limit_test extends \advanced_testcase {
         $task->execute();
         $this->assertSame('', ob_get_clean());
         $this->assertEquals(1, $DB->count_records('vrroom_events', ['attemptid' => $overdue->id, 'verb' => 'completed',
+            'objecttype' => 'activity']));
+    }
+
+    /**
+     * The task finishes and grades an attempt left complete (every required objective done, no
+     * activity for a day), as of its last activity; it leaves recent and incomplete attempts alone.
+     *
+     * @return void
+     */
+    public function test_task_finishes_attempts_left_complete(): void {
+        global $CFG, $DB;
+        require_once($CFG->libdir . '/gradelib.php');
+        $fx = $this->setup_activity(0);
+        $third = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
+        $idle = time() - attempt_manager::ABANDON_AFTER - 60;
+
+        [$left] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $DB->update_record('vrroom_attempts', (object)['id' => $left->id, 'requireddone' => 1, 'timemodified' => $idle]);
+        [$recent] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->other->id);
+        $DB->update_record('vrroom_attempts', (object)['id' => $recent->id, 'requireddone' => 1,
+            'timemodified' => time() - 60]);
+        [$incomplete] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$third->id);
+        $DB->update_record('vrroom_attempts', (object)['id' => $incomplete->id, 'requireddone' => 0,
+            'timemodified' => $idle]);
+
+        $this->assertTrue(attempt_manager::is_abandoned_complete(attempt_manager::get_attempt((int)$left->id)));
+        $this->assertFalse(attempt_manager::is_abandoned_complete(attempt_manager::get_attempt((int)$recent->id)));
+        $this->assertFalse(attempt_manager::is_abandoned_complete(attempt_manager::get_attempt((int)$incomplete->id)));
+
+        $task = new finish_overdue_attempts();
+        ob_start();
+        $task->execute();
+        $output = ob_get_clean();
+        $this->assertStringContainsString('finished 1 attempt(s) left complete', $output);
+        $this->assertStringNotContainsString('overdue', $output);
+
+        $row = attempt_manager::get_attempt((int)$left->id);
+        $this->assertSame(attempt_manager::STATE_FINISHED, $row->state);
+        $this->assertEquals($idle, $row->timefinish);
+        $completed = $this->completed_result((int)$left->id);
+        $this->assertNotNull($completed);
+        $this->assertObjectNotHasProperty('timeup', $completed);
+        $grades = grade_get_grades($fx->course->id, 'mod', 'vrroom', $fx->vrroom->id, (int)$fx->student->id);
+        $this->assertNotNull($grades->items[0]->grades[$fx->student->id]->grade);
+        foreach ([$recent, $incomplete] as $attempt) {
+            $this->assertSame(attempt_manager::STATE_INPROGRESS, attempt_manager::get_attempt((int)$attempt->id)->state);
+        }
+
+        // A second run has nothing to do, and a finished attempt is never finished twice.
+        ob_start();
+        $task->execute();
+        $this->assertSame('', ob_get_clean());
+        $this->assertFalse(attempt_manager::close_if_abandoned($row));
+        $this->assertEquals(1, $DB->count_records('vrroom_events', ['attemptid' => $left->id, 'verb' => 'completed',
             'objecttype' => 'activity']));
     }
 

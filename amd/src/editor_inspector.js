@@ -32,6 +32,7 @@ import Pending from 'core/pending';
 import {getStrings, getString} from 'core/str';
 import {findRef, findScene} from 'mod_vrroom/editor_model';
 import {assetsOfKind, findAsset, parseKey, refKey, toRef} from 'mod_vrroom/editor_assets';
+import {boundsOf, fitToEnvironment, keepInside, moveStation} from 'mod_vrroom/editor_layout';
 
 /** Lang strings the inspector uses, by key (component mod_vrroom unless given). */
 const STRINGKEYS = [
@@ -133,7 +134,8 @@ export const displayName = (object) => {
  *
  * @param {HTMLElement} container The inspector region.
  * @param {Object} model The editor model.
- * @param {Object} context {assets, presets, questions, info, actions: {deleteSelection, duplicateSelection, upload}}
+ * @param {Object} context {assets, presets, questions, info, actions: {deleteSelection, duplicateSelection, upload,
+ *     keptInside, environmentFitted}}; it adds actions.focusField(path).
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
 export const init = (container, model, context) => {
@@ -160,6 +162,10 @@ export const init = (container, model, context) => {
 const start = (container, model, context, str) => {
     let destroyed = false;
     let renderid = 0;
+    // What the last apply() had to do on its own (set while a change is applied, read right after).
+    let report = {clamped: false, fitted: null};
+    // Id of the field to focus once the next drawing is done (focusField()).
+    let pendingfocus = null;
 
     const kindlabels = {
         environment: str.editorenvironment, spawn: str.editoraddspawn, zone: str.editoraddzone, prop: str.editoraddprop,
@@ -440,7 +446,16 @@ const start = (container, model, context, str) => {
                     return false;
                 }
                 const fallback = path.startsWith('scale') || path.startsWith('size') ? [1, 1, 1] : [0, 0, 0];
+                const before = ref.kind === 'zone' && Array.isArray(target.center) ? target.center.map(Number) : null;
                 setPath(target, path, Math.round(value * 1000) / 1000, getPath(target, path.split('.')[0]) || fallback);
+                if (/^(position|center)\.\d$/.test(path)) {
+                    // Keep it inside the room; a zone takes its station along.
+                    const bounds = boundsOf(scene);
+                    report.clamped = keepInside(ref.kind, target, bounds);
+                    if (before && Array.isArray(target.center)) {
+                        moveStation(scene, target.id, target.center.map((v, i) => Number(v) - before[i]), bounds);
+                    }
+                }
                 return true;
             }
             case 'numbernull': {
@@ -525,42 +540,59 @@ const start = (container, model, context, str) => {
      * @returns {boolean}
      */
     const applyEnvironment = (scene, value) => {
+        const before = boundsOf(scene);
+        const changed = changeEnvironment(scene, value);
+        if (changed) {
+            report.fitted = fitToEnvironment(scene, before, changed.start);
+        }
+        return !!changed;
+    };
+
+    /**
+     * The environment of a simple room or a pack room, copied from its preset.
+     *
+     * @param {string} id Preset id ('<id>' or '<pack>/<room>').
+     * @param {Object} preset The preset.
+     * @returns {Object} Environment.
+     */
+    const presetEnvironment = (id, preset) => {
+        const common = {
+            sky: preset.sky,
+            lights: JSON.parse(JSON.stringify(preset.lights || [])),
+            bounds: JSON.parse(JSON.stringify(preset.bounds || MODELBOUNDS)),
+        };
+        if (preset.kind === 'pack') {
+            return {type: 'pack', pack: preset.pack, room: preset.room, ...common};
+        }
+        return {type: 'preset', preset: id, shape: JSON.parse(JSON.stringify(preset.shape)), ...common};
+    };
+
+    /**
+     * Replace a room's environment (applyEnvironment() then fits the room's contents to it).
+     *
+     * @param {Object} scene Draft scene.
+     * @param {string} value 'preset:<id>', 'preset:<pack>/<room>' or 'file:<key>'.
+     * @returns {Object|null} {start: the new surroundings' start point or null}, or null when nothing changed.
+     */
+    const changeEnvironment = (scene, value) => {
         const env = scene.environment || {};
         if (value.startsWith('preset:')) {
             const id = value.slice(7);
             const preset = context.presets[id];
             if (!preset) {
-                return false;
+                return null;
             }
-            if (preset.kind === 'pack') {
-                if (preset.missing) {
-                    // A room this site lacks can be kept, not chosen anew (its layout is unknown here).
-                    return false;
-                }
-                scene.environment = {
-                    type: 'pack',
-                    pack: preset.pack,
-                    room: preset.room,
-                    sky: preset.sky,
-                    lights: JSON.parse(JSON.stringify(preset.lights || [])),
-                    bounds: JSON.parse(JSON.stringify(preset.bounds || MODELBOUNDS)),
-                };
-                return true;
+            if (preset.kind === 'pack' && preset.missing) {
+                // A room this site lacks can be kept, not chosen anew (its layout is unknown here).
+                return null;
             }
-            scene.environment = {
-                type: 'preset',
-                preset: id,
-                shape: JSON.parse(JSON.stringify(preset.shape)),
-                sky: preset.sky,
-                lights: JSON.parse(JSON.stringify(preset.lights || [])),
-                bounds: JSON.parse(JSON.stringify(preset.bounds || MODELBOUNDS)),
-            };
-            return true;
+            scene.environment = presetEnvironment(id, preset);
+            return {start: preset.spawn || null};
         }
         if (value.startsWith('file:')) {
             const ref = parseKey(value.slice(5));
             if (!ref) {
-                return false;
+                return null;
             }
             scene.environment = {
                 type: 'model',
@@ -569,9 +601,32 @@ const start = (container, model, context, str) => {
                 lights: Array.isArray(env.lights) && env.lights.length ? env.lights : MODELLIGHTS,
                 bounds: env.bounds && env.bounds.min && env.bounds.max ? env.bounds : MODELBOUNDS,
             };
-            return true;
+            // An uploaded model has no start point of its own: the current one is kept inside the bounds.
+            return {start: null};
         }
-        return false;
+        return null;
+    };
+
+    /**
+     * Run a change and tell the teacher what it moved on its own.
+     *
+     * @param {string} label Undo label.
+     * @param {Function} mutate As for model.transact().
+     * @param {string} name Name of the thing changed.
+     * @returns {boolean} Whether anything changed.
+     */
+    const transactAndReport = (label, mutate, name) => {
+        report = {clamped: false, fitted: null};
+        const changed = model.transact(label, mutate);
+        if (changed && report.clamped && context.actions.keptInside) {
+            context.actions.keptInside([name]);
+        }
+        if (changed && report.fitted && context.actions.environmentFitted) {
+            context.actions.environmentFitted({start: report.fitted.start,
+                moved: report.fitted.moved.map((m) => displayName(m.object))});
+        }
+        report = {clamped: false, fitted: null};
+        return changed;
     };
 
     /**
@@ -591,7 +646,7 @@ const start = (container, model, context, str) => {
         const name = ref.kind === 'environment'
             ? displayName(findScene(model.getDocument(), ref.scene)) : displayName(object);
         getString('editorchange_edit', 'mod_vrroom', name).then((label) => {
-            const changed = model.transact(label, (draft) => apply(draft, ref, path, type, raw));
+            const changed = transactAndReport(label, (draft) => apply(draft, ref, path, type, raw), name);
             if (!changed) {
                 // Show the stored value again.
                 refresh();
@@ -623,7 +678,7 @@ const start = (container, model, context, str) => {
             if (label === null || destroyed) {
                 return null;
             }
-            model.transact(label, (draft) => {
+            transactAndReport(label, (draft) => {
                 if (path === 'environment') {
                     const scene = findScene(draft, ref.scene);
                     return scene ? applyEnvironment(scene, `file:${key}`) : false;
@@ -631,7 +686,7 @@ const start = (container, model, context, str) => {
                 const type = path === 'file' && findRef(draft, ref) && findRef(draft, ref).kind === 'grabbable'
                     ? 'grabsource' : 'fileref';
                 return apply(draft, ref, path, type, key);
-            });
+            }, label);
             refresh();
             return null;
         }).catch(Notification.exception);
@@ -653,6 +708,17 @@ const start = (container, model, context, str) => {
                 return null;
             }
             Templates.replaceNodeContents(container, html, js);
+            if (pendingfocus) {
+                const field = document.getElementById(pendingfocus);
+                pendingfocus = null;
+                if (field && container.contains(field)) {
+                    field.focus();
+                    if (typeof field.select === 'function') {
+                        field.select();
+                    }
+                    return null;
+                }
+            }
             if (active) {
                 const again = document.getElementById(active);
                 if (again && container.contains(again)) {
@@ -699,8 +765,20 @@ const start = (container, model, context, str) => {
     ];
     refresh();
 
+    /**
+     * Focus a field of the selection once the inspector has been drawn for it (after an Add).
+     *
+     * @param {string} path Field path, such as 'name'.
+     */
+    const focusField = (path) => {
+        pendingfocus = `vrroom-insp-${idOf(path)}`;
+        refresh();
+    };
+    context.actions.focusField = focusField;
+
     return {
         refresh: refresh,
+        focusField: focusField,
         destroy: () => {
             destroyed = true;
             container.removeEventListener('change', onChange);

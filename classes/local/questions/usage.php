@@ -104,9 +104,11 @@ final class usage {
      * @param \stdClass $attempt The vrroom_attempts record (uniqueid, slotmap).
      * @param int $graphslot The graph slot number.
      * @param bool $feedback True for the graded feedback view (read-only).
+     * @param bool $revealanswer False when the question can still be tried again: the feedback
+     *     view then hides the right answer and the general feedback (see display_options()).
      * @return array{0: string, 1: string} [html, javascript].
      */
-    public static function render(\stdClass $attempt, int $graphslot, bool $feedback): array {
+    public static function render(\stdClass $attempt, int $graphslot, bool $feedback, bool $revealanswer = true): array {
         global $PAGE;
 
         self::require_engine();
@@ -121,7 +123,7 @@ final class usage {
         $PAGE->initialise_theme_and_output();
         self::start_collecting_javascript();
 
-        $html = $quba->render_question($slot, self::display_options($feedback));
+        $html = $quba->render_question($slot, self::display_options($feedback, $revealanswer));
         $javascript = $PAGE->requires->get_end_code();
 
         return [$html, $javascript];
@@ -282,10 +284,17 @@ final class usage {
      * is switched off because looking it up needs a page context that may not
      * exist off-page. The caller (or render_question()) sets the context.
      *
+     * A try that fell short of a question the student can still try again (the
+     * retry question mode, or a lock whose pass fraction was not reached) must
+     * not give the answer away: $revealanswer = false keeps the right answer and
+     * the general feedback (which often states the answer) hidden, while the
+     * correctness, the mark and the feedback on the student's own response stay.
+     *
      * @param bool $feedback True for the feedback view.
+     * @param bool $revealanswer Whether the feedback view may show the right answer and general feedback.
      * @return \question_display_options The options.
      */
-    public static function display_options(bool $feedback): \question_display_options {
+    public static function display_options(bool $feedback, bool $revealanswer = true): \question_display_options {
         self::require_engine();
         $options = new \question_display_options();
         $options->flags = \question_display_options::HIDDEN;
@@ -300,8 +309,9 @@ final class usage {
             $options->marks = \question_display_options::MARK_AND_MAX;
             $options->feedback = \question_display_options::VISIBLE;
             $options->numpartscorrect = \question_display_options::VISIBLE;
-            $options->generalfeedback = \question_display_options::VISIBLE;
-            $options->rightanswer = \question_display_options::VISIBLE;
+            $reveal = $revealanswer ? \question_display_options::VISIBLE : \question_display_options::HIDDEN;
+            $options->generalfeedback = $reveal;
+            $options->rightanswer = $reveal;
         } else {
             $options->readonly = false;
             $options->correctness = \question_display_options::HIDDEN;

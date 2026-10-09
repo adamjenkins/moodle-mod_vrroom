@@ -94,4 +94,41 @@ final class config_builder_test extends \advanced_testcase {
         $this->assertArrayNotHasKey('credit', $environment);
         $this->assertArrayHasKey('bounds', $environment);
     }
+
+    /**
+     * The resume state id is kept per attempt, and the attempt id can be read back from it.
+     */
+    public function test_resume_stateid(): void {
+        $this->assertSame('vrroom-resume-ec', config_builder::resume_stateid(42));
+        $this->assertSame('vrroom-resume-cee', config_builder::resume_stateid(244));
+        $this->assertSame('vrroom-resume-baj', config_builder::resume_stateid(109));
+        $this->assertNotSame(config_builder::resume_stateid(1), config_builder::resume_stateid(2));
+        // Core's state web services clean the state id as PARAM_ALPHAEXT: no digits.
+        foreach ([1, 42, 109, 9999999999] as $attemptid) {
+            $stateid = config_builder::resume_stateid($attemptid);
+            $this->assertSame($stateid, clean_param($stateid, PARAM_ALPHAEXT));
+            $this->assertSame($attemptid, config_builder::attemptid_from_resume_stateid($stateid));
+        }
+        $this->assertNull(config_builder::attemptid_from_resume_stateid(config_builder::RESUME_STATEID));
+        $this->assertNull(config_builder::attemptid_from_resume_stateid('vrroom-resume-a'));
+        $this->assertNull(config_builder::attemptid_from_resume_stateid('vrroom-resume-ab'));
+        $this->assertNull(config_builder::attemptid_from_resume_stateid('vrroom-resume-42'));
+        $this->assertNull(config_builder::attemptid_from_resume_stateid('vrroom-resume-bk'));
+        $this->assertNull(config_builder::attemptid_from_resume_stateid('other-resume-ec'));
+    }
+
+    /**
+     * An attempt's launch config names that attempt's resume state; a preview names none.
+     */
+    public function test_resume_state_in_config(): void {
+        [$preview, $vrroom, $cm, $context] = $this->preview_config();
+        $this->assertSame('', $preview['resume']['stateid']);
+
+        $student = $this->getDataGenerator()->create_and_enrol($cm->get_course(), 'student');
+        $this->setUser($student);
+        [$attempt] = \mod_vrroom\local\attempt\attempt_manager::start_or_resume($cm, $vrroom, (int)$student->id);
+        $config = config_builder::build($cm, $context, $vrroom, $attempt, $student);
+        $this->assertSame(config_builder::resume_stateid((int)$attempt->id), $config['resume']['stateid']);
+        $this->assertSame(\core_xapi\iri::generate((string)$context->id, 'activity'), $config['resume']['activityid']);
+    }
 }

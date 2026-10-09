@@ -173,7 +173,10 @@ final class room_manager {
      * The rooms of an activity (or of one group of it) with their occupancy, for the room list.
      *
      * A snapshot without locks and without writes: stale presences are left out, not purged.
-     * Counts only, never names.
+     * Counts only, never names. The asking user's own presence (another window of theirs) is not
+     * counted: joining replaces it, so it takes no place, and counting it showed a room as full
+     * ("2 of 2") with a Join button. A room the teacher made smaller than its occupancy shows a
+     * count above its capacity and is not joinable.
      *
      * @param \stdClass $vrroom vrroom row.
      * @param int $groupid The group whose rooms to list (already resolved), 0 without groups.
@@ -209,7 +212,7 @@ final class room_manager {
             $rooms[] = [
                 'number' => $number,
                 'name' => get_string('liveroomname', 'vrroomruntime_builtin', $number),
-                'count' => (int)($all[$number] ?? 0),
+                'count' => (int)($others[$number] ?? 0),
                 'capacity' => $capacity,
                 'joinable' => (int)($others[$number] ?? 0) < $capacity,
             ];

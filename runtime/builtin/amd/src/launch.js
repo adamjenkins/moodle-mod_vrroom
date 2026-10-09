@@ -33,7 +33,7 @@ import * as Viewer from 'vrroomruntime_builtin/viewer';
 import * as ListView from 'vrroomruntime_builtin/listview';
 import {createProgress} from 'vrroomruntime_builtin/panels';
 import {createLiveController} from 'vrroomruntime_builtin/live/controller';
-import {region, announce, showMessage, clearMessage} from 'vrroomruntime_builtin/util';
+import {region, announce, showMessage, showMessageWithLink, clearMessage} from 'vrroomruntime_builtin/util';
 
 /**
  * Call one web service and return a native promise.
@@ -167,11 +167,15 @@ class Controller {
     }
 
     /**
-     * Messages from the session: completion announcements and statement failures.
+     * Messages from the session: completion announcements, statement failures and a closed attempt.
      *
      * @param {Object} message Session message.
      */
     onSessionMessage(message) {
+        if (message.type === 'closed') {
+            this.onClosed();
+            return;
+        }
         if (message.type === 'failure') {
             if (message.failing) {
                 showMessage(this.root, this.strings.statementsfailed, 'warning');
@@ -190,6 +194,23 @@ class Controller {
             announce(this.root, this.strings.allrequireddone);
             showMessage(this.root, this.strings.allrequireddone, 'success');
         }
+    }
+
+    /**
+     * The attempt can no longer be worked on in this page (finished in another tab, deleted by a
+     * teacher, the activity hidden or restricted, the session expired): close the room and the live
+     * room, and say so with a link to the activity page instead of an error dialog.
+     */
+    onClosed() {
+        this.stopView();
+        if (this.live) {
+            const live = this.live;
+            this.live = null;
+            live.destroy().catch(() => undefined);
+        }
+        const text = this.strings.attemptnotopen;
+        showMessageWithLink(this.root, text, this.strings.backtoactivity, this.config.finishurl, 'warning');
+        announce(this.root, text);
     }
 
     /**
@@ -316,6 +337,11 @@ class Controller {
             window.location.href = (result && result.redirecturl) || this.config.finishurl;
             return undefined;
         }).catch((error) => {
+            if (this.session.closed) {
+                // Finished elsewhere already (or by its deadline): there is nothing left to finish here.
+                window.location.href = this.config.finishurl;
+                return undefined;
+            }
             // The attempt is still open: bring the live room and the view back, then report the error.
             if (!this.live) {
                 this.live = createLiveController(this.root, this.config, this.session);
@@ -373,13 +399,15 @@ export const init = (boot) => {
         {key: 'loadfailed', component: 'vrroomruntime_builtin'},
         {key: 'allrequireddone', component: 'vrroomruntime_builtin'},
         {key: 'statementsfailed', component: 'vrroomruntime_builtin'},
-    ]).then(([previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed]) => {
-        strings = {previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed};
+        {key: 'attemptnotopen', component: 'vrroomruntime_builtin'},
+        {key: 'backtoactivity', component: 'vrroomruntime_builtin'},
+    ]).then(([previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed, attemptnotopen, backtoactivity]) => {
+        strings = {previewnotice, webglunavailable, loadfailed, allrequireddone, statementsfailed, attemptnotopen, backtoactivity};
         return Templates.renderForPromise('vrroomruntime_builtin/shell', {
             cmid: boot.cmid,
             canstart: canstart,
             canpreview: canpreview,
-            nolaunch: !canstart && !canpreview,
+            nolaunch: !canstart && !canpreview && !boot.hasmessage,
         });
     }).then(({html, js}) => {
         Templates.replaceNodeContents(root, html, js);

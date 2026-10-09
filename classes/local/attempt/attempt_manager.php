@@ -23,6 +23,7 @@ use mod_vrroom\local\grading\grader;
 use mod_vrroom\local\graph\evaluation_result;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\launch\config_builder;
 use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\questions\slots;
 use mod_vrroom\local\questions\usage;
@@ -51,36 +52,106 @@ final class attempt_manager {
     public const DEADLINE_GRACE = 5;
 
     /**
+     * @var int Seconds without activity after which an attempt whose required objectives are all done
+     * counts as left complete (the student closed the tab instead of finishing) and is finished.
+     */
+    public const ABANDON_AFTER = DAYSECS;
+
+    /** @var int Seconds to wait for another request of the same user that is starting an attempt. */
+    private const START_LOCK_TIMEOUT = 10;
+
+    /**
      * Return the user's attempt in progress, or start a new one.
      *
      * An attempt in progress whose time ran out is finished first and no longer counts as open.
      * A new attempt gets its deadline from the time limit of the current graph.
+     *
+     * Starting is serialised per activity and user with a lock: several windows or devices that
+     * start at the same moment get the one attempt the first of them created, instead of racing
+     * for the next attempt number.
      *
      * @param \cm_info $cm course module
      * @param \stdClass $vrroom vrroom row
      * @param int $userid user id
      * @param int|null $timenow current time
      * @return array{0: \stdClass, 1: bool} [attempt, resumed]
-     * @throws \moodle_exception errornomoreattempts
+     * @throws \moodle_exception errornomoreattempts, or errorattemptbusy when the lock cannot be had
      */
     public static function start_or_resume(\cm_info $cm, \stdClass $vrroom, int $userid, ?int $timenow = null): array {
-        global $DB;
-        $timenow = $timenow ?? time();
+        $lock = \core\lock\lock_config::get_lock_factory('mod_vrroom')->get_lock(
+            'start_' . (int)$vrroom->id . '_' . $userid,
+            self::START_LOCK_TIMEOUT
+        );
+        if (!$lock) {
+            throw new \moodle_exception('errorattemptbusy', 'mod_vrroom');
+        }
+        try {
+            $open = self::get_open_attempt((int)$vrroom->id, $userid);
+            if ($open && !self::close_if_overdue($open, $timenow)) {
+                return [$open, true];
+            }
+            try {
+                $attempt = self::create_attempt($cm, $vrroom, $userid, $timenow ?? time());
+            } catch (\dml_write_exception $e) {
+                // A request that did not go through the lock (a lock backend that is not shared by
+                // every web node) created the attempt first: resume that one.
+                $open = self::get_open_attempt((int)$vrroom->id, $userid);
+                if ($open) {
+                    return [$open, true];
+                }
+                throw $e;
+            }
+        } finally {
+            $lock->release();
+        }
 
+        $event = attempt_started::create([
+            'objectid' => $attempt->id,
+            'relateduserid' => $userid,
+            'context' => \context_module::instance($cm->id),
+            'other' => ['vrroomid' => (int)$vrroom->id],
+        ]);
+        $event->add_record_snapshot('vrroom_attempts', $attempt);
+        $event->trigger();
+
+        return [$attempt, false];
+    }
+
+    /**
+     * The user's latest attempt in progress of an activity.
+     *
+     * @param int $vrroomid vrroom id
+     * @param int $userid user id
+     * @return \stdClass|null vrroom_attempts row, or null when none is in progress
+     */
+    private static function get_open_attempt(int $vrroomid, int $userid): ?\stdClass {
+        global $DB;
         $open = $DB->get_records(
             'vrroom_attempts',
-            ['vrroomid' => $vrroom->id, 'userid' => $userid, 'state' => self::STATE_INPROGRESS],
+            ['vrroomid' => $vrroomid, 'userid' => $userid, 'state' => self::STATE_INPROGRESS],
             'attempt DESC',
             '*',
             0,
             1
         );
-        if ($open) {
-            $current = reset($open);
-            if (!self::close_if_overdue($current, $timenow)) {
-                return [$current, true];
-            }
-        }
+        return $open ? reset($open) : null;
+    }
+
+    /**
+     * Create a new attempt with its question usage (the caller holds the start lock).
+     *
+     * The usage, the attempt row and its first statement are written in one transaction, which is
+     * rolled back on any error, so a failed start never leaves a transaction open or half an attempt.
+     *
+     * @param \cm_info $cm course module
+     * @param \stdClass $vrroom vrroom row
+     * @param int $userid user id
+     * @param int $timenow current time
+     * @return \stdClass the new vrroom_attempts row
+     * @throws \moodle_exception errornomoreattempts
+     */
+    private static function create_attempt(\cm_info $cm, \stdClass $vrroom, int $userid, int $timenow): \stdClass {
+        global $DB;
 
         $count = $DB->count_records('vrroom_attempts', ['vrroomid' => $vrroom->id, 'userid' => $userid]);
         if ((int)$vrroom->maxattempts > 0 && $count >= (int)$vrroom->maxattempts) {
@@ -97,48 +168,50 @@ final class attempt_manager {
 
         $context = \context_module::instance($cm->id);
         $transaction = $DB->start_delegated_transaction();
-        [$qubaid, $slotmap] = usage::create($context, slots::get_slots((int)$vrroom->id, $context));
-        $attempt = (object) [
-            'vrroomid' => (int)$vrroom->id,
-            'userid' => $userid,
-            'attempt' => $last + 1,
-            'state' => self::STATE_INPROGRESS,
-            'uniqueid' => (int)$qubaid,
-            'slotmap' => json_encode((object)$slotmap),
-            'graphversion' => (int)$vrroom->graphversion,
-            'score' => null,
-            'requireddone' => 0,
-            'timestart' => $timenow,
-            'timefinish' => 0,
-            'timedue' => $timelimit > 0 ? $timenow + $timelimit : 0,
-            'timemodified' => $timenow,
-        ];
-        $attempt->id = (int)$DB->insert_record('vrroom_attempts', $attempt);
-        event_store::record_server($attempt, 'launched', 'activity', null, null);
-        $transaction->allow_commit();
-
-        $event = attempt_started::create([
-            'objectid' => $attempt->id,
-            'relateduserid' => $userid,
-            'context' => $context,
-            'other' => ['vrroomid' => (int)$vrroom->id],
-        ]);
-        $event->add_record_snapshot('vrroom_attempts', $attempt);
-        $event->trigger();
-
-        return [$attempt, false];
+        try {
+            [$qubaid, $slotmap] = usage::create($context, slots::get_slots((int)$vrroom->id, $context));
+            $attempt = (object) [
+                'vrroomid' => (int)$vrroom->id,
+                'userid' => $userid,
+                'attempt' => $last + 1,
+                'state' => self::STATE_INPROGRESS,
+                'uniqueid' => (int)$qubaid,
+                'slotmap' => json_encode((object)$slotmap),
+                'graphversion' => (int)$vrroom->graphversion,
+                'score' => null,
+                'requireddone' => 0,
+                'timestart' => $timenow,
+                'timefinish' => 0,
+                'timedue' => $timelimit > 0 ? $timenow + $timelimit : 0,
+                'timemodified' => $timenow,
+            ];
+            $attempt->id = (int)$DB->insert_record('vrroom_attempts', $attempt);
+            event_store::record_server($attempt, 'launched', 'activity', null, null);
+            $transaction->allow_commit();
+        } catch (\Throwable $e) {
+            // Rolls back and throws $e again.
+            $transaction->rollback($e);
+        }
+        return $attempt;
     }
 
     /**
      * Load an attempt.
      *
+     * An attempt that does not exist (any more: a teacher deleted it while the student was in the
+     * room) fails with a message the student can act on, not with the database error.
+     *
      * @param int $attemptid
      * @return \stdClass
-     * @throws \dml_missing_record_exception
+     * @throws \moodle_exception errorattemptmissing
      */
     public static function get_attempt(int $attemptid): \stdClass {
         global $DB;
-        return $DB->get_record('vrroom_attempts', ['id' => $attemptid], '*', MUST_EXIST);
+        $attempt = $DB->get_record('vrroom_attempts', ['id' => $attemptid]);
+        if (!$attempt) {
+            throw new \moodle_exception('errorattemptmissing', 'mod_vrroom');
+        }
+        return $attempt;
     }
 
     /**
@@ -150,7 +223,8 @@ final class attempt_manager {
      * @param int $attemptid
      * @param int $userid
      * @return array{0: \stdClass, 1: \stdClass, 2: \cm_info, 3: \context_module} [attempt, vrroom, cm, context]
-     * @throws \moodle_exception errornotyourattempt, errorattempttimeup, errorattemptclosed, or a missing capability
+     * @throws \moodle_exception errorattemptmissing, errornotyourattempt, errorattempttimeup, errorattemptclosed,
+     *     or a missing capability
      */
     public static function require_own_open_attempt(int $attemptid, int $userid): array {
         $attempt = self::get_attempt($attemptid);
@@ -203,6 +277,49 @@ final class attempt_manager {
         } catch (\moodle_exception $e) {
             if ($e->errorcode === 'errorattemptclosed') {
                 // Another request finished it in the meantime.
+                return false;
+            }
+            throw $e;
+        }
+        return true;
+    }
+
+    /**
+     * Whether an attempt in progress was left complete: every required objective is done, and
+     * nothing has happened in it for ABANDON_AFTER seconds.
+     *
+     * @param \stdClass $attempt vrroom_attempts row
+     * @param int|null $timenow current time
+     * @return bool
+     */
+    public static function is_abandoned_complete(\stdClass $attempt, ?int $timenow = null): bool {
+        $timenow = $timenow ?? time();
+        return ($attempt->state ?? '') === self::STATE_INPROGRESS && (int)($attempt->requireddone ?? 0) === 1
+            && (int)($attempt->timemodified ?? 0) < $timenow - self::ABANDON_AFTER;
+    }
+
+    /**
+     * Finish an attempt that was left complete (see is_abandoned_complete()), as of its last activity.
+     *
+     * The student did everything that is required and closed the tab instead of finishing, so the
+     * attempt is finished and graded like a normal finish. The row is read again first, so a stale
+     * copy never finishes an attempt twice.
+     *
+     * @param \stdClass $attempt vrroom_attempts row (only the id is used)
+     * @param int|null $timenow current time
+     * @return bool true when this call finished the attempt
+     */
+    public static function close_if_abandoned(\stdClass $attempt, ?int $timenow = null): bool {
+        global $DB;
+        $row = $DB->get_record('vrroom_attempts', ['id' => (int)$attempt->id]);
+        if (!$row || !self::is_abandoned_complete($row, $timenow)) {
+            return false;
+        }
+        try {
+            self::finish($row, (int)$row->timemodified);
+        } catch (\moodle_exception $e) {
+            if ($e->errorcode === 'errorattemptclosed' || $e->errorcode === 'errorattemptmissing') {
+                // Another request finished or deleted it in the meantime.
                 return false;
             }
             throw $e;
@@ -405,6 +522,9 @@ final class attempt_manager {
         if ($completion->is_enabled($cm) == COMPLETION_TRACKING_AUTOMATIC) {
             $completion->update_state($cm, COMPLETION_UNKNOWN, (int)$attempt->userid);
         }
+
+        // The 3D position belongs to this attempt only; the next attempt starts at the start point.
+        self::delete_resume_states($context, (int)$attempt->userid, (int)$attempt->id);
         return $attempt;
     }
 
@@ -426,10 +546,8 @@ final class attempt_manager {
         $DB->delete_records('vrroom_attempts', ['id' => $attempt->id]);
         $transaction->allow_commit();
 
-        if ($attempt->state === self::STATE_INPROGRESS) {
-            // The resume position belonged to the deleted attempt.
-            self::wipe_xapi_states($context, (int)$attempt->userid);
-        }
+        // The resume position belonged to the deleted attempt.
+        self::delete_resume_states($context, (int)$attempt->userid, (int)$attempt->id);
 
         $event = attempt_deleted::create([
             'objectid' => $attempt->id,
@@ -477,6 +595,8 @@ final class attempt_manager {
 
         $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, $vrroom->course, false, IGNORE_MISSING);
         if ($cm) {
+            // Every state id of the module (the legacy per-module resume position and the per-attempt
+            // ones), for the user or for everyone.
             self::wipe_xapi_states(\context_module::instance($cm->id), $userid);
         }
 
@@ -488,15 +608,30 @@ final class attempt_manager {
     }
 
     /**
+     * Remove the resume positions of one attempt: its own state and the legacy per-module state
+     * (written before resume positions were kept per attempt).
+     *
+     * @param \context_module $context module context
+     * @param int $userid the attempt's user
+     * @param int $attemptid attempt id
+     * @return void
+     */
+    private static function delete_resume_states(\context_module $context, int $userid, int $attemptid): void {
+        self::wipe_xapi_states($context, $userid, config_builder::RESUME_STATEID);
+        self::wipe_xapi_states($context, $userid, config_builder::resume_stateid($attemptid));
+    }
+
+    /**
      * Remove VR room's xAPI states (resume positions) of a module context.
      *
      * @param \context_module $context module context
      * @param int|null $userid one user, or null for everyone
+     * @param string|null $stateid one state id, or null for all of them
      * @return void
      */
-    private static function wipe_xapi_states(\context_module $context, ?int $userid): void {
+    private static function wipe_xapi_states(\context_module $context, ?int $userid, ?string $stateid = null): void {
         try {
-            \core_xapi\handler::create('mod_vrroom')->wipe_states((string)$context->id, $userid);
+            \core_xapi\handler::create('mod_vrroom')->wipe_states((string)$context->id, $userid, $stateid);
         } catch (\Throwable $e) {
             debugging('Could not remove VR room xAPI states: ' . $e->getMessage(), DEBUG_DEVELOPER);
         }

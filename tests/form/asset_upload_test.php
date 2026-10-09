@@ -51,10 +51,11 @@ final class asset_upload_test extends \advanced_testcase {
      * Put a file in a new draft area of the current user.
      *
      * @param string $filename file name
+     * @param string|null $content file content; a .glb gets the real test cube by default
      * @return int draft item id
      */
-    private static function draft_with(string $filename): int {
-        global $USER;
+    private static function draft_with(string $filename, ?string $content = null): int {
+        global $CFG, $USER;
         $draftid = file_get_unused_draft_itemid();
         get_file_storage()->create_file_from_string([
             'contextid' => \context_user::instance($USER->id)->id,
@@ -63,7 +64,9 @@ final class asset_upload_test extends \advanced_testcase {
             'itemid' => $draftid,
             'filepath' => '/',
             'filename' => $filename,
-        ], 'content of ' . $filename);
+        ], $content ?? (str_ends_with($filename, '.glb')
+            ? file_get_contents($CFG->dirroot . '/mod/vrroom/tests/fixtures/cube.glb')
+            : 'content of ' . $filename));
         return $draftid;
     }
 
@@ -133,6 +136,21 @@ final class asset_upload_test extends \advanced_testcase {
         } catch (\moodle_exception $e) {
             $this->assertSame('erroreditorinvalid', $e->errorcode);
         }
+        $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));
+    }
+
+    /**
+     * A text file renamed to .glb is refused and not kept.
+     */
+    public function test_fake_glb(): void {
+        $fx = $this->setup_activity();
+        $this->setUser($fx->teacher);
+        $result = self::submit((int)$fx->module->cmid, 'model', self::draft_with('fake.glb', 'not a model'));
+        $this->assertFalse($result['submitted']);
+        $this->assertStringContainsString(
+            get_string('erroreditorbadglb', 'mod_vrroom', 'fake.glb'),
+            html_entity_decode($result['html'], ENT_QUOTES)
+        );
         $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));
     }
 

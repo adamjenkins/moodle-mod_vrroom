@@ -22,7 +22,8 @@
 
     Context variables required for this template:
     * stations - list of stations (zones) with their items and question slots; roomlabel is
-      plain text, empty with a single room
+      plain text, empty with a single room; status is locked, available or completed (a visited
+      station whose questions are not all answered is still available)
     * hasothers - whether items outside any station exist
     * others - those items
     * canswitch - show the button that switches to the 3D room
@@ -40,8 +41,9 @@
                 "sceneid": "s-1",
                 "name": "The Vase",
                 "roomlabel": "Room: Hall",
+                "status": "available",
                 "statuslabel": "To do",
-                "badgeclass": "bg-info text-dark",
+                "badgeclass": "text-bg-info",
                 "hidden": false,
                 "items": [
                     {"id": "h-1", "sceneid": "s-1", "title": "The Vase", "html": "<p>Made in 1720.</p>", "text": "", "imageurl": "",
@@ -75,7 +77,7 @@
                 <div class="card-body">
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <h3 class="h5 mb-0" id="vrroom-station-{{zoneid}}">{{name}}</h3>
-                        <span class="badge {{badgeclass}}" data-region="vrroom-station-status">{{statuslabel}}</span>
+                        <span class="badge {{badgeclass}}" data-region="vrroom-station-status" data-status="{{status}}">{{statuslabel}}</span>
                         {{#roomlabel}}<span class="badge bg-light text-dark" data-region="vrroom-station-room">{{roomlabel}}</span>{{/roomlabel}}
                     </div>
                     <button type="button" class="btn btn-secondary btn-sm mt-2" data-action="vrroom-open-station" data-zone="{{zoneid}}" aria-expanded="false" aria-controls="vrroom-station-body-{{zoneid}}">{{#str}}openstation, vrroomruntime_builtin{{/str}}</button>

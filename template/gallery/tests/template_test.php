@@ -797,6 +797,62 @@ final class template_test extends \advanced_testcase {
     }
 
     /**
+     * Points that cannot be stored (infinite, too large for the question slot, too small to keep)
+     * are validation errors, never a failed save.
+     */
+    public function test_validation_points_range(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+        $component = 'vrroomtemplate_gallery';
+        $max = format_float(template::MAX_POINTS, 0);
+
+        $data = [
+            'gallery_environment' => 'gallery-hall',
+            'gallery_title' => ['Inf', 'Big', 'Tiny', 'Max', 'Small', 'Zero'],
+            'gallery_text' => array_fill(0, 6, ['text' => '', 'format' => FORMAT_HTML]),
+            'gallery_mediatype' => array_fill(0, 6, 'none'),
+            'gallery_model' => array_fill(0, 6, 0),
+            'gallery_image' => array_fill(0, 6, 0),
+            'gallery_question' => array_fill(0, 6, 0),
+            'gallery_required' => array_fill(0, 6, 1),
+            'gallery_points' => ['1e309', 100000, 0.00000001, 99999, 0.0000001, 0],
+        ];
+        $errors = (new template())->validation($data, [], (int)$course->id);
+
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['gallery_points[0]']);
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['gallery_points[1]']);
+        $this->assertSame(get_string('errorpointsrange', $component, $max), $errors['gallery_points[2]']);
+        $this->assertArrayNotHasKey('gallery_points[3]', $errors);
+        $this->assertArrayNotHasKey('gallery_points[4]', $errors);
+        $this->assertArrayNotHasKey('gallery_points[5]', $errors);
+    }
+
+    /**
+     * Without the form's validation (a generator or a web service), points that cannot be stored
+     * are clamped, so the config always encodes.
+     */
+    public function test_extract_config_clamps_points(): void {
+        $this->resetAfterTest();
+        $formdata = (object)[
+            'gallery_environment' => 'gallery-hall',
+            'gallery_stationcount' => 2,
+            'gallery_title' => ['One', 'Two'],
+            'gallery_text' => array_fill(0, 2, ['text' => '', 'format' => FORMAT_HTML]),
+            'gallery_mediatype' => ['none', 'none'],
+            'gallery_question' => [0, 0],
+            'gallery_required' => [1, 1],
+            'gallery_points' => [INF, 1e12],
+        ];
+
+        $config = (new template())->extract_config($formdata);
+
+        $this->assertSame(0.0, $config->stations[0]->points);
+        $this->assertSame(template::MAX_POINTS, $config->stations[1]->points);
+        $this->assertIsString(json_encode($config, JSON_THROW_ON_ERROR));
+    }
+
+    /**
      * Restore remapping replaces the stations' question bank entry ids and reports whether anything changed.
      */
     public function test_remap_question_entries(): void {

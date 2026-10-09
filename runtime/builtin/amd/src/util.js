@@ -23,8 +23,9 @@
 
 /** Badge classes for objective states (BS5). */
 export const BADGES = {
-    locked: 'bg-secondary',
-    available: 'bg-info text-dark',
+    // Dark text: in the dark colour mode the secondary background stays light.
+    locked: 'bg-secondary text-dark',
+    available: 'text-bg-info',
     completed: 'bg-success',
 };
 
@@ -92,6 +93,53 @@ export const showMessage = (root, text, level = 'warning') => {
     message.textContent = text;
     message.dataset.vrroomMessage = text;
 };
+
+/**
+ * Show a message with a link after it in the message region (for example back to the activity page).
+ *
+ * @param {HTMLElement} root The VR room root element.
+ * @param {string} text Plain text.
+ * @param {string} linktext Plain text of the link.
+ * @param {string} url The link's URL.
+ * @param {string} level 'warning', 'info' or 'success'.
+ */
+export const showMessageWithLink = (root, text, linktext, url, level = 'warning') => {
+    const message = region(root, 'vrroom-message');
+    if (!message) {
+        return;
+    }
+    showMessage(root, text, level);
+    if (!url || !linktext) {
+        return;
+    }
+    const link = document.createElement('a');
+    link.href = url;
+    link.className = 'alert-link ms-1';
+    link.textContent = linktext;
+    message.append(' ', link);
+};
+
+/**
+ * Error codes of web service calls that mean the attempt can no longer be worked on in this page:
+ * finished (in another tab, or its time ran out), deleted by a teacher, or the activity is hidden,
+ * restricted or the session has expired.
+ */
+export const CLOSED_ERRORS = [
+    'errorattemptclosed',
+    'errorattemptmissing',
+    'errorattempttimeup',
+    'invalidrecord',
+    'requireloginerror',
+    'servicerequireslogin',
+];
+
+/**
+ * Whether a web service error means the attempt is closed for this page (see CLOSED_ERRORS).
+ *
+ * @param {*} error The rejection value of a core/ajax call.
+ * @returns {boolean}
+ */
+export const isClosedError = (error) => !!(error && typeof error === 'object' && CLOSED_ERRORS.indexOf(error.errorcode) >= 0);
 
 /**
  * Hide the message region, optionally only when it still shows a given text.

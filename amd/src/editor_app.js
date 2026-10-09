@@ -29,7 +29,9 @@ import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
 import {validate} from 'vrroomruntime_builtin/graph';
 import {clone, createModel, findRef, findScene, getCollection} from 'mod_vrroom/editor_model';
-import {assetsOfKind, upload, toRef} from 'mod_vrroom/editor_assets';
+import {choose, upload, toRef} from 'mod_vrroom/editor_assets';
+import {boundsOf, forgetIds, graphReferences, idsOfScene, isNetworkError, keepInside, portalsInto, retargetPortals,
+    usedAssetItemids} from 'mod_vrroom/editor_layout';
 import {displayName, init as initInspector} from 'mod_vrroom/editor_inspector';
 import {init as initOutline} from 'mod_vrroom/editor_outline';
 import {init as initView, isWebGLAvailable} from 'mod_vrroom/editor_view';
@@ -49,6 +51,9 @@ const PREFIXES = {
 
 /** Interactable kinds. */
 const INTERACTABLES = ['hotspot', 'model', 'image', 'text', 'portal', 'grabbable', 'media'];
+
+/** Kind of list => the editor info key of its most items per room. */
+const LIMITS = {interactable: 'maxinteractables', zone: 'maxzones'};
 
 /**
  * Find a region inside the editor.
@@ -71,26 +76,15 @@ const plain = (html) => {
 };
 
 /**
- * Item ids of the assets area that the rooms of a document use.
+ * Put a string into an element once it has loaded.
  *
- * @param {Object} doc Document.
- * @returns {Set<number>}
+ * @param {HTMLElement} element Where the text goes.
+ * @param {Promise<string>} text The string.
+ * @returns {Promise<null>}
  */
-const usedAssetItemids = (doc) => {
-    const used = new Set();
-    const note = (ref) => {
-        if (ref && ref.area === 'assets') {
-            used.add(Number(ref.itemid));
-        }
-    };
-    (doc.scenes || []).forEach((scene) => {
-        note(scene.environment && scene.environment.file);
-        (scene.interactables || []).forEach((item) => {
-            note(item.file);
-            ((item.content && item.content.media) || []).forEach(note);
-        });
-    });
-    return used;
+const showText = async(element, text) => {
+    element.textContent = await text;
+    return null;
 };
 
 /**
@@ -119,9 +113,13 @@ export const init = ({cmid, rootid}) => {
         });
         return start(root, cmid, response, strings);
     }).catch((error) => {
-        region(root, 'vrroom-editor-status').textContent = '';
-        Notification.exception(error);
-    }).finally(() => pending.resolve());
+        const status = region(root, 'vrroom-editor-status');
+        status.textContent = '';
+        if (isNetworkError(error)) {
+            return showText(status, getString('editornetworkerror', 'mod_vrroom'));
+        }
+        return Notification.exception(error);
+    }).catch(Notification.exception).finally(() => pending.resolve());
 };
 
 /**
@@ -171,6 +169,121 @@ const start = (root, cmid, response, strings) => {
     const showMessage = (text) => {
         message.textContent = text;
         message.classList.remove('d-none');
+    };
+
+    // The note under the toolbar: what the editor did on its own, why something was refused, why a save failed.
+    const note = region(root, 'vrroom-editor-note');
+    const notetext = region(root, 'vrroom-editor-notetext');
+    let notekind = '';
+
+    /**
+     * Show a note under the toolbar (it replaces the previous one).
+     *
+     * @param {string} text Plain text.
+     * @param {string} [kind] What the note is about ('error' for a failed save, 'clearance', or '').
+     */
+    const showNote = (text, kind = '') => {
+        notekind = kind;
+        notetext.textContent = text;
+        note.classList.toggle('alert-danger', kind === 'error');
+        note.classList.toggle('alert-warning', kind !== 'error');
+        note.classList.remove('d-none');
+        // The note sits under the toolbar; after a refused delete at the bottom of the inspector,
+        // bring it into view.
+        note.scrollIntoView({block: 'nearest'});
+    };
+
+    /**
+     * Show a failed save's reason in the note once its string has loaded.
+     *
+     * @param {Promise<string>} reason The reason.
+     * @returns {Promise<string>} The reason's text, for the status line.
+     */
+    const noteError = async(reason) => {
+        const text = await reason;
+        showNote(text, 'error');
+        return text;
+    };
+
+    /**
+     * Hide the note.
+     *
+     * @param {string} [kind] Hide it only when it is about this.
+     */
+    const hideNote = (kind) => {
+        if (kind === undefined || kind === notekind) {
+            note.classList.add('d-none');
+            notetext.textContent = '';
+            notekind = '';
+        }
+    };
+
+    /**
+     * Show a note made from a lang string.
+     *
+     * @param {string} key String key (mod_vrroom).
+     * @param {*} a String parameter.
+     * @param {string} [kind] As for showNote().
+     * @returns {Promise}
+     */
+    const noteString = (key, a, kind = '') => getString(key, 'mod_vrroom', a).then((text) => {
+        showNote(text, kind);
+        announce(text);
+        return null;
+    }).catch(Notification.exception);
+
+    /**
+     * A list of names for a message ("A", "B", "C").
+     *
+     * @param {string[]} names Names.
+     * @returns {string}
+     */
+    const nameList = (names) => Array.from(new Set(names)).map((n) => `"${n}"`).join(', ');
+
+    /**
+     * A start point's name for a message: its own, or "Start point <number>" as in the outline.
+     *
+     * @param {Object} spawn {name, number}.
+     * @returns {Promise<string>}
+     */
+    const spawnLabel = async(spawn) => {
+        if (spawn.name) {
+            return spawn.name;
+        }
+        const kind = await getString('editoraddspawn', 'mod_vrroom');
+        return getString('editornewname', 'mod_vrroom', {kind: kind, number: spawn.number});
+    };
+
+    /**
+     * What a list of task and rule references is called, for a message.
+     *
+     * @param {Object[]} refs From graphReferences().
+     * @returns {Promise<string>}
+     */
+    const describeRefs = (refs) => Promise.all(refs.map((ref) => {
+        if (ref.type === 'rule') {
+            return getString('logicrule', 'mod_vrroom', ref.index + 1);
+        }
+        if (ref.title) {
+            return getString('editorrefobjective', 'mod_vrroom', {number: ref.index + 1, title: ref.title});
+        }
+        return getString('logicobjective', 'mod_vrroom', ref.index + 1);
+    })).then((labels) => labels.join(', '));
+
+    /**
+     * Whether a room has room for one more thing of a kind; tells the teacher when not.
+     *
+     * @param {Object} scene Scene document.
+     * @param {string} collection Kind of list (interactable, zone, ...).
+     * @returns {boolean}
+     */
+    const hasRoomFor = (scene, collection) => {
+        const max = Number(context.info[LIMITS[collection]]) || 0;
+        if (!max || getCollection(clone(scene), collection).length < max) {
+            return true;
+        }
+        noteString(collection === 'zone' ? 'editortoomanyzones' : 'editortoomanyobjects', max);
+        return false;
     };
 
     /**
@@ -241,20 +354,15 @@ const start = (root, cmid, response, strings) => {
     };
 
     /**
-     * The file a new model, image or media object starts with: an existing one, or a fresh upload.
+     * The file a new model, image or media object starts with: the teacher picks one of the
+     * activity's files or uploads one (nothing is reused without asking).
      *
      * @param {string} kind Asset kind.
      * @param {string[]} areas Allowed areas.
-     * @param {HTMLElement} returnfocus Where focus goes after the upload form.
+     * @param {HTMLElement} returnfocus Where focus goes after the dialogue.
      * @returns {Promise<Object|null>}
      */
-    const chooseAsset = (kind, areas, returnfocus) => {
-        const existing = assetsOfKind(context.assets, kind, areas);
-        if (existing.length) {
-            return Promise.resolve(existing[existing.length - 1]);
-        }
-        return upload(cmid, kind, context.assets, returnfocus);
-    };
+    const chooseAsset = (kind, areas, returnfocus) => choose(cmid, kind, context.assets, areas, returnfocus);
 
     /**
      * Add an object to the room being edited.
@@ -266,6 +374,9 @@ const start = (root, cmid, response, strings) => {
     const addObject = (kind, media, trigger) => {
         const scene = model.getActiveScene();
         if (!scene || !KINDLABELS[kind]) {
+            return;
+        }
+        if (!hasRoomFor(scene, INTERACTABLES.includes(kind) ? 'interactable' : kind)) {
             return;
         }
         let assetpromise = Promise.resolve(null);
@@ -306,14 +417,33 @@ const start = (root, cmid, response, strings) => {
             if (!object) {
                 return null;
             }
-            model.transact(label, (draft) => {
+            keepInside(collection, object, boundsOf(state.current));
+            let full = false;
+            const added = model.transact(label, (draft) => {
                 const target = findScene(draft, scene.id);
                 if (!target) {
                     return false;
                 }
-                getCollection(target, collection).push(object);
+                const items = getCollection(target, collection);
+                const max = Number(context.info[LIMITS[collection]]) || 0;
+                if (max && items.length >= max) {
+                    // Another object arrived while the file dialogue was open.
+                    full = true;
+                    return false;
+                }
+                items.push(object);
                 return true;
             });
+            if (full) {
+                hasRoomFor(findScene(model.getDocument(), scene.id) || scene, collection);
+            }
+            if (!added) {
+                return null;
+            }
+            // Keyboard users carry on in the new object's Name field.
+            if (context.actions.focusField) {
+                context.actions.focusField('name');
+            }
             model.select({scene: scene.id, kind: collection, id: id});
             announce(label);
             return null;
@@ -332,8 +462,17 @@ const start = (root, cmid, response, strings) => {
         if (ref.kind === 'spawn' && (!Array.isArray(scene.spawn) || scene.spawn.length < 2)) {
             return;
         }
-        getString('editorchange_delete', 'mod_vrroom', displayName(object)).then((label) => {
-            model.transact(label, (draft) => {
+        const name = displayName(object);
+        // A thing the tasks need is not deleted: the save would fail with ids the teacher cannot read.
+        const refs = graphReferences(doc, new Set([String(ref.id)]));
+        if (refs.length) {
+            describeRefs(refs).then((uses) => noteString('editordeleteblocked', {name: name, uses: uses}))
+                .catch(Notification.exception);
+            return;
+        }
+        let retargeted = 0;
+        getString('editorchange_delete', 'mod_vrroom', name).then((label) => {
+            const deleted = model.transact(label, (draft) => {
                 const target = findScene(draft, ref.scene);
                 const list = getCollection(target, ref.kind);
                 const index = list.findIndex((o) => o && o.id === ref.id);
@@ -350,10 +489,20 @@ const start = (root, cmid, response, strings) => {
                         delete item.opens;
                     }
                 });
+                forgetIds(draft, new Set([String(ref.id)]));
+                if (ref.kind === 'spawn') {
+                    retargeted = retargetPortals(draft, ref.scene, ref.id);
+                }
                 return true;
             });
+            if (!deleted) {
+                return null;
+            }
             model.select(null);
             announce(label);
+            if (retargeted) {
+                noteString('editorportalsretargeted', retargeted);
+            }
             return null;
         }).catch(Notification.exception);
     };
@@ -366,6 +515,10 @@ const start = (root, cmid, response, strings) => {
             return;
         }
         const kind = ref.kind === 'interactable' ? object.kind : ref.kind;
+        const scene = findScene(model.getDocument(), ref.scene);
+        if (!scene || !hasRoomFor(scene, ref.kind)) {
+            return;
+        }
         getString('editorchange_add', 'mod_vrroom', displayName(object)).then((label) => {
             const copy = clone(object);
             copy.id = model.newId(PREFIXES[kind] || 'x');
@@ -373,6 +526,7 @@ const start = (root, cmid, response, strings) => {
             if (Array.isArray(copy[key]) && copy[key].length === 3) {
                 copy[key] = [Math.round((Number(copy[key][0]) + 0.5) * 1000) / 1000, copy[key][1], copy[key][2]];
             }
+            keepInside(ref.kind, copy, boundsOf(scene));
             model.transact(label, (draft) => {
                 const target = findScene(draft, ref.scene);
                 if (!target) {
@@ -435,22 +589,72 @@ const start = (root, cmid, response, strings) => {
     };
 
     /**
-     * Delete a room and everything in it (never the last one).
+     * Delete a room and everything in it (never the last one), after asking.
+     *
+     * The portals of other rooms that lead into it go too. A room whose contents (or whose
+     * portals into it) the tasks use is not deleted: the teacher is told which tasks.
      *
      * @param {string} sceneid Scene id.
+     * @param {HTMLElement} [trigger] The button, focused again when the dialogue closes.
      */
-    const deleteScene = (sceneid) => {
+    const deleteScene = (sceneid, trigger) => {
         const doc = model.getDocument();
         const scene = findScene(doc, sceneid);
         if (!scene || doc.scenes.length < 2) {
             return;
         }
-        getString('editorchange_delete', 'mod_vrroom', displayName(scene)).then((label) => {
-            model.transact(label, (draft) => {
+        const name = displayName(scene);
+        const portals = portalsInto(doc, sceneid);
+        const ids = idsOfScene(scene);
+        portals.forEach((p) => ids.add(String(p.item.id)));
+        const refs = graphReferences(doc, ids, new Set([String(sceneid)]));
+        if (refs.length) {
+            describeRefs(refs).then((uses) => noteString('editordeleteblocked', {name: name, uses: uses}))
+                .catch(Notification.exception);
+            return;
+        }
+        const question = portals.length
+            ? getString('editordeletesceneportals', 'mod_vrroom', {name: name, count: portals.length})
+            : getString('editordeletesceneconfirm', 'mod_vrroom', name);
+        const confirmation = Notification.deleteCancelPromise(getString('editordeletescene', 'mod_vrroom'), question,
+            getString('editordeletescene', 'mod_vrroom'), {triggerElement: trigger || null});
+        confirmation.then(() => true, () => false).then((confirmed) => {
+            return confirmed ? getString('editorchange_delete', 'mod_vrroom', name) : null;
+        }).then((label) => {
+            if (label === null) {
+                // Cancelled.
+                return null;
+            }
+            const deleted = model.transact(label, (draft) => {
+                if (!findScene(draft, sceneid) || draft.scenes.length < 2) {
+                    return false;
+                }
+                const gone = idsOfScene(findScene(draft, sceneid));
                 draft.scenes = draft.scenes.filter((s) => s.id !== sceneid);
+                draft.scenes.forEach((s) => {
+                    s.interactables = (Array.isArray(s.interactables) ? s.interactables : []).filter((item) => {
+                        const into = item && item.kind === 'portal' && item.target && item.target.scene === sceneid;
+                        if (into) {
+                            gone.add(String(item.id));
+                        }
+                        return !into;
+                    });
+                    // Nothing may open a portal that is gone.
+                    s.interactables.forEach((item) => {
+                        if (item.opens && gone.has(String(item.opens))) {
+                            delete item.opens;
+                        }
+                    });
+                });
+                forgetIds(draft, gone);
                 return true;
             });
-            announce(label);
+            if (deleted) {
+                announce(label);
+                if (portals.length) {
+                    noteString('editorportalsremoved', portals.length);
+                }
+            }
             return null;
         }).catch(Notification.exception);
     };
@@ -488,6 +692,35 @@ const start = (root, cmid, response, strings) => {
         upload: (kind, returnfocus) => upload(cmid, kind, context.assets, returnfocus),
         showMessage: ({key, component}) => {
             getString(key, component).then(showMessage).catch(Notification.exception);
+        },
+        keptInside: (names) => {
+            // An unnamed start point arrives as its id: name it as the outline does.
+            const scene = model.getActiveScene();
+            const spawns = scene && Array.isArray(scene.spawn) ? scene.spawn : [];
+            Promise.all(names.map((name) => {
+                const index = spawns.findIndex((spawn) => spawn && spawn.id === name && !(spawn.name || '').trim());
+                return index < 0 ? name : spawnLabel({name: '', number: index + 1});
+            })).then((labels) => noteString('editorkeptinside', nameList(labels))).catch(Notification.exception);
+        },
+        environmentFitted: ({start, moved}) => {
+            if (moved.length) {
+                noteString(start ? 'editorenvstartmoved' : 'editorenvmoved', nameList(moved));
+            } else if (start) {
+                noteString('editorenvstart', null);
+            }
+        },
+        onClearance: (cramped) => {
+            if (!cramped.length) {
+                hideNote('clearance');
+                return;
+            }
+            const first = cramped[0];
+            spawnLabel(first).then((name) => {
+                if (first.distance === 0) {
+                    return noteString('editorspawnonfurniture', name, 'clearance');
+                }
+                return noteString('editorspawncramped', {name: name, distance: first.distance}, 'clearance');
+            }).catch(Notification.exception);
         },
         onMode: (mode) => {
             root.querySelectorAll('[data-action="vrroom-editor-mode"]').forEach((button) => {
@@ -599,8 +832,17 @@ const start = (root, cmid, response, strings) => {
             }
             // Only what was sent is stored; edits made while saving stay unsaved.
             model.markSaved(result.revision, savedoc);
+            // The server deleted the activity's files the saved rooms no longer use. Undo and redo
+            // steps that would bring such a file back are dropped (the other steps are whole
+            // documents and still work); the teacher uploads the file again if it is wanted.
             const used = usedAssetItemids(savedoc);
+            const removed = new Set(context.assets.filter((a) => a.area === 'assets' && !used.has(Number(a.itemid)))
+                .map((a) => Number(a.itemid)));
             context.assets = context.assets.filter((a) => a.area !== 'assets' || used.has(Number(a.itemid)));
+            if (removed.size) {
+                model.pruneHistory((doc) => Array.from(usedAssetItemids(doc)).some((itemid) => removed.has(itemid)));
+            }
+            hideNote('error');
             eversaved = true;
             return model.isDirty() ? strings.editorunsaved : strings.editorsaved;
         }).catch((error) => {
@@ -609,7 +851,10 @@ const start = (root, cmid, response, strings) => {
                 Notification.exception(error);
                 return null;
             }
-            return getString('editorsavefailed', 'mod_vrroom', plain(error && error.message));
+            const reason = isNetworkError(error) ? getString('editornetworkerror', 'mod_vrroom')
+                : getString('editorsavefailed', 'mod_vrroom', plain(error && error.message));
+            // The status line is short; the whole reason (such as what lies outside the room) goes in the note.
+            return noteError(reason);
         }).then((text) => {
             if (text) {
                 setStatus(text);
@@ -651,6 +896,9 @@ const start = (root, cmid, response, strings) => {
                 break;
             case 'vrroom-editor-tab':
                 showTab(button.dataset.tab);
+                break;
+            case 'vrroom-editor-note-close':
+                hideNote();
                 break;
         }
     });

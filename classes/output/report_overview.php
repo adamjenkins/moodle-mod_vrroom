@@ -19,6 +19,7 @@ namespace mod_vrroom\output;
 use core\output\renderable;
 use core\output\renderer_base;
 use core\output\templatable;
+use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\grading\grader;
 
 /**
@@ -106,7 +107,7 @@ class report_overview implements renderable, templatable {
                 'attempt' => (int)$record->attempt,
                 'state' => self::state_label((string)$record->state),
                 'score' => self::format_score($score),
-                'grade' => grader::format_grade($this->vrroom, $score),
+                'grade' => self::format_attempt_grade($this->vrroom, (string)$record->state, $score),
                 'timestart' => $record->timestart ? userdate((int)$record->timestart) : '-',
                 'timefinish' => $record->timefinish ? userdate((int)$record->timefinish) : '-',
                 'viewurl' => (new \moodle_url($baseurl, ['attemptid' => $record->id]))->out(false),
@@ -153,6 +154,24 @@ class report_overview implements renderable, templatable {
             return get_string('state_' . $state, 'mod_vrroom');
         }
         return $state;
+    }
+
+    /**
+     * The grade of an attempt, "-" until it is finished.
+     *
+     * The score of an attempt in progress is a running score: it has not reached the gradebook, so
+     * no grade is shown for it.
+     *
+     * @param \stdClass $vrroom vrroom row
+     * @param string $state attempt state
+     * @param float|null $score fraction 0..1
+     * @return string
+     */
+    public static function format_attempt_grade(\stdClass $vrroom, string $state, ?float $score): string {
+        if ($state !== attempt_manager::STATE_FINISHED) {
+            return '-';
+        }
+        return grader::format_grade($vrroom, $score);
     }
 
     /**

@@ -19,7 +19,8 @@ namespace mod_vrroom\local\scene;
 /**
  * Validates vrroom-scene/1 documents.
  *
- * Errors are developer-facing English (they describe a template bug, not a teacher mistake).
+ * Errors are developer-facing English (they describe a template bug, not a teacher mistake). The room
+ * editor (editor_manager) turns the ones a teacher can cause into teacher-facing messages.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -382,6 +383,65 @@ final class scene_validator {
         }
 
         return $errors;
+    }
+
+    /**
+     * The walkable area of a room: what the viewer keeps the student inside.
+     *
+     * This mirrors runtime/builtin/amd/src/environment.js: the stored bounds when there are any, else
+     * for a preset the size of its procedural shape (a courtyard's radius less 1 m, a hall's width and
+     * length). A room model uploaded without bounds is measured by the viewer only, so it has none here.
+     *
+     * @param mixed $environment The scene's environment block.
+     * @return array|null ['min' => [x, y, z], 'max' => [x, y, z]] as floats, or null when not known.
+     */
+    public static function walkable_bounds($environment): ?array {
+        if (!is_array($environment)) {
+            return null;
+        }
+        $bounds = $environment['bounds'] ?? null;
+        if (is_array($bounds)) {
+            $errors = [];
+            if (
+                self::check_vector($bounds['min'] ?? null, 'min', $errors)
+                    && self::check_vector($bounds['max'] ?? null, 'max', $errors)
+            ) {
+                return [
+                    'min' => array_map('floatval', $bounds['min']),
+                    'max' => array_map('floatval', $bounds['max']),
+                ];
+            }
+            return null;
+        }
+        if (($environment['type'] ?? null) !== 'preset') {
+            return null;
+        }
+        $shape = is_array($environment['shape'] ?? null) ? $environment['shape'] : [];
+        $number = fn(string $key, float $default): float => self::is_number($shape[$key] ?? null) ? (float)$shape[$key] : $default;
+        if (($shape['kind'] ?? null) === 'courtyard') {
+            $r = $number('radius', 14.0) - 1;
+            return ['min' => [-$r, 0.0, -$r], 'max' => [$r, 0.0, $r]];
+        }
+        $hw = $number('width', 12.0) / 2;
+        $hl = $number('length', 30.0) / 2;
+        return ['min' => [-$hw, 0.0, -$hl], 'max' => [$hw, 0.0, $hl]];
+    }
+
+    /**
+     * Whether a position lies inside a walkable area (x and z only, edges included).
+     *
+     * @param mixed $position [x, y, z].
+     * @param array $bounds Walkable area from walkable_bounds().
+     * @return bool False also when the position is not 3 finite numbers.
+     */
+    public static function inside_bounds($position, array $bounds): bool {
+        $errors = [];
+        if (!self::check_vector($position, 'position', $errors)) {
+            return false;
+        }
+        $epsilon = 1e-6;
+        return $position[0] >= $bounds['min'][0] - $epsilon && $position[0] <= $bounds['max'][0] + $epsilon
+            && $position[2] >= $bounds['min'][2] - $epsilon && $position[2] <= $bounds['max'][2] + $epsilon;
     }
 
     /**

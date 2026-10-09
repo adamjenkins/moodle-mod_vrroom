@@ -26,9 +26,10 @@
 
 import Ajax from 'core/ajax';
 import Log from 'core/log';
+import Notification from 'core/notification';
 import {evaluate, classify, STATUS} from 'vrroomruntime_builtin/graph';
 import {createQueue, buildStatement} from 'vrroomruntime_builtin/statements';
-import {plainText} from 'vrroomruntime_builtin/util';
+import {plainText, isClosedError} from 'vrroomruntime_builtin/util';
 
 /** Order of objective states, used to merge server and local state. */
 const RANK = {locked: 0, available: 1, completed: 2};
@@ -112,6 +113,13 @@ const round = (x, digits) => {
  * @returns {Promise}
  */
 const call = (methodname, args) => Promise.resolve(Ajax.call([{methodname: methodname, args: args}])[0]);
+
+/**
+ * The rejection of a call made after the attempt closed in this page (shaped like a web service error).
+ *
+ * @returns {Promise}
+ */
+const closedError = () => Promise.reject({errorcode: 'errorattemptclosed', message: ''});
 
 /**
  * The client side of one attempt.
@@ -202,7 +210,9 @@ class Session {
      * Subscribe to session changes.
      *
      * Listeners receive {type: 'change', state, previous, unlocked, completed, effects},
-     * {type: 'failure', failing} or, once, {type: 'timeup'} when the attempt's time has run out.
+     * {type: 'failure', failing}, once {type: 'timeup'} when the attempt's time has run out, and once
+     * {type: 'closed'} when the server says the attempt can no longer be worked on in this page
+     * (finished elsewhere, deleted, the activity hidden, the session expired).
      * Listeners must ignore types they do not know.
      *
      * @param {Function} listener The listener.
@@ -427,6 +437,48 @@ class Session {
     }
 
     /**
+     * The attempt can no longer be worked on in this page: stop recording, sending and saving, and
+     * tell the listeners once.
+     */
+    markClosed() {
+        if (this.closed) {
+            return;
+        }
+        this.closed = true;
+        this.active = false;
+        this.destroy();
+        this.emit({type: 'closed'});
+    }
+
+    /**
+     * Mark the session closed when a web service error says so, then pass the error on.
+     *
+     * @param {*} error The rejection value.
+     * @returns {Promise} always rejected with error
+     */
+    checkClosed(error) {
+        if (isClosedError(error)) {
+            this.markClosed();
+        }
+        return Promise.reject(error);
+    }
+
+    /**
+     * Report a web service error: an error that means the attempt is closed closes the session (the
+     * page shows one notice for that) instead of the exception dialog; others get the dialog.
+     *
+     * @param {*} error The rejection value.
+     * @returns {Promise}
+     */
+    reportError(error) {
+        if (isClosedError(error)) {
+            this.markClosed();
+            return Promise.resolve();
+        }
+        return Notification.exception(error);
+    }
+
+    /**
      * Handle the result of one statement batch, then reconcile with the server.
      *
      * @param {Object} result {batch, accepted, error}
@@ -444,7 +496,12 @@ class Session {
             }
         });
         if (result.error) {
+            // A refused batch ("No statement can be processed.") is checked by the reconcile below:
+            // the attempt state shows whether the attempt is still open.
             Log.debug(result.error);
+            if (isClosedError(result.error)) {
+                this.markClosed();
+            }
         }
         return this.reconcile();
     }
@@ -462,6 +519,11 @@ class Session {
         const pendingbefore = this.pendingevents.length;
         this.reconciling = call('mod_vrroom_get_attempt_state', {attemptid: this.config.attemptid})
             .then((state) => {
+                if (state && state.state && state.state !== 'inprogress') {
+                    // Finished in another tab or by the deadline, or abandoned.
+                    this.markClosed();
+                    return state;
+                }
                 this.setServerState(state, this.pendingevents.length === 0 && pendingbefore === 0);
                 this.update(false);
                 this.startTimer();
@@ -469,6 +531,10 @@ class Session {
             })
             .catch((e) => {
                 Log.debug(e);
+                if (isClosedError(e)) {
+                    this.markClosed();
+                    return;
+                }
                 this.update(false);
             })
             .then(() => {
@@ -704,10 +770,13 @@ class Session {
      * @returns {Promise<Object>} {slot, html, javascript, answered}
      */
     getQuestion(slot) {
+        if (this.closed) {
+            return closedError();
+        }
         return this.flush().then(() => call('mod_vrroom_get_question', {
             attemptid: this.config.attemptid,
             slot: Number(slot),
-        }));
+        })).catch((error) => this.checkClosed(error));
     }
 
     /**
@@ -742,6 +811,9 @@ class Session {
         const list = (Array.isArray(responses) ? responses : [])
             .filter((r) => r && typeof r.name === 'string')
             .map((r) => ({name: r.name, value: r.value === undefined || r.value === null ? '' : String(r.value)}));
+        if (this.closed) {
+            return closedError();
+        }
         return this.flush()
             .then(() => call('mod_vrroom_submit_question', {
                 attemptid: this.config.attemptid,
@@ -760,7 +832,7 @@ class Session {
                 }
                 this.update(true);
                 return Object.assign({}, result, {answered: answered, retry: !!result.retry});
-            });
+            }, (error) => this.checkClosed(error));
     }
 
     /**
@@ -816,13 +888,13 @@ class Session {
                     hintsused: Number(result.hintsused) || entry.used.length,
                     hintstotal: entry.total,
                 };
-            });
+            }, (error) => this.checkClosed(error));
     }
 
     /**
      * Load the saved position (3D only).
      *
-     * @returns {Promise<Object|null>} {scene, position, yaw} or null.
+     * @returns {Promise<Object|null>} {scene, position, yaw, key} or null.
      */
     loadResume() {
         if (this.preview || !this.config.resume || !this.config.attemptid) {
@@ -845,14 +917,20 @@ class Session {
             if (position.some((v) => !Number.isFinite(v))) {
                 return null;
             }
-            return {scene: data.scene, position: position, yaw: Number(data.yaw) || 0};
+            // The layout key of the room when the position was saved (none in positions saved before keys).
+            return {
+                scene: data.scene,
+                position: position,
+                yaw: Number(data.yaw) || 0,
+                key: typeof data.key === 'string' ? data.key : '',
+            };
         }).catch(() => null);
     }
 
     /**
      * Save the position every 10 s while a 3D view runs.
      *
-     * @param {Function} getter Returns {scene, position, yaw}.
+     * @param {Function} getter Returns {scene, position, yaw, key} (key: the room's layout key), or null.
      */
     startResume(getter) {
         this.stopResume();
@@ -903,7 +981,7 @@ class Session {
                 this.closed = true;
                 this.destroy();
                 return result;
-            });
+            }, (error) => this.checkClosed(error));
     }
 
     /**

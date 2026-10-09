@@ -172,7 +172,7 @@ final class lib_test extends \advanced_testcase {
         \core_xapi\test_helper::create_state([
             'component' => 'mod_vrroom',
             'activity' => \core_xapi\local\statement\item_activity::create_from_id((string)$context->id),
-            'stateid' => 'vrroom-resume',
+            'stateid' => \mod_vrroom\local\launch\config_builder::resume_stateid((int)$attempt->id),
             'data' => (object)['scene' => $scene['id'], 'position' => [0, 0, 0], 'yaw' => 0],
         ], true);
         $this->assertEquals(1, $DB->count_records('xapi_states', ['component' => 'mod_vrroom']));
