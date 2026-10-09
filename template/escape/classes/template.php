@@ -955,7 +955,7 @@ class template extends \mod_vrroom\local\template\base {
      * Replace the puzzles' question bank entry ids after a restore.
      *
      * @param \stdClass $config decoded vrroomtemplate_escape/1 config, changed in place
-     * @param callable $map fn(int $old): int, returns $old when there is no mapping
+     * @param callable $map fn(int $old): int, returns $old to keep an id or 0 to drop it (no question)
      * @return bool whether any id changed
      */
     public function remap_question_entries(\stdClass $config, callable $map): bool {
@@ -969,8 +969,8 @@ class template extends \mod_vrroom\local\template\base {
             }
             $old = (int)$puzzle->questionbankentryid;
             $new = (int)$map($old);
-            if ($new > 0 && $new !== $old) {
-                $puzzle->questionbankentryid = $new;
+            if ($new !== $old) {
+                $puzzle->questionbankentryid = max(0, $new);
                 $changed = true;
             }
         }

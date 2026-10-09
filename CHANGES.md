@@ -72,3 +72,5 @@ First release.
   refuses files that are not real 3D models, and explains problems in plain words.
 - Clearer messages when an attempt was finished elsewhere, deleted or closed; live controls stay
   available in fullscreen; question and story panels fit on phones.
+- Restoring a backup checks question links, attempts and statements the way the activity itself
+  does, and a room whose tasks no longer fit it is rebuilt from its template.

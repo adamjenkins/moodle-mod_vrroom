@@ -73,6 +73,9 @@ class provider implements
             'timejoined' => 'privacy:metadata:peers:timejoined',
             'timeseen' => 'privacy:metadata:peers:timeseen',
             'lastsignal' => 'privacy:metadata:peers:lastsignal',
+            'ratewindow' => 'privacy:metadata:peers:ratewindow',
+            'pollcount' => 'privacy:metadata:peers:pollcount',
+            'signalcount' => 'privacy:metadata:peers:signalcount',
         ], 'privacy:metadata:peers');
 
         $collection->add_database_table(self::TABLE_SIGNALS, [
@@ -172,6 +175,9 @@ class provider implements
                     'timejoined' => transform::datetime($peer->timejoined),
                     'timeseen' => transform::datetime($peer->timeseen),
                     'lastsignal' => empty($peer->lastsignal) ? null : transform::datetime($peer->lastsignal),
+                    'ratewindow' => empty($peer->ratewindow) ? null : transform::datetime($peer->ratewindow),
+                    'pollcount' => (int)$peer->pollcount,
+                    'signalcount' => (int)$peer->signalcount,
                 ];
             }
 

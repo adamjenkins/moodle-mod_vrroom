@@ -18,6 +18,7 @@ namespace mod_vrroom\backup;
 
 use backup;
 use backup_controller;
+use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\graph\graph_validator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\live_settings;
@@ -341,5 +342,63 @@ final class restore_tampered_test extends \advanced_testcase {
         $this->assertSame([], instance_manager::get_graph((int)$new->id)['objectives']);
         $attempt = $DB->get_record('vrroom_attempts', ['vrroomid' => $new->id], '*', MUST_EXIST);
         $this->assertEquals($new->graphversion, $attempt->graphversion);
+    }
+
+    /**
+     * Restored records are kept to what the activity writes: a question link the restoring user may
+     * not use is dropped, attempt and statement values are allowlisted, the run mode must be a plugin
+     * name, and rooms whose tasks do not fit them are rebuilt from the template.
+     */
+    public function test_restore_tampered_records(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $vrroom, $cm, $student] = $this->create_setup();
+        $sourceevents = $DB->count_records_sql(
+            'SELECT COUNT(1) FROM {vrroom_events} e JOIN {vrroom_attempts} a ON a.id = e.attemptid WHERE a.vrroomid = ?',
+            [$vrroom->id]
+        );
+
+        $newcourseid = $this->backup_tamper_restore($course, $cm, function (\DOMDocument $xml): void {
+            $this->set_child($this->element($xml, 'vrroom'), 'runtime', '<b>evil</b>');
+            // A question bank entry that is not in the backup and that nobody may use here.
+            $this->set_child($this->element($xml, 'question_reference'), 'questionbankentryid', '999999');
+            $attempt = $this->element($xml, 'attempt');
+            $this->set_child($attempt, 'state', 'hacked');
+            $this->set_child($attempt, 'score', '5');
+            $this->set_child($attempt, 'requireddone', '7');
+            $this->set_child($attempt, 'slotmap', 'not json');
+            $events = $xml->getElementsByTagName('event');
+            $this->set_child($events->item(0), 'verb', 'hacked');
+            $this->set_child($events->item(1), 'resultjson', '{"fraction":9}');
+            // The graph's first zone task now names a zone that no room has.
+            $graphs = $xml->getElementsByTagName('graph');
+            for ($i = 0; $i < $graphs->length; $i++) {
+                $json = $this->element($graphs->item($i), 'graphjson');
+                $json->textContent = preg_replace('/"zone":"[^"]+"/', '"zone":"z-nowhere"', $json->textContent, 1);
+            }
+        });
+
+        $new = $this->get_restored($newcourseid);
+        $this->assertSame('builtin', $new->runtime);
+        $this->assertFalse($DB->record_exists('question_references', ['questionbankentryid' => 999999]));
+        // The room was rebuilt from its template, so the tasks fit the rooms again.
+        $this->assert_room_valid($new);
+        $this->assertStringNotContainsString('z-nowhere', (string)$new->graphjson);
+
+        $attempt = $DB->get_record('vrroom_attempts', ['vrroomid' => $new->id], '*', MUST_EXIST);
+        $this->assertSame(attempt_manager::STATE_ABANDONED, $attempt->state);
+        $this->assertEqualsWithDelta(1.0, (float)$attempt->score, 0.0000001);
+        $this->assertEquals(1, $attempt->requireddone);
+        $this->assertSame('{}', $attempt->slotmap);
+        $events = $DB->get_records('vrroom_events', ['attemptid' => $attempt->id], 'id');
+        $this->assertCount($sourceevents - 1, $events);
+        foreach ($events as $event) {
+            $this->assertNotSame('hacked', $event->verb);
+            $result = json_decode((string)$event->resultjson, true);
+            if (is_array($result) && array_key_exists('fraction', $result)) {
+                $this->assertLessThanOrEqual(1, $result['fraction']);
+            }
+        }
     }
 }

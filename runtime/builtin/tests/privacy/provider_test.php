@@ -138,7 +138,8 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         );
         $this->assertInstanceOf(\core_privacy\local\metadata\types\external_location::class, $items['livepeers']);
         $this->assertEqualsCanonicalizing(
-            ['userid', 'groupid', 'room', 'peerid', 'kind', 'attemptid', 'timejoined', 'timeseen', 'lastsignal'],
+            ['userid', 'groupid', 'room', 'peerid', 'kind', 'attemptid', 'timejoined', 'timeseen', 'lastsignal', 'ratewindow',
+                'pollcount', 'signalcount'],
             array_keys($items['vrroomruntime_builtin_peers']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
@@ -215,6 +216,9 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertSame(transform::datetime($this->peers[1]->timejoined), $presence->timejoined);
         $this->assertSame(transform::datetime($this->peers[1]->timeseen), $presence->timeseen);
         $this->assertSame(transform::datetime($this->peers[1]->lastsignal), $presence->lastsignal);
+        $this->assertIsInt($presence->pollcount);
+        $this->assertIsInt($presence->signalcount);
+        $this->assertObjectHasProperty('ratewindow', $presence);
 
         $this->assertCount(1, $data->signals);
         $this->assertSame($this->peers[2]->peerid, $data->signals[0]->topeer);

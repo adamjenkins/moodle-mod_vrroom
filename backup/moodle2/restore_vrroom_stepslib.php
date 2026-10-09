@@ -48,6 +48,9 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
     /** @var int|null New id of the attempt being restored; null while there is none (e.g. user skipped). */
     protected $currentattemptid = null;
 
+    /** @var bool[] Question bank entry id => whether the restoring user may keep it unmapped. */
+    private $usableentries = [];
+
     /**
      * The paths to process.
      *
@@ -107,6 +110,16 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $data->customised = max(0, (int)($data->customised ?? 0));
         $data->livemaxusers = min(50, max(2, (int)($data->livemaxusers ?? 6)));
         $data->graphversion = max(0, (int)($data->graphversion ?? 0));
+        // Run mode and template are plugin names in char(40) columns. A name this site does not have
+        // is kept (the activity page and the template rebuild handle it); one that is no plugin name is not.
+        foreach (['runtime' => 'builtin', 'template' => 'gallery'] as $field => $default) {
+            $name = clean_param(core_text::substr((string)($data->$field ?? ''), 0, 40), PARAM_PLUGIN);
+            if ($name === '' || $name !== (string)($data->$field ?? '')) {
+                $this->log("VR room {$field} name is not a plugin name. Using {$default}", backup::LOG_WARNING);
+                $name = $name !== '' ? $name : $default;
+            }
+            $data->$field = $name;
+        }
         // A template config that is not a JSON object could never be decoded again: drop it.
         $templateconfig = $data->templateconfig ?? null;
         if ($templateconfig !== null && $templateconfig !== '' && !(json_decode((string)$templateconfig) instanceof stdClass)) {
@@ -249,10 +262,48 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
             // Its slot was skipped.
             return;
         }
-        if ($entry = $this->get_mappingid('question_bank_entry', $data->questionbankentryid)) {
-            $data->questionbankentryid = $entry;
+        // A slot's reference, whatever the file says.
+        $data->component = 'mod_vrroom';
+        $data->questionarea = 'slot';
+        $entry = (int)$this->get_mappingid('question_bank_entry', $data->questionbankentryid);
+        if (!$entry) {
+            $entry = $this->usable_unmapped_entry((int)$data->questionbankentryid);
+        }
+        if (!$entry) {
+            $this->log('VR room question ' . (int)$data->questionbankentryid . ' is not in the backup and cannot be used'
+                . ' by the restoring user here. Skipping its question link', backup::LOG_WARNING);
+            return;
+        }
+        $data->questionbankentryid = $entry;
+        $unique = ['usingcontextid' => $data->usingcontextid, 'component' => 'mod_vrroom', 'questionarea' => 'slot',
+            'itemid' => $data->itemid];
+        if ($DB->record_exists('question_references', $unique)) {
+            $this->log(
+                'VR room slot ' . $data->itemid . ' has more than one question link. Skipping the repeat',
+                backup::LOG_WARNING
+            );
+            return;
         }
         $DB->insert_record('question_references', $data);
+    }
+
+    /**
+     * A question bank entry the backup refers to but does not contain: kept only when the backup was
+     * made on this site and the restoring user may use that question here, as the activity form and
+     * the room editor require (bank::validate_entry()).
+     *
+     * @param int $entryid Question bank entry id from the backup.
+     * @return int The same id, or 0 when it cannot be kept.
+     */
+    private function usable_unmapped_entry(int $entryid): int {
+        if ($entryid <= 0) {
+            return 0;
+        }
+        if (!array_key_exists($entryid, $this->usableentries)) {
+            $this->usableentries[$entryid] = $this->task->is_samesite()
+                && \mod_vrroom\local\questions\bank::validate_entry($entryid, (int)$this->get_courseid()) === null;
+        }
+        return $this->usableentries[$entryid] ? $entryid : 0;
     }
 
     /**
@@ -310,11 +361,46 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         $oldid = $data->id;
         unset($data->id);
         $data->uniqueid = $newusageid;
+        self::clean_attempt($data);
 
         $newitemid = $DB->insert_record('vrroom_attempts', $data);
         $this->currentattemptid = (int)$newitemid;
         // Logs and events map attempt ids through this.
         $this->set_mapping('vrroom_attempt', $oldid, $newitemid, false);
+    }
+
+    /**
+     * Keep a restored attempt's values to what the activity itself writes: a known state, a score
+     * between 0 and 1, a 0/1 flag and a slot map of numbers to numbers.
+     *
+     * @param stdClass $data attempt row, changed in place
+     * @return void
+     */
+    private static function clean_attempt(stdClass $data): void {
+        $manager = \mod_vrroom\local\attempt\attempt_manager::class;
+        $states = [$manager::STATE_INPROGRESS, $manager::STATE_FINISHED, $manager::STATE_ABANDONED];
+        if (!in_array((string)($data->state ?? ''), $states, true)) {
+            $data->state = $manager::STATE_ABANDONED;
+        }
+        if (isset($data->score) && $data->score !== '' && $data->score !== null) {
+            $score = (float)$data->score;
+            $data->score = is_finite($score) ? min(1.0, max(0.0, $score)) : null;
+        } else {
+            $data->score = null;
+        }
+        $data->requireddone = empty($data->requireddone) ? 0 : 1;
+        $data->graphversion = max(0, (int)($data->graphversion ?? 0));
+        foreach (['timestart', 'timefinish', 'timedue', 'timemodified'] as $field) {
+            $data->$field = max(0, (int)($data->$field ?? 0));
+        }
+        $slotmap = json_decode((string)($data->slotmap ?? ''), true);
+        $clean = [];
+        foreach (is_array($slotmap) ? $slotmap : [] as $slot => $usageslot) {
+            if (is_numeric($slot) && (int)$slot > 0 && is_numeric($usageslot) && (int)$usageslot > 0) {
+                $clean[(string)(int)$slot] = (int)$usageslot;
+            }
+        }
+        $data->slotmap = json_encode((object)$clean);
     }
 
     /**
@@ -345,6 +431,15 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
                 return;
             }
         }
+        // The vocabulary the activity itself writes (vrroom-vocab/1).
+        $knownverb = array_key_exists((string)($data->verb ?? ''), \mod_vrroom\local\xapi\iri::VERBS);
+        $knowntype = in_array((string)($data->objecttype ?? ''), \mod_vrroom\local\xapi\iri::OBJECT_TYPES, true);
+        if (!$knownverb || !$knowntype) {
+            $this->log('VR room statement with an unknown verb or object type. Skipping it', backup::LOG_WARNING);
+            return;
+        }
+        $data->clientasserted = empty($data->clientasserted) ? 0 : 1;
+        $data->resultjson = self::clean_result($data->resultjson ?? null);
         $data->statementid = strtolower((string)($data->statementid ?? ''));
         if (
             preg_match(self::UUID_PATTERN, $data->statementid) !== 1
@@ -353,6 +448,28 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
             $data->statementid = strtolower(\core\uuid::generate());
         }
         $DB->insert_record('vrroom_events', $data);
+    }
+
+    /**
+     * A restored statement result as the activity stores one: a JSON object whose fraction, if any,
+     * lies between 0 and 1; anything else is dropped.
+     *
+     * @param mixed $resultjson stored result
+     * @return string|null
+     */
+    private static function clean_result($resultjson): ?string {
+        if ($resultjson === null || $resultjson === '') {
+            return null;
+        }
+        $result = json_decode((string)$resultjson, true);
+        if (!is_array($result)) {
+            return null;
+        }
+        if (array_key_exists('fraction', $result)) {
+            $fraction = is_numeric($result['fraction']) ? (float)$result['fraction'] : null;
+            $result['fraction'] = $fraction !== null && is_finite($fraction) ? min(1.0, max(0.0, $fraction)) : null;
+        }
+        return json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -406,7 +523,8 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
         }
         $changed = $template->remap_question_entries(
             $config,
-            fn(int $old): int => (int)($this->get_mappingid('question_bank_entry', $old) ?: $old)
+            fn(int $old): int => (int)($this->get_mappingid('question_bank_entry', $old)
+                ?: $this->usable_unmapped_entry($old))
         );
         if ($changed) {
             // Same flags as instance_manager, so link markers awaiting decoding stay intact.
@@ -471,6 +589,10 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
             $scenes[] = json_decode($row->scenejson, true);
         }
         $errors = \mod_vrroom\local\scene\scene_validator::validate_set($scenes);
+        if (!$errors && $graphok) {
+            // Each part may be valid on its own and still not fit together: the editor's checks.
+            $errors = $this->cross_check($vrroom, $scenes);
+        }
         if ($errors) {
             $this->log('VR room rooms are not valid (' . reset($errors) . ')', backup::LOG_WARNING);
         }
@@ -497,6 +619,47 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
                 ['version' => $vrroom->graphversion, 'vrroomid' => $vrroom->id, 'vrroomid2' => $vrroom->id]
             );
         }
+    }
+
+    /**
+     * What the room editor checks before it saves, on the restored activity: the tasks name zones,
+     * objects and start points that exist, the question tasks have their slots, and every file the
+     * rooms use was restored.
+     *
+     * @param stdClass $vrroom The restored vrroom row.
+     * @param array $scenes Its decoded rooms, valid as a set.
+     * @return string[] Problems; [] = consistent.
+     */
+    protected function cross_check(stdClass $vrroom, array $scenes): array {
+        $graph = json_decode((string)$vrroom->graphjson, true);
+        if (!is_array($graph)) {
+            return ['the task graph cannot be decoded'];
+        }
+        $context = \context_module::instance($this->task->get_moduleid());
+        $bindings = [];
+        foreach (\mod_vrroom\local\questions\slots::get_slots((int)$vrroom->id, $context) as $slot) {
+            $bindings[] = [
+                'slot' => (int)$slot->slot,
+                'questionbankentryid' => (int)$slot->questionbankentryid,
+                'maxmark' => round((float)$slot->maxmark, 7),
+            ];
+        }
+        $problems = \mod_vrroom\local\editor\editor_manager::cross_check($scenes, $graph, $bindings);
+        $fs = get_file_storage();
+        foreach (\mod_vrroom\local\editor\editor_manager::file_refs($scenes) as $ref) {
+            $file = $fs->get_file(
+                $context->id,
+                'mod_vrroom',
+                (string)$ref['area'],
+                (int)($ref['itemid'] ?? 0),
+                (string)($ref['filepath'] ?? '/'),
+                (string)$ref['filename']
+            );
+            if (!$file || $file->is_directory()) {
+                $problems[] = 'the file "' . (string)$ref['filename'] . '" was not restored';
+            }
+        }
+        return $problems;
     }
 
     /**

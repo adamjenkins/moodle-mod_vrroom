@@ -816,7 +816,7 @@ class template extends \mod_vrroom\local\template\base {
      * Replace the stations' question bank entry ids after a restore.
      *
      * @param \stdClass $config decoded vrroomtemplate_gallery/1 config, changed in place
-     * @param callable $map fn(int $old): int, returns $old when there is no mapping
+     * @param callable $map fn(int $old): int, returns $old to keep an id or 0 to drop it (no question)
      * @return bool whether any id changed
      */
     public function remap_question_entries(\stdClass $config, callable $map): bool {
@@ -830,8 +830,8 @@ class template extends \mod_vrroom\local\template\base {
             }
             $old = (int)$station->questionbankentryid;
             $new = (int)$map($old);
-            if ($new > 0 && $new !== $old) {
-                $station->questionbankentryid = $new;
+            if ($new !== $old) {
+                $station->questionbankentryid = max(0, $new);
                 $changed = true;
             }
         }

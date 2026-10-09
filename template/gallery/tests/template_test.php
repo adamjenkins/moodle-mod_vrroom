@@ -872,6 +872,11 @@ final class template_test extends \advanced_testcase {
         // Nothing left to map: unchanged.
         $this->assertFalse($template->remap_question_entries($config, $map));
         $this->assertFalse($template->remap_question_entries((object)['schema' => template::SCHEMA], $map));
+
+        // A question the restoring user may not use is dropped (the map returns 0).
+        $this->assertTrue($template->remap_question_entries($config, fn (int $old): int => $old === 102 ? 0 : $old));
+        $this->assertSame(0, $config->stations[2]->questionbankentryid);
+        $this->assertSame(501, $config->stations[0]->questionbankentryid);
     }
 
     /**

@@ -81,7 +81,7 @@ abstract class base {
      * question bank entry ids override it.
      *
      * @param \stdClass $config Decoded stored config, changed in place.
-     * @param callable $map fn(int $old): int, returns $old when there is no mapping.
+     * @param callable $map fn(int $old): int, returns $old to keep an id or 0 to drop it (no question).
      * @return bool Whether $config changed.
      */
     public function remap_question_entries(\stdClass $config, callable $map): bool {

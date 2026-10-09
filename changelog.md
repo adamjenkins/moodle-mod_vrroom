@@ -71,6 +71,17 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Fixed
 
+- Room editor: a room's name is escaped in the Delete room confirmation (it was placed in the dialogue
+  as HTML).
+- Restore: a question link to a question bank entry that is not in the backup is kept only for a
+  backup of this site whose question the restoring user may use (`bank::validate_entry()`), else
+  dropped from the slot and the template settings; question references are forced to the slot area
+  and not repeated; the editor's cross-checks and file checks run on the restored rooms (a room that
+  fails is rebuilt from its template); attempt state, score, flag, slot map and times, statement verb,
+  object type and result fraction are allowlisted; run mode and template must be plugin names.
+- Privacy: the live room's rate-limit counters (`ratewindow`, `pollcount`, `signalcount`) are
+  declared and exported.
+
 - `lib.php` loads `questionlib.php`: core's `edit_module_post_actions()` calls
   `question_get_default_category()` for `FEATURE_USES_QUESTIONS` modules, which failed for the Blank
   template and customised rooms (their forms never loaded the question library), and a failed add left

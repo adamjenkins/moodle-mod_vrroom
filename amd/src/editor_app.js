@@ -76,6 +76,18 @@ const plain = (html) => {
 };
 
 /**
+ * Text made safe to place in HTML.
+ *
+ * @param {string} text Plain text.
+ * @returns {string} The same text with HTML special characters escaped.
+ */
+const escapeHTML = (text) => {
+    const span = document.createElement('span');
+    span.textContent = String(text);
+    return span.innerHTML.replace(/"/g, '&quot;');
+};
+
+/**
  * Put a string into an element once it has loaded.
  *
  * @param {HTMLElement} element Where the text goes.
@@ -613,9 +625,11 @@ const start = (root, cmid, response, strings) => {
                 .catch(Notification.exception);
             return;
         }
+        // The confirmation's body is HTML: the room name a teacher typed goes in as text.
+        const safename = escapeHTML(name);
         const question = portals.length
-            ? getString('editordeletesceneportals', 'mod_vrroom', {name: name, count: portals.length})
-            : getString('editordeletesceneconfirm', 'mod_vrroom', name);
+            ? getString('editordeletesceneportals', 'mod_vrroom', {name: safename, count: portals.length})
+            : getString('editordeletesceneconfirm', 'mod_vrroom', safename);
         const confirmation = Notification.deleteCancelPromise(getString('editordeletescene', 'mod_vrroom'), question,
             getString('editordeletescene', 'mod_vrroom'), {triggerElement: trigger || null});
         confirmation.then(() => true, () => false).then((confirmed) => {
