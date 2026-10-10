@@ -25,6 +25,10 @@
  * scaled by their size, so readTransform(object).scale of a prop or zone helper is its size;
  * spawn helpers turn by their yaw (yaw θ looks towards (−sin θ, 0, −cos θ)).
  *
+ * In a 360° photo room (environment type panorama) items with a placement {yaw, pitch, distance}
+ * take their position and rotation from it (vrroomruntime_builtin/placement), portals are round
+ * markers floating on the photo instead of doors, and the photo sphere is never a pick target.
+ *
  * @module     vrroomruntime_builtin/scenebuilder
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -33,7 +37,9 @@
 
 import Log from 'core/log';
 import {getString} from 'core/str';
-import {buildEnvironment} from 'vrroomruntime_builtin/environment';
+import {buildEnvironment, buildPanoramaPlaceholder} from 'vrroomruntime_builtin/environment';
+import {buildPortalMarker} from 'vrroomruntime_builtin/markers';
+import {placementTransform} from 'vrroomruntime_builtin/placement';
 import {plainText} from 'vrroomruntime_builtin/util';
 
 /** Degrees to radians. */
@@ -236,7 +242,9 @@ const allSettledToUndefined = (promises) => Promise.all(promises).then(() => und
  *
  * Options: loader (GLTFLoader), textureloader (THREE.TextureLoader), resolveUrl(fileref) →
  * string|null (default: fileref.url), editor (bool), hidden (Set of initially hidden ids),
- * onLoadError(error, item), roomName(sceneid) → string|null (portal labels).
+ * onLoadError(error, item), roomName(sceneid) → string|null (portal labels), maxTextureSize
+ * (renderer.capabilities.maxTextureSize: picks the phone copy of a 360° photo), phone (bool,
+ * default detected).
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} scenedoc vrroom-scene/1 document.
@@ -265,6 +273,9 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         }
     };
     const roomName = (sceneid) => (options.roomName ? options.roomName(sceneid) : null);
+    const isPanoramaEnv = (environment) => !!(environment && typeof environment === 'object' && environment.type === 'panorama');
+    // Whether the room is a 360° photo: portals are drawn as floating markers then.
+    let panoramic = isPanoramaEnv(doc.environment);
 
     const root = new THREE.Group();
     root.name = 'vrroom-room';
@@ -473,7 +484,33 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         }), item);
     };
 
+    // A portal in a 360° photo: a round marker with an arrow, the target room's name above it.
+    const buildPortalMarkerRecord = (record) => {
+        const item = record.item;
+        const marker = buildPortalMarker(THREE);
+        record.group.add(marker.group);
+        record.portal = marker.disc;
+        const target = item.target && typeof item.target === 'object' ? item.target : {};
+        const name = plainText(roomName(target.scene) || '');
+        const labeltext = name ? getString('portalto', 'vrroomruntime_builtin', name) : Promise.resolve(plainText(item.name || ''));
+        track(Promise.resolve(labeltext).then((text) => {
+            if (disposed || record.disposed || !text) {
+                return;
+            }
+            const label = makeLabel(text);
+            label.position.set(0, marker.labelY, 0);
+            record.group.add(label);
+            record.label = label;
+            refreshItem(record);
+            return;
+        }), item);
+    };
+
     const buildPortal = (record) => {
+        if (panoramic) {
+            buildPortalMarkerRecord(record);
+            return;
+        }
         const item = record.item;
         const width = positive(item.width, 1.2);
         const height = positive(item.height, 2.2);
@@ -636,7 +673,14 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
 
     const buildInteractable = (item) => {
         const group = new THREE.Group();
-        applyTransform(group, {position: vec3(item.position, [0, 0, 0]), rotation: vec3(item.rotation, [0, 0, 0])});
+        // Readers prefer the placement by direction (photo rooms) over the stored position.
+        const placed = placementTransform(item);
+        if (placed) {
+            group.rotation.order = placed.order;
+            applyTransform(group, {position: placed.position, rotation: placed.rotation});
+        } else {
+            applyTransform(group, {position: vec3(item.position, [0, 0, 0]), rotation: vec3(item.rotation, [0, 0, 0])});
+        }
         group.userData.vrroomItem = item.id;
         group.userData.vrroomKind = item.kind;
         group.name = `vrroom-item-${item.id}`;
@@ -668,6 +712,10 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
                 break;
             default:
                 break;
+        }
+        if (placed && panoramic && (item.kind === 'hotspot' || item.kind === 'portal')) {
+            // Far markers grow a little, so they stay easy to see and to hit on the photo.
+            group.scale.setScalar(Math.max(1, placed.distance / 3));
         }
         root.add(group);
         items.set(item.id, record);
@@ -779,12 +827,17 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
     // The environment, with a plain hall when an uploaded environment fails to load or a room from a
     // room pack is not installed. The hall is centred on the stored bounds (a pack room's bounds need
     // not be centred on the origin).
+    // A 360° photo that fails to load keeps a plain sky (never a hall): the room stays a photo room.
     const makeEnvironment = (environment) => {
         // The fallback hall's centre, set in the catch and applied after the chain (no nested promise).
         let offset = null;
-        return buildEnvironment(THREE, environment, loader, resolveUrl).catch((error) => {
-            onLoadError(error, {kind: 'environment'});
+        const envoptions = {textureloader: textureloader, maxTextureSize: options.maxTextureSize, phone: options.phone};
+        return buildEnvironment(THREE, environment, loader, resolveUrl, envoptions).catch((error) => {
             const env = environment || {};
+            onLoadError(error, {kind: 'environment', type: env.type});
+            if (isPanoramaEnv(env)) {
+                return buildPanoramaPlaceholder(THREE, env);
+            }
             const b = env.bounds && Array.isArray(env.bounds.min) && Array.isArray(env.bounds.max) ? env.bounds : null;
             const width = b ? Math.max(2, Number(b.max[0]) - Number(b.min[0]) + 0.8) : 12;
             const length = b ? Math.max(2, Number(b.max[2]) - Number(b.min[2]) + 0.8) : 12;
@@ -873,14 +926,14 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
         },
 
         /**
-         * Objects a click or a controller ray can hit: the environment, visible props and
-         * interactables, and the zone boxes while they are shown.
+         * Objects a click or a controller ray can hit: the environment (not a 360° photo), visible
+         * props and interactables, and the zone boxes while they are shown.
          *
          * @returns {Object[]} THREE.Object3D list
          */
         pickTargets() {
             const targets = [];
-            if (handle.environment) {
+            if (handle.environment && !handle.environment.panorama) {
                 targets.push(handle.environment.group);
             }
             props.forEach((record) => {
@@ -973,6 +1026,7 @@ export const buildScene = (THREE, scenedoc, options = {}) => {
          * @returns {Promise}
          */
         setEnvironment(environment) {
+            panoramic = isPanoramaEnv(environment);
             return makeEnvironment(environment).then((env) => {
                 if (disposed) {
                     disposeTree(env.group);

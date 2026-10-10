@@ -18,7 +18,9 @@
     @template mod_vrroom/editor_page
 
     The room editor's frame: toolbar, tabs, outline, 3D preview, inspector and the tasks panel.
-    mod_vrroom/editor_app fills the regions once the document is loaded.
+    mod_vrroom/editor_app fills the regions once the document is loaded. Other plugins render it
+    too (a student's tour in an assignment): without viewurl there is no Preview link, and the
+    "Done" link appears after a save when the editor's backend gives a doneurl.
 
     Classes required for JS:
     * vrroom-editor
@@ -29,14 +31,16 @@
     * data-action="vrroom-editor-mode" with data-mode
     * data-action="vrroom-editor-undo", "vrroom-editor-redo", "vrroom-editor-save", "vrroom-editor-tab" with data-tab
     * data-action="vrroom-editor-note-close"
+    * data-region="vrroom-editor-modes", "vrroom-editor-add-mediahead", "vrroom-editor-done", "vrroom-editor-tabs",
+      "vrroom-editor-photohelp"
     * data-region="vrroom-editor-status", "vrroom-editor-attempts", "vrroom-editor-room", "vrroom-editor-outline",
       "vrroom-editor-stage", "vrroom-editor-canvas", "vrroom-editor-message", "vrroom-editor-inspector",
       "vrroom-editor-tasks", "vrroom-editor-logic", "vrroom-editor-live", "vrroom-editor-note", "vrroom-editor-notetext"
 
     Context variables required for this template:
     * rootid - id of the editor's root element
-    * cmid - course module id
-    * viewurl - URL of the activity page
+    * cmid - course module id (also makes the element ids unique)
+    * viewurl - optional, URL of the activity page (the Preview link)
 
     Example context (json):
     {
@@ -62,13 +66,13 @@
                 <li><button type="button" class="dropdown-item" data-action="vrroom-editor-add" data-kind="portal">{{#str}}editoraddportal, mod_vrroom{{/str}}</button></li>
                 <li><button type="button" class="dropdown-item" data-action="vrroom-editor-add" data-kind="grabbable">{{#str}}editoraddgrabbable, mod_vrroom{{/str}}</button></li>
                 <li><button type="button" class="dropdown-item" data-action="vrroom-editor-add" data-kind="prop">{{#str}}editoraddprop, mod_vrroom{{/str}}</button></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><h6 class="dropdown-header">{{#str}}editoraddmedia, mod_vrroom{{/str}}</h6></li>
+                <li data-region="vrroom-editor-add-mediahead"><hr class="dropdown-divider"></li>
+                <li data-region="vrroom-editor-add-mediahead"><h6 class="dropdown-header">{{#str}}editoraddmedia, mod_vrroom{{/str}}</h6></li>
                 <li><button type="button" class="dropdown-item" data-action="vrroom-editor-add" data-kind="media" data-media="audio">{{#str}}editormedia_audio, mod_vrroom{{/str}}</button></li>
                 <li><button type="button" class="dropdown-item" data-action="vrroom-editor-add" data-kind="media" data-media="video">{{#str}}editormedia_video, mod_vrroom{{/str}}</button></li>
             </ul>
         </div>
-        <div class="btn-group" role="group" aria-label="{{#str}}editormodetranslate, mod_vrroom{{/str}}, {{#str}}editormoderotate, mod_vrroom{{/str}}, {{#str}}editormodescale, mod_vrroom{{/str}}">
+        <div class="btn-group" role="group" data-region="vrroom-editor-modes" aria-label="{{#str}}editormodetranslate, mod_vrroom{{/str}}, {{#str}}editormoderotate, mod_vrroom{{/str}}, {{#str}}editormodescale, mod_vrroom{{/str}}">
             <button type="button" class="btn btn-outline-secondary active" data-action="vrroom-editor-mode" data-mode="translate" aria-pressed="true">{{#str}}editormodetranslate, mod_vrroom{{/str}}</button>
             <button type="button" class="btn btn-outline-secondary" data-action="vrroom-editor-mode" data-mode="rotate" aria-pressed="false">{{#str}}editormoderotate, mod_vrroom{{/str}}</button>
             <button type="button" class="btn btn-outline-secondary" data-action="vrroom-editor-mode" data-mode="scale" aria-pressed="false">{{#str}}editormodescale, mod_vrroom{{/str}}</button>
@@ -76,7 +80,10 @@
         <button type="button" class="btn btn-secondary" data-action="vrroom-editor-undo" disabled>{{#str}}editorundo, mod_vrroom{{/str}}</button>
         <button type="button" class="btn btn-secondary" data-action="vrroom-editor-redo" disabled>{{#str}}editorredo, mod_vrroom{{/str}}</button>
         <button type="button" class="btn btn-primary" data-action="vrroom-editor-save" disabled>{{#str}}editorsave, mod_vrroom{{/str}}</button>
+        {{#viewurl}}
         <a class="btn btn-outline-secondary" href="{{viewurl}}">{{#str}}editorpreview, mod_vrroom{{/str}}</a>
+        {{/viewurl}}
+        <a class="btn btn-outline-primary d-none" href="#" data-region="vrroom-editor-done">{{#str}}editordone, mod_vrroom{{/str}}</a>
         <span class="ms-2" data-region="vrroom-editor-status" role="status">{{#str}}editorloading, mod_vrroom{{/str}}</span>
     </div>
     <div class="alert alert-info d-none" data-region="vrroom-editor-attempts">{{#str}}editorattemptsexist, mod_vrroom{{/str}}</div>
@@ -86,7 +93,7 @@
             <button type="button" class="btn-close" data-action="vrroom-editor-note-close" aria-label="{{#str}}closebuttontitle, core{{/str}}"></button>
         </div>
     </div>
-    <ul class="nav nav-tabs mb-2" role="tablist">
+    <ul class="nav nav-tabs mb-2" role="tablist" data-region="vrroom-editor-tabs">
         <li class="nav-item" role="presentation">
             <button type="button" class="nav-link active" id="vrroom-editor-tab-room-{{cmid}}" role="tab" aria-selected="true"
                     aria-controls="vrroom-editor-room-{{cmid}}" data-action="vrroom-editor-tab" data-tab="room">{{#str}}editortabroom, mod_vrroom{{/str}}</button>
@@ -102,6 +109,7 @@
         <div class="vrroom-editor-stage flex-grow-1" data-region="vrroom-editor-stage">
             <canvas data-region="vrroom-editor-canvas" tabindex="0" aria-label="{{#str}}editorcanvaslabel, mod_vrroom{{/str}}" aria-describedby="vrroom-editor-help-{{cmid}}"></canvas>
             <p class="visually-hidden" id="vrroom-editor-help-{{cmid}}">{{#str}}editorkeyboardhelp, mod_vrroom{{/str}}</p>
+            <p class="small text-body-secondary mt-1 mb-0 d-none" data-region="vrroom-editor-photohelp">{{#str}}editorphotohelp, mod_vrroom{{/str}}</p>
             <div class="alert alert-warning d-none" data-region="vrroom-editor-message" role="status"></div>
         </div>
         <aside class="vrroom-editor-inspector" data-region="vrroom-editor-inspector" aria-label="{{#str}}editorinspector, mod_vrroom{{/str}}"></aside>

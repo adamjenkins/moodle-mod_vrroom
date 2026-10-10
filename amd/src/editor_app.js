@@ -17,6 +17,11 @@
  * The room editor: loads the document, wires the toolbar, the outline, the inspector, the 3D
  * preview and the logic editor to one model, and saves everything in one call.
  *
+ * Where the document comes from and goes to is a backend: by default the activity's own
+ * mod_vrroom_editor_load/save services and upload form. Another plugin (a student's tour in an
+ * assignment) passes its own, and its editor info turns off what it does not support
+ * (info.features: logic, questions, kinds).
+ *
  * @module     mod_vrroom/editor_app
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -29,7 +34,8 @@ import Pending from 'core/pending';
 import {getString, getStrings} from 'core/str';
 import {validate} from 'vrroomruntime_builtin/graph';
 import {clone, createModel, findRef, findScene, getCollection} from 'mod_vrroom/editor_model';
-import {choose, upload, toRef} from 'mod_vrroom/editor_assets';
+import {DEFAULT_FORM, choose, upload, toRef} from 'mod_vrroom/editor_assets';
+import {PHOTO_EXCLUDED, isPhotoScene, newPhotoScene, placementOf, setPlacement} from 'mod_vrroom/editor_photo';
 import {boundsOf, forgetIds, graphReferences, idsOfScene, isNetworkError, keepInside, portalsInto, retargetPortals,
     usedAssetItemids} from 'mod_vrroom/editor_layout';
 import {displayName, init as initInspector} from 'mod_vrroom/editor_inspector';
@@ -100,13 +106,53 @@ const showText = async(element, text) => {
 };
 
 /**
+ * The backend the editor talks to, with today's activity services for anything not given.
+ *
+ * load and save are functions returning promises. As js_call_amd can only pass data, they may
+ * also be web service names: load is then called with 'args', and save with 'args' plus
+ * documentjson (the JSON of the payload).
+ *
+ * @param {number} cmid Course module id.
+ * @param {Object|null|undefined} backend {load, save, args, uploadForm, uploadArgs, doneurl}.
+ * @returns {Object} {load(), save(payload), form: {formClass, args}, doneurl}
+ */
+const makeBackend = (cmid, backend) => {
+    const given = backend && typeof backend === 'object' ? backend : {};
+    const args = given.args && typeof given.args === 'object' ? given.args : {cmid: cmid};
+    const call = (methodname, methodargs) => Promise.resolve(Ajax.call([{methodname: methodname, args: methodargs}])[0]);
+    let load = () => call('mod_vrroom_editor_load', {cmid: cmid});
+    if (typeof given.load === 'function') {
+        load = () => Promise.resolve(given.load());
+    } else if (typeof given.load === 'string' && given.load !== '') {
+        load = () => call(given.load, Object.assign({}, args));
+    }
+    let save = (payload) => call('mod_vrroom_editor_save', {cmid: cmid, documentjson: JSON.stringify(payload)});
+    if (typeof given.save === 'function') {
+        save = (payload) => Promise.resolve(given.save(payload));
+    } else if (typeof given.save === 'string' && given.save !== '') {
+        save = (payload) => call(given.save, Object.assign({}, args, {documentjson: JSON.stringify(payload)}));
+    }
+    return {
+        load: load,
+        save: save,
+        form: {
+            formClass: typeof given.uploadForm === 'string' && given.uploadForm !== '' ? given.uploadForm : DEFAULT_FORM.formClass,
+            args: given.uploadArgs && typeof given.uploadArgs === 'object' ? given.uploadArgs : {cmid: cmid},
+        },
+        doneurl: typeof given.doneurl === 'string' ? given.doneurl : '',
+    };
+};
+
+/**
  * Start the editor.
  *
- * @param {Object} options {cmid, rootid}
+ * @param {Object} options {cmid, rootid, backend}
  * @param {number} options.cmid Course module id.
  * @param {string} options.rootid Id of the editor root element.
+ * @param {Object} [options.backend] {load: () => Promise<{documentjson, assetsjson, presetsjson, questionsjson,
+ *     infojson}>, save: (payload) => Promise<{revision, ...}>, uploadForm, uploadArgs, doneurl}; see makeBackend().
  */
-export const init = ({cmid, rootid}) => {
+export const init = ({cmid, rootid, backend}) => {
     const root = document.getElementById(rootid);
     if (!root) {
         return;
@@ -115,15 +161,16 @@ export const init = ({cmid, rootid}) => {
     const strings = {};
     const stringkeys = ['editorsaving', 'editorsaved', 'editorunsaved', 'editornowebgl', 'editorundo', 'editorredo']
         .concat(Object.values(KINDLABELS));
+    const api = makeBackend(Number(cmid) || 0, backend);
 
     Promise.all([
-        Promise.resolve(Ajax.call([{methodname: 'mod_vrroom_editor_load', args: {cmid: cmid}}])[0]),
+        api.load(),
         getStrings(stringkeys.map((key) => ({key: key, component: 'mod_vrroom'}))),
     ]).then(([response, values]) => {
         stringkeys.forEach((key, i) => {
             strings[key] = values[i];
         });
-        return start(root, cmid, response, strings);
+        return start(root, api, response, strings);
     }).catch((error) => {
         const status = region(root, 'vrroom-editor-status');
         status.textContent = '';
@@ -135,23 +182,64 @@ export const init = ({cmid, rootid}) => {
 };
 
 /**
+ * What the editor info allows (an older server sends no features: everything).
+ *
+ * @param {Object} info Editor info.
+ * @returns {Object} {logic: boolean, questions: boolean, kinds: string[]|null}
+ */
+const featuresOf = (info) => {
+    const features = info && info.features && typeof info.features === 'object' ? info.features : {};
+    return {
+        logic: features.logic !== false,
+        questions: features.questions !== false,
+        kinds: Array.isArray(features.kinds) ? features.kinds.map(String) : null,
+    };
+};
+
+/**
+ * Whether the editor info allows adding a kind of thing.
+ *
+ * A kinds list may name 'media' (audio and video) or 'audio' and 'video' one by one.
+ *
+ * @param {Object} features From featuresOf().
+ * @param {string} kind Kind.
+ * @param {string} [media] audio or video, for media.
+ * @returns {boolean}
+ */
+const kindAllowed = (features, kind, media) => {
+    if (!features.kinds) {
+        return true;
+    }
+    if (kind === 'media') {
+        return features.kinds.includes('media') || (!!media && features.kinds.includes(media));
+    }
+    return features.kinds.includes(kind);
+};
+
+/**
  * Run the editor once the document is loaded.
  *
  * @param {HTMLElement} root Editor root.
- * @param {number} cmid Course module id.
- * @param {Object} response mod_vrroom_editor_load result.
+ * @param {Object} api The backend, from makeBackend().
+ * @param {Object} response The load result.
  * @param {Object} strings Strings by key.
  * @returns {Promise}
  */
-const start = (root, cmid, response, strings) => {
+const start = (root, api, response, strings) => {
     const document0 = JSON.parse(response.documentjson);
     const context = {
         assets: JSON.parse(response.assetsjson),
-        presets: JSON.parse(response.presetsjson),
+        presets: JSON.parse(response.presetsjson) || {},
         questions: JSON.parse(response.questionsjson),
         info: JSON.parse(response.infojson),
         actions: {},
     };
+    // A list (an assignment sends []) works as an empty set of presets.
+    if (Array.isArray(context.presets)) {
+        context.presets = {};
+    }
+    const features = featuresOf(context.info);
+    context.info.features = features;
     const model = createModel(document0);
     const status = region(root, 'vrroom-editor-status');
     const live = region(root, 'vrroom-editor-live');
@@ -374,7 +462,7 @@ const start = (root, cmid, response, strings) => {
      * @param {HTMLElement} returnfocus Where focus goes after the dialogue.
      * @returns {Promise<Object|null>}
      */
-    const chooseAsset = (kind, areas, returnfocus) => choose(cmid, kind, context.assets, areas, returnfocus);
+    const chooseAsset = (kind, areas, returnfocus) => choose(api.form, kind, context.assets, areas, returnfocus);
 
     /**
      * Add an object to the room being edited.
@@ -385,7 +473,11 @@ const start = (root, cmid, response, strings) => {
      */
     const addObject = (kind, media, trigger) => {
         const scene = model.getActiveScene();
-        if (!scene || !KINDLABELS[kind]) {
+        if (!scene || !KINDLABELS[kind] || !kindAllowed(features, kind, media)) {
+            return;
+        }
+        const photo = isPhotoScene(scene);
+        if (photo && PHOTO_EXCLUDED.includes(kind)) {
             return;
         }
         if (!hasRoomFor(scene, INTERACTABLES.includes(kind) ? 'interactable' : kind)) {
@@ -423,11 +515,18 @@ const start = (root, cmid, response, strings) => {
                 return null;
             }
             const id = model.newId(PREFIXES[kind]);
-            const p = view ? view.getPlacement() : roomCentre();
+            const p = view && !photo ? view.getPlacement() : roomCentre();
             const object = newObject(kind, id, state.name, p, {asset: state.asset, media: media === 'video' ? 'video' : 'audio',
                 scene: state.current, doc: state.doc});
             if (!object) {
                 return null;
+            }
+            if (photo) {
+                // In a photo room a new thing goes where the teacher is looking (or ahead of the start).
+                const look = view && view.getLookDirection ? view.getLookDirection() : null;
+                const spawns = Array.isArray(state.current.spawn) ? state.current.spawn : [];
+                const startyaw = spawns.length ? Number(spawns[0].yaw) || 0 : 0;
+                setPlacement(object, look ? look.yaw : startyaw, look ? look.pitch : 0);
             }
             keepInside(collection, object, boundsOf(state.current));
             let full = false;
@@ -535,7 +634,11 @@ const start = (root, cmid, response, strings) => {
             const copy = clone(object);
             copy.id = model.newId(PREFIXES[kind] || 'x');
             const key = ref.kind === 'zone' ? 'center' : 'position';
-            if (Array.isArray(copy[key]) && copy[key].length === 3) {
+            if (ref.kind === 'interactable' && isPhotoScene(scene)) {
+                // In a photo room the copy sits a little to the right of the original, at the same distance.
+                const p = placementOf(copy);
+                setPlacement(copy, p.yaw - 10, p.pitch, p.distance);
+            } else if (Array.isArray(copy[key]) && copy[key].length === 3) {
                 copy[key] = [Math.round((Number(copy[key][0]) + 0.5) * 1000) / 1000, copy[key][1], copy[key][2]];
             }
             keepInside(ref.kind, copy, boundsOf(scene));
@@ -553,10 +656,66 @@ const start = (root, cmid, response, strings) => {
         }).catch(Notification.exception);
     };
 
-    /** Add a room built from the first built-in surroundings. */
-    const addScene = () => {
+    /**
+     * Add a photo room: the teacher picks or uploads a 360° photo, and the room is that photo with
+     * one start point at its centre.
+     *
+     * @param {HTMLElement|null} trigger The button, focused again when the dialogue closes.
+     */
+    const addPhotoScene = (trigger) => {
+        const state = {asset: null, name: '', spawnname: ''};
+        chooseAsset('panorama', ['environment', 'assets'], trigger || null).then((asset) => {
+            if (!asset) {
+                return null;
+            }
+            state.asset = asset;
+            const number = (model.getDocument().scenes || []).length + 1;
+            return Promise.all([
+                getString('editornewphotoscenename', 'mod_vrroom', number),
+                getString('editornewname', 'mod_vrroom', {kind: strings.editoraddspawn, number: 1}),
+            ]);
+        }).then((names) => {
+            if (!names) {
+                return null;
+            }
+            [state.name, state.spawnname] = names;
+            return getString('editorchange_add', 'mod_vrroom', state.name);
+        }).then((label) => {
+            if (label === null) {
+                return null;
+            }
+            const sceneid = model.newSceneId();
+            const scene = newPhotoScene(sceneid, state.name, model.newId('s'), state.spawnname, toRef(state.asset));
+            const added = model.transact(label, (draft) => {
+                if ((draft.scenes || []).length >= (Number(context.info.maxscenes) || 20)) {
+                    return false;
+                }
+                draft.scenes.push(scene);
+                return true;
+            });
+            if (added) {
+                model.setActiveScene(sceneid);
+                model.select({scene: sceneid, kind: 'environment', id: sceneid});
+                announce(label);
+            }
+            return null;
+        }).catch(Notification.exception);
+    };
+
+    /**
+     * Add a room: built from the first built-in surroundings, or a photo room.
+     *
+     * @param {string} [kind] 'photo' for a photo room; a site without presets (an assignment's
+     *     tour) only has photo rooms.
+     * @param {HTMLElement} [trigger] The button.
+     */
+    const addScene = (kind, trigger) => {
         const doc = model.getDocument();
         if ((doc.scenes || []).length >= (Number(context.info.maxscenes) || 20)) {
+            return;
+        }
+        if (kind === 'photo' || !Object.keys(context.presets).length) {
+            addPhotoScene(trigger || null);
             return;
         }
         const presetids = Object.keys(context.presets);
@@ -703,7 +862,7 @@ const start = (root, cmid, response, strings) => {
         addScene: addScene,
         deleteScene: deleteScene,
         moveScene: moveScene,
-        upload: (kind, returnfocus) => upload(cmid, kind, context.assets, returnfocus),
+        upload: (kind, returnfocus) => upload(api.form, kind, context.assets, returnfocus),
         showMessage: ({key, component}) => {
             getString(key, component).then(showMessage).catch(Notification.exception);
         },
@@ -798,6 +957,10 @@ const start = (root, cmid, response, strings) => {
      * @returns {Promise<string|null>} A message, or null when the tasks are fine.
      */
     const checkLogic = (doc) => {
+        if (!features.logic) {
+            // No tasks here (an assignment's tour): the server checks nothing about them either.
+            return Promise.resolve(null);
+        }
         const errors = validate(doc.graph || {});
         if (errors.length) {
             return getString('logicinvalid', 'mod_vrroom', errors[0]);
@@ -838,8 +1001,7 @@ const start = (root, cmid, response, strings) => {
                 bindings: doc.bindings,
             };
             savedoc = doc;
-            return Ajax.call([{methodname: 'mod_vrroom_editor_save',
-                args: {cmid: cmid, documentjson: JSON.stringify(payload)}}])[0];
+            return api.save(payload);
         }).then((result) => {
             if (!result) {
                 return null;
@@ -858,6 +1020,7 @@ const start = (root, cmid, response, strings) => {
             }
             hideNote('error');
             eversaved = true;
+            showDone();
             return model.isDirty() ? strings.editorunsaved : strings.editorsaved;
         }).catch((error) => {
             if (!savedoc) {
@@ -882,6 +1045,57 @@ const start = (root, cmid, response, strings) => {
             savepending.resolve();
         });
     };
+
+    /** After a save, the backend's "Done" link (back to where the editor was opened from). */
+    const showDone = () => {
+        const done = region(root, 'vrroom-editor-done');
+        if (done && api.doneurl) {
+            done.setAttribute('href', api.doneurl);
+            done.classList.remove('d-none');
+        }
+    };
+
+    /**
+     * Show only what the editor info allows and what suits the active room: a photo room has no
+     * zones, start points to add, blocks or things to pick up, and no move/rotate/resize gizmo.
+     */
+    const updateSceneTools = () => {
+        const photo = isPhotoScene(model.getActiveScene());
+        root.querySelectorAll('[data-action="vrroom-editor-add"]').forEach((button) => {
+            const kind = button.dataset.kind;
+            const shown = kindAllowed(features, kind, button.dataset.media) && !(photo && PHOTO_EXCLUDED.includes(kind));
+            const item = button.closest('li') || button;
+            item.classList.toggle('d-none', !shown);
+        });
+        // The media heading and its divider go when no media item is left.
+        const media = Array.from(root.querySelectorAll('[data-action="vrroom-editor-add"][data-kind="media"]'));
+        const anymedia = media.some((button) => !(button.closest('li') || button).classList.contains('d-none'));
+        root.querySelectorAll('[data-region="vrroom-editor-add-mediahead"]').forEach((el) => {
+            el.classList.toggle('d-none', !anymedia);
+        });
+        root.querySelectorAll('[data-action="vrroom-editor-mode"]').forEach((button) => {
+            button.disabled = !view || photo;
+        });
+        const modes = region(root, 'vrroom-editor-modes');
+        if (modes) {
+            modes.classList.toggle('d-none', photo);
+        }
+        const photohelp = region(root, 'vrroom-editor-photohelp');
+        if (photohelp) {
+            photohelp.classList.toggle('d-none', !photo);
+        }
+    };
+
+    if (!features.logic) {
+        // No tasks in this editor: the Tasks tab goes, the Room tab is all there is.
+        root.querySelectorAll('[data-action="vrroom-editor-tab"][data-tab="tasks"]').forEach((button) => {
+            (button.closest('li') || button).classList.add('d-none');
+        });
+        const tabs = region(root, 'vrroom-editor-tabs');
+        if (tabs) {
+            tabs.classList.add('d-none');
+        }
+    }
 
     // Toolbar.
     root.addEventListener('click', (e) => {
@@ -925,7 +1139,9 @@ const start = (root, cmid, response, strings) => {
     model.on('change', () => {
         updateToolbar();
         updateStatus();
+        updateSceneTools();
     });
+    model.on('scene', updateSceneTools);
     model.on('saved', updateToolbar);
 
     // The 3D preview, when the browser can draw it.
@@ -947,12 +1163,15 @@ const start = (root, cmid, response, strings) => {
 
     const outline = initOutline(region(root, 'vrroom-editor-outline'), model, context);
     const inspector = initInspector(region(root, 'vrroom-editor-inspector'), model, context);
-    const logicapi = initLogic(region(root, 'vrroom-editor-logic'), model, {
-        questions: context.questions,
-        presets: context.presets,
-        info: context.info,
-    });
-    const logic = Promise.resolve(logicapi && logicapi.ready ? logicapi.ready : logicapi);
+    let logic = Promise.resolve(null);
+    if (features.logic) {
+        const logicapi = initLogic(region(root, 'vrroom-editor-logic'), model, {
+            questions: context.questions,
+            presets: context.presets,
+            info: context.info,
+        });
+        logic = Promise.resolve(logicapi && logicapi.ready ? logicapi.ready : logicapi);
+    }
 
     return Promise.all([outline, inspector, logic]).then(() => {
         const first = model.getActiveScene();
@@ -963,6 +1182,7 @@ const start = (root, cmid, response, strings) => {
         savebutton.disabled = false;
         setStatus('');
         updateToolbar();
+        updateSceneTools();
         root.dataset.vrroomEditorReady = '1';
         return null;
     });

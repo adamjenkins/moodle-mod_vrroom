@@ -69,9 +69,10 @@ const isShown = (object) => {
  *
  * Options: getTargets() → Object3D[]; onSelect(object3d|null, controller) → true when handled
  * (null: the ray hit nothing); onTeleport(point); teleportAllowed() → bool (also allows snap
- * turn); onGrabStart(itemid, controller) → bool; onGrabEnd(itemid); bounds ({min, max} or a
- * function returning them); camera (the camera inside the rig); onConnect(handedness, grip,
- * inputsource); onDisconnect(handedness).
+ * turn unless snapAllowed is given); snapAllowed() → bool (snap turn; a 360° photo room allows
+ * turning but no teleport); reach() → metres a ray selects (default 30); onGrabStart(itemid,
+ * controller) → bool; onGrabEnd(itemid); bounds ({min, max} or a function returning them); camera
+ * (the camera inside the rig); onConnect(handedness, grip, inputsource); onDisconnect(handedness).
  *
  * @param {Object} THREE three.js namespace (with XRHandModelFactory).
  * @param {Object} renderer THREE.WebGLRenderer.
@@ -144,6 +145,11 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
     };
 
     const teleportAllowed = () => !!(options.teleportAllowed && options.teleportAllowed());
+    const snapAllowed = () => (typeof options.snapAllowed === 'function' ? !!options.snapAllowed() : teleportAllowed());
+    const reach = () => {
+        const value = typeof options.reach === 'function' ? Number(options.reach()) : NaN;
+        return Number.isFinite(value) && value > 0 ? value : REACH;
+    };
 
     const api = {
         /**
@@ -212,7 +218,7 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
                     entry.reticle.visible = false;
                     return;
                 }
-                const hit = cast(entry, REACH);
+                const hit = cast(entry, reach());
                 if (hit) {
                     entry.line.scale.z = hit.distance;
                     entry.reticle.position.set(0, 0, -hit.distance + 0.005);
@@ -222,7 +228,7 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
                     entry.reticle.visible = false;
                 }
                 const gamepad = entry.source.gamepad;
-                if (gamepad && gamepad.axes && gamepad.axes.length && teleportAllowed()) {
+                if (gamepad && gamepad.axes && gamepad.axes.length && snapAllowed()) {
                     const x = gamepad.axes.length >= 4 ? gamepad.axes[2] : gamepad.axes[0];
                     if (entry.turnready && Math.abs(x) > TURN_ON) {
                         entry.turnready = false;
@@ -288,7 +294,7 @@ export const createXrInput = (THREE, renderer, rig, options = {}) => {
         if (disposed || !entry.source) {
             return;
         }
-        const hit = cast(entry, REACH);
+        const hit = cast(entry, reach());
         const handled = options.onSelect ? options.onSelect(hit ? hit.object : null, entry.controller) : false;
         if (handled || !teleportAllowed()) {
             return;

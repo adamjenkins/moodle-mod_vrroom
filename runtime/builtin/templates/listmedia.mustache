@@ -1,0 +1,39 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template vrroomruntime_builtin/listmedia
+
+    One picture, audio or video of a hotspot in the list view (a partial of
+    vrroomruntime_builtin/listview).
+
+    Context variables required for this template:
+    * url - file URL
+    * alt - plain-text label
+    * isimage, isaudio, isvideo - which element to show
+
+    Example context (json):
+    {
+        "url": "https://example.com/pluginfile.php/1/mod_vrroom/media/2/guide.mp3",
+        "alt": "The Vase",
+        "isimage": false,
+        "isaudio": true,
+        "isvideo": false
+    }
+}}
+{{#isimage}}<img class="img-fluid d-block mb-2" src="{{url}}" alt="{{alt}}">{{/isimage}}
+{{#isaudio}}<audio class="d-block mb-2" controls preload="none" src="{{url}}" aria-label="{{alt}}"></audio>{{/isaudio}}
+{{#isvideo}}<video class="d-block w-100 mb-2" controls playsinline preload="none" src="{{url}}" aria-label="{{alt}}"></video>{{/isvideo}}

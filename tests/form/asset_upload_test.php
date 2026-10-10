@@ -16,6 +16,14 @@
 
 namespace mod_vrroom\form;
 
+use mod_vrroom\local\panorama;
+use mod_vrroom\local\panorama_test_image;
+
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->dirroot . '/mod/vrroom/tests/fixtures/panorama_test_image.php');
+
 /**
  * Tests of the room editor's upload form, submitted the way core_form/modalform submits it.
  *
@@ -173,5 +181,67 @@ final class asset_upload_test extends \advanced_testcase {
         $page = $this->getDataGenerator()->create_module('page', ['course' => $fx->module->course]);
         $this->expectException(\moodle_exception::class);
         self::submit((int)$page->cmid, 'image', self::draft_with('map.png'));
+    }
+
+    /**
+     * A 360° photo of the wrong shape is refused in the form, and the draft file is removed.
+     */
+    public function test_panorama_bad_ratio(): void {
+        $fx = $this->setup_activity();
+        $this->setUser($fx->teacher);
+        $draftid = self::draft_with('square.jpg', panorama_test_image::make(1024, 1024));
+        $result = self::submit((int)$fx->module->cmid, 'panorama', $draftid);
+        $this->assertFalse($result['submitted']);
+        $this->assertStringContainsString(
+            get_string('panoramabadratio', 'mod_vrroom'),
+            html_entity_decode($result['html'], ENT_QUOTES)
+        );
+        $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));
+        $usercontext = \context_user::instance($fx->teacher->id);
+        $this->assertSame([], get_file_storage()->get_area_files($usercontext->id, 'user', 'draft', $draftid, 'id', false));
+    }
+
+    /**
+     * A good 360° photo is stored as kind panorama, with its smaller copies beside it.
+     */
+    public function test_panorama_accepted_with_variants(): void {
+        $fx = $this->setup_activity();
+        set_config('panodesktopwidth', 1536, 'mod_vrroom');
+        set_config('panomobilewidth', 1024, 'mod_vrroom');
+        $this->setUser($fx->teacher);
+        $draft = self::draft_with('yard.jpg', panorama_test_image::make(2048, 1024));
+        $result = self::submit((int)$fx->module->cmid, 'panorama', $draft);
+        $this->assertTrue($result['submitted']);
+        $asset = json_decode($result['data'], true);
+        $this->assertSame('panorama', $asset['kind']);
+        $this->assertTrue($asset['panorama']);
+        $this->assertSame('assets', $asset['area']);
+        $this->assertSame('yard.jpg', $asset['filename']);
+
+        $fs = get_file_storage();
+        $file = $fs->get_file($fx->context->id, 'mod_vrroom', 'assets', $asset['itemid'], '/', 'yard.jpg');
+        $variants = panorama::find_variants($file);
+        $this->assertSame(1536, $variants['desktop']->get_imageinfo()['width']);
+        $this->assertSame(1024, $variants['mobile']->get_imageinfo()['width']);
+
+        // The editor's list shows the photo once, as a 360° image, and not its copies.
+        $assets = \mod_vrroom\local\editor\editor_manager::list_assets($fx->context);
+        $this->assertSame(['yard.jpg'], array_column($assets, 'filename'));
+        $this->assertTrue($assets[0]['panorama']);
+    }
+
+    /**
+     * A 360° photo must be a jpg, png or webp file; a gif is refused.
+     */
+    public function test_panorama_wrong_extension(): void {
+        $fx = $this->setup_activity();
+        $this->setUser($fx->teacher);
+        try {
+            $result = self::submit((int)$fx->module->cmid, 'panorama', self::draft_with('anim.gif'));
+            $this->assertFalse($result['submitted']);
+        } catch (\moodle_exception $e) {
+            $this->assertSame('erroreditorinvalid', $e->errorcode);
+        }
+        $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));
     }
 }

@@ -30,7 +30,8 @@
 
     Item fields: id, sceneid, title (plain text), html (server-formatted), text (plain text),
     imageurl, ismodel, isaudio, isvideo, mediaurl, portaltext (plain text), uselabel (plain text,
-    empty when the item has no use button), hidden, slot; others also roomlabel.
+    empty when the item has no use button), hidden, slot, contentmedia (a hotspot's pictures, audio
+    and video: list of {url, alt, isimage, isaudio, isvideo}); others also roomlabel.
 
     Example context (json):
     {
@@ -87,6 +88,7 @@
                         <div class="mb-2" data-interactable="{{id}}" data-scene="{{sceneid}}"{{#hidden}} hidden{{/hidden}}>
                             <h4 class="h6">{{title}}</h4>
                             {{{html}}}
+                            {{#contentmedia}}{{> vrroomruntime_builtin/listmedia}}{{/contentmedia}}
                             {{#text}}<p>{{text}}</p>{{/text}}
                             {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
                             {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, vrroomruntime_builtin{{/str}}</p>{{/ismodel}}
@@ -120,6 +122,7 @@
                 {{#portaltext}}<p class="mt-2 mb-0">{{portaltext}}</p>{{/portaltext}}
                 <div class="mt-2" id="vrroom-item-body-{{id}}" data-region="vrroom-item-body" hidden>
                     {{{html}}}
+                    {{#contentmedia}}{{> vrroomruntime_builtin/listmedia}}{{/contentmedia}}
                     {{#text}}<p>{{text}}</p>{{/text}}
                     {{#imageurl}}<img class="img-fluid" src="{{imageurl}}" alt="{{title}}">{{/imageurl}}
                     {{#ismodel}}<p class="text-muted">{{#str}}modelinlist, vrroomruntime_builtin{{/str}}</p>{{/ismodel}}

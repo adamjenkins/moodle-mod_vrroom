@@ -82,3 +82,109 @@
 [data-region="vrroom-editor-note"] {
     scroll-margin-top: 5rem;
 }
+
+/* The room editor on another plugin's page (a student's tour in an assignment): the same layout as
+   above, scoped to the editor's root instead of the activity's pages. */
+
+.vrroom-editor .vrroom-editor-room {
+    align-items: flex-start;
+}
+
+.vrroom-editor .vrroom-editor-outline,
+.vrroom-editor .vrroom-editor-inspector {
+    max-width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.vrroom-editor .vrroom-editor-outline {
+    flex: 0 0 15rem;
+}
+
+.vrroom-editor .vrroom-editor-inspector {
+    flex: 0 0 18rem;
+}
+
+.vrroom-editor .vrroom-editor-stage {
+    position: relative;
+    min-width: 18rem;
+}
+
+.vrroom-editor .vrroom-editor-stage canvas {
+    display: block;
+    width: 100%;
+    height: 60vh;
+    min-height: 18rem;
+    background-color: #20242a;
+    border-radius: 0.25rem;
+    touch-action: none;
+}
+
+.vrroom-editor .vrroom-editor-stage canvas:focus-visible {
+    outline: 3px solid var(--bs-primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 991.98px) {
+    .vrroom-editor .vrroom-editor-outline,
+    .vrroom-editor .vrroom-editor-inspector {
+        flex: 1 1 100%;
+        max-height: none;
+    }
+}
+
+/* Photo rooms in the editor: dragging looks around, a click places the selected thing. */
+
+.vrroom-editor .vrroom-editor-stage canvas.vrroom-editor-photomode {
+    cursor: crosshair;
+}
+
+/* The direction picker (mod_vrroom/panorama_picker): the flat 360° photo with a crosshair. */
+
+.vrroom-panopicker {
+    cursor: crosshair;
+    overflow: hidden;
+    user-select: none;
+}
+
+.vrroom-panopicker:focus-visible {
+    outline: 3px solid var(--bs-primary);
+    outline-offset: 2px;
+}
+
+.vrroom-panopicker-mark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2rem;
+    height: 2rem;
+    margin: -1rem 0 0 -1rem;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+}
+
+.vrroom-panopicker-mark::before,
+.vrroom-panopicker-mark::after {
+    content: "";
+    position: absolute;
+    background-color: #fff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.vrroom-panopicker-mark::before {
+    left: 50%;
+    top: -0.5rem;
+    bottom: -0.5rem;
+    width: 2px;
+    margin-left: -1px;
+}
+
+.vrroom-panopicker-mark::after {
+    top: 50%;
+    left: -0.5rem;
+    right: -0.5rem;
+    height: 2px;
+    margin-top: -1px;
+}

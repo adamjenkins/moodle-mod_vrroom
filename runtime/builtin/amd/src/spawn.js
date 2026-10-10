@@ -152,10 +152,13 @@ export const spreadOffset = (key) => {
  *
  * A saved position is only used again while the key of its room is unchanged, so a teacher who
  * changes the room's surroundings or moves its start point does not leave students inside a wall.
+ * A 360° photo's north offset is part of the key too.
  *
  * @param {Object|null} doc A vrroom-scene/1 document.
  * @returns {string}
  */
+// One guard per field of the key, in a fixed order.
+// eslint-disable-next-line complexity
 export const layoutKey = (doc) => {
     const scene = doc && typeof doc === 'object' ? doc : {};
     const env = scene.environment && typeof scene.environment === 'object' ? scene.environment : {};
@@ -173,5 +176,10 @@ export const layoutKey = (doc) => {
         bounds: env.bounds === undefined ? null : env.bounds,
         spawn: [first.position === undefined ? null : first.position, first.yaw === undefined ? null : first.yaw],
     };
+    // A 360° photo turned by its north offset faces another way: a saved view is not used again.
+    // Only added when set, so the keys of rooms without one stay as they were.
+    if (env.northoffset !== undefined && env.northoffset !== null) {
+        parts.northoffset = env.northoffset;
+    }
     return `v1-${hashString(JSON.stringify(parts)).toString(36)}`;
 };

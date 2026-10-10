@@ -31,6 +31,10 @@
  * small mirrored self view in the corner of the overlay element given as option (overlay or
  * getOverlay()); without one it only keeps the stream.
  *
+ * In a 360° photo room (option isPanorama() true) everyone looks from the centre of the photo, so
+ * the others are drawn on a ring of 1.4 m around it (live/ring.js): each at an angle from a hash of
+ * their peer id, the same for every viewer, facing where they look; the positions they send are not used.
+ *
  * Avatars kept per peer, created, updated and removed as people come and go, follow mod_gear's
  * collaborative viewer.
  *
@@ -46,6 +50,7 @@ import {createPoseSource} from 'vrroomruntime_builtin/live/posesource';
 import {createAvatar, parseAppearance, parseAssets, cleanPictureUrl, hasLiveVideo, FADE_MS, COLOURS, hueOf}
     from 'vrroomruntime_builtin/live/avatarmodel';
 import {createSpawnFlash, prefersReducedMotion, timeline as flashTimeline} from 'vrroomruntime_builtin/live/spawnflash';
+import {ringPose} from 'vrroomruntime_builtin/live/ring';
 
 /** Seconds between two own pose messages (12 Hz). */
 const SEND_INTERVAL = 1 / 12;
@@ -110,7 +115,8 @@ const changed = (a, b) => {
  *
  * Options: live (LiveController), camera, getRoomRoot() → Object3D, getSceneId() → string,
  * getGrip(handedness) → Object3D|null, getHand(index) → Object3D|null, overlay (HTMLElement) or
- * getOverlay() → HTMLElement|null for the self view (optional).
+ * getOverlay() → HTMLElement|null for the self view (optional), isPanorama() → bool (the current
+ * room is a 360° photo: the others stand on a ring around its centre; optional).
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} options Options.
@@ -126,6 +132,13 @@ export const createAvatarLayer = (THREE, options) => {
     let sendclock = 0;
     let lastsent = null;
     let lastsenttime = 0;
+    const ringed = () => {
+        try {
+            return typeof options.isPanorama === 'function' && !!options.isPanorama();
+        } catch (error) {
+            return false;
+        }
+    };
 
     const posesource = createPoseSource(THREE, {
         camera: options.camera,
@@ -644,7 +657,9 @@ export const createAvatarLayer = (THREE, options) => {
                     return;
                 }
                 const drawn = isDrawn(entry, now);
-                const pose = drawn ? entry.interpolator.sample(now) : null;
+                const sampled = drawn ? entry.interpolator.sample(now) : null;
+                // In a photo room the received position is replaced by the peer's place on the ring.
+                const pose = sampled && ringed() ? ringPose(sampled, peerid) : sampled;
                 entry.avatar.object.visible = !!pose;
                 if (!pose) {
                     entry.lastpos = null;

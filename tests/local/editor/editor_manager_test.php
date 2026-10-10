@@ -17,8 +17,15 @@
 namespace mod_vrroom\local\editor;
 
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\panorama;
+use mod_vrroom\local\panorama_test_image;
 use mod_vrroom\local\questions\slots;
 use mod_vrroom\local\scene\environment_registry;
+
+defined('MOODLE_INTERNAL') || die();
+
+global $CFG;
+require_once($CFG->dirroot . '/mod/vrroom/tests/fixtures/panorama_test_image.php');
 
 /**
  * Tests for the room editor's document: load, revision, validation and save.
@@ -212,6 +219,8 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertSame(editor_manager::MAX_DOCUMENT_BYTES, $info['maxdocumentbytes']);
         $this->assertSame(20, $info['maxscenes']);
         $this->assertSame(20 * 1048576, $info['maxbytes']);
+        $this->assertSame(panorama::limits(), $info['panorama']);
+        $this->assertSame(['logic' => true, 'questions' => true], $info['features']);
     }
 
     /**
@@ -855,5 +864,118 @@ final class editor_manager_test extends \advanced_testcase {
         $changed['scenes'][0]['zones'][1]['center'] = $moved['scenes'][0]['zones'][1]['center'];
         $this->save_document($fx, $changed);
         $this->assertSame('z-renamed', instance_manager::get_scenes($fx->vrroomid)[0]['zones'][1]['id']);
+    }
+
+    /**
+     * A 360° photo room saves when its photo is 2:1 and within the limits, and its runtime keys are stripped.
+     */
+    public function test_panorama_environment(): void {
+        $fx = $this->setup_activity();
+        $document = $this->load_document($fx);
+        $photo = self::store_file($fx->context, 'environment', 1, 'yard.jpg', 'mod_vrroom', panorama_test_image::make(2048, 1024));
+        $scene = &$document['scenes'][0];
+        $scene['environment'] = [
+            'type' => 'panorama',
+            'file' => ['area' => 'environment', 'itemid' => 1, 'filepath' => '/', 'filename' => 'yard.jpg',
+                'url' => 'https://example.com/x.jpg'],
+            'northoffset' => 12,
+            'variants' => ['desktop' => 'https://example.com/d.jpg'],
+        ];
+        // A photo room's spawn is at the centre; its zero walkable area is not checked against zones.
+        $scene['spawn'][0]['position'] = [0, 0, 0];
+        foreach ($scene['interactables'] as $j => $item) {
+            if ($item['kind'] === 'hotspot') {
+                $scene['interactables'][$j]['placement'] = ['yaw' => 15, 'pitch' => 5, 'distance' => 3];
+                $scene['interactables'][$j]['position'] = panorama::placement_position(15, 5, 3);
+            }
+        }
+        unset($scene);
+        $result = $this->save_document($fx, $document);
+        $this->assertTrue($result['scenesupdated']);
+        $stored = instance_manager::get_scenes($fx->vrroomid)[0];
+        $this->assertSame('panorama', $stored['environment']['type']);
+        $this->assertArrayNotHasKey('variants', $stored['environment']);
+        $this->assertArrayNotHasKey('url', $stored['environment']['file']);
+        $this->assertSame(12, $stored['environment']['northoffset']);
+
+        // A photo of the wrong shape is refused with the room's name and the reason.
+        $document = $this->load_document($fx);
+        self::store_file($fx->context, 'environment', 2, 'square.jpg', 'mod_vrroom', panorama_test_image::make(1024, 1024));
+        $document['scenes'][0]['environment']['file'] = ['area' => 'environment', 'itemid' => 2, 'filepath' => '/',
+            'filename' => 'square.jpg'];
+        $this->assert_save_fails(
+            $fx,
+            $document,
+            'erroreditorinvalid',
+            s(get_string('panoramabadratio', 'mod_vrroom'))
+        );
+
+        // So is a photo wider than the site allows.
+        set_config('panomaxwidth', 1500, 'mod_vrroom');
+        $document['scenes'][0]['environment']['file']['itemid'] = 1;
+        $document['scenes'][0]['environment']['file']['filename'] = 'yard.jpg';
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s(get_string('panoramatoolarge', 'mod_vrroom')));
+        $this->assertNotNull($photo);
+    }
+
+    /**
+     * The editor's file list hides the smaller copies and marks 360° photos; pruning keeps a kept photo's copies.
+     */
+    public function test_panorama_assets(): void {
+        $fx = $this->setup_activity();
+        set_config('panodesktopwidth', 1536, 'mod_vrroom');
+        set_config('panomobilewidth', 1024, 'mod_vrroom');
+        $kept = self::store_file($fx->context, 'assets', 1, 'yard.jpg', 'mod_vrroom', panorama_test_image::make(2048, 1024));
+        $this->assertSame(['desktop', 'mobile'], panorama::make_variants($kept));
+        $dropped = self::store_file($fx->context, 'assets', 2, 'hall.jpg', 'mod_vrroom', panorama_test_image::make(2048, 1024));
+        $this->assertSame(['desktop', 'mobile'], panorama::make_variants($dropped));
+        self::store_file($fx->context, 'assets', 3, 'map.png', 'mod_vrroom', panorama_test_image::make(64, 64, 'png'));
+        // 2:1 without copies (an uploaded image) still counts as a 360° photo.
+        self::store_file($fx->context, 'environment', 4, 'flat.png', 'mod_vrroom', panorama_test_image::make(1200, 600, 'png'));
+
+        $assets = editor_manager::list_assets($fx->context);
+        $names = array_column($assets, 'filename');
+        // Areas in editor_manager::AREAS order (environment before assets).
+        $this->assertSame(['flat.png', 'yard.jpg', 'hall.jpg', 'map.png'], $names);
+        $this->assertNotContains('desktop.jpg', $names);
+        $this->assertNotContains('mobile.jpg', $names);
+        $byname = array_combine($names, $assets);
+        $this->assertSame('image', $byname['yard.jpg']['kind']);
+        $this->assertTrue($byname['yard.jpg']['panorama']);
+        $this->assertTrue($byname['hall.jpg']['panorama']);
+        $this->assertTrue($byname['flat.png']['panorama']);
+        $this->assertArrayNotHasKey('panorama', $byname['map.png']);
+
+        // Save a photo room on the kept photo: the other uploads go, the kept photo's copies stay.
+        $document = $this->load_document($fx);
+        $document['scenes'][0]['environment'] = [
+            'type' => 'panorama',
+            'file' => ['area' => 'assets', 'itemid' => 1, 'filepath' => '/', 'filename' => 'yard.jpg'],
+        ];
+        $document['scenes'][0]['spawn'][0]['position'] = [0, 0, 0];
+        $this->save_document($fx, $document);
+        $fs = get_file_storage();
+        $this->assertTrue($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 1, '/variants/', 'desktop.jpg'));
+        $this->assertTrue($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 1, '/variants/', 'mobile.jpg'));
+        $this->assertFalse($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 2, '/', 'hall.jpg'));
+        $this->assertFalse($fs->file_exists($fx->context->id, 'mod_vrroom', 'assets', 2, '/variants/', 'mobile.jpg'));
+        $this->assertTrue(panorama::has_variants($kept));
+    }
+
+    /**
+     * Runtime keys of photo rooms and hotspot media are removed before validation.
+     */
+    public function test_strip_runtime_keys(): void {
+        $scene = [
+            'environment' => ['type' => 'panorama', 'file' => ['area' => 'assets', 'url' => 'u'], 'variants' => ['mobile' => 'm']],
+            'interactables' => [[
+                'kind' => 'hotspot',
+                'content' => ['html' => '<p>x</p>', 'media' => [['area' => 'media', 'url' => 'u', 'kind' => 'audio']]],
+            ]],
+        ];
+        $this->assertSame([
+            'environment' => ['type' => 'panorama', 'file' => ['area' => 'assets']],
+            'interactables' => [['kind' => 'hotspot', 'content' => ['media' => [['area' => 'media']]]]],
+        ], editor_manager::strip_runtime_keys($scene));
     }
 }

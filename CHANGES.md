@@ -17,6 +17,9 @@ First release.
   until students have attempts or the room has been edited in the room editor.
 - The activity settings and the room editor show a picture of the chosen room before saving.
 - Room packs may include small rooms (smaller station areas, 2 or more stations).
+- 360° photo rooms and virtual tours: upload 360° photos (size limits in the site settings), place
+  points of interest on them, and build tours with the new Virtual tour template; the viewer shows them
+  on desktop, phones and headsets, and the room editor has a photo mode.
 - Room packs: a new sub-plugin type (`vrroomenv`) for packs of ready-made 3D rooms. The activity
   form and the room editor list them by category next to the simple rooms, the activity page shows
   their credits, and an activity whose room pack is missing shows a plain hall (with a warning for

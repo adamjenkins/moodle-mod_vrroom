@@ -31,6 +31,7 @@ import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
 import {renderQuestion} from 'vrroomruntime_builtin/question';
+import {mediaItems} from 'vrroomruntime_builtin/media';
 import {BADGES, plainText, formatPoints, startScene, announce, showMessage} from 'vrroomruntime_builtin/util';
 
 /** Counter for unique heading ids. */
@@ -87,6 +88,14 @@ export const createPanels = (stageroot, session, options = {}) => {
             return;
         }
         current = null;
+        // A playing audio or video stops with its panel.
+        overlay.querySelectorAll('audio, video').forEach((media) => {
+            try {
+                media.pause();
+            } catch (e) {
+                // Nothing to stop.
+            }
+        });
         overlay.replaceChildren();
         if (options.onClose) {
             options.onClose();
@@ -101,6 +110,7 @@ export const createPanels = (stageroot, session, options = {}) => {
         context.uid = `${session.config.cmid}-${uidcounter}`;
         return Templates.renderForPromise('vrroomruntime_builtin/panel', context)
             .then(({html, js}) => {
+                overlay.querySelectorAll('audio, video').forEach((media) => media.pause());
                 Templates.replaceNodeContents(overlay, html, js);
                 current = {id: context.id, slot: slot};
                 const panel = overlay.querySelector('[data-region="vrroom-panel"]');
@@ -131,7 +141,7 @@ export const createPanels = (stageroot, session, options = {}) => {
     };
 
     /**
-     * Open the panel of a hotspot (its content, media and question).
+     * Open the panel of a hotspot (its content, its pictures, audio and video, and its question).
      *
      * @param {Object} item A hotspot interactable.
      * @returns {Promise}
@@ -140,14 +150,11 @@ export const createPanels = (stageroot, session, options = {}) => {
         const content = item.content || {};
         const slot = content.question === null || content.question === undefined ? null : Number(content.question);
         const title = plainText(content.title || item.name || '');
-        const images = (Array.isArray(content.media) ? content.media : [])
-            .filter((m) => m && m.url)
-            .map((m) => ({url: m.url, alt: title}));
         return show({
             id: item.id,
             title: title,
             html: content.html || '',
-            images: images,
+            media: mediaItems(content, title),
             hasquestion: slot !== null,
             slot: slot,
         }, slot);
@@ -176,7 +183,7 @@ export const createPanels = (stageroot, session, options = {}) => {
             id: `slot-${n}`,
             title: objective ? objective.title : '',
             html: '',
-            images: [],
+            media: [],
             hasquestion: true,
             slot: n,
         }, n);

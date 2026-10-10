@@ -24,7 +24,7 @@
     * id - interactable id
     * title - plain-text title (escaped here)
     * html - content already formatted by the server (format_text)
-    * images - list of {url, alt}
+    * media - list of {url, alt, isimage, isaudio, isvideo}: pictures, audio and video in their order
     * hasquestion - whether a question region is added
     * slot - question slot
 
@@ -34,7 +34,10 @@
         "id": "h-1",
         "title": "The Vase",
         "html": "<p>Made in 1720.</p>",
-        "images": [{"url": "https://example.com/pluginfile.php/1/mod_vrroom/media/1/vase.jpg", "alt": "The Vase"}],
+        "media": [
+            {"url": "https://example.com/pluginfile.php/1/mod_vrroom/media/1/vase.jpg", "alt": "The Vase", "isimage": true, "isaudio": false, "isvideo": false},
+            {"url": "https://example.com/pluginfile.php/1/mod_vrroom/media/2/guide.mp3", "alt": "The Vase", "isimage": false, "isaudio": true, "isvideo": false}
+        ],
         "hasquestion": true,
         "slot": 1
     }
@@ -46,7 +49,13 @@
             <button type="button" class="btn-close" data-action="vrroom-close-panel" aria-label="{{#str}}closebuttontitle{{/str}}"></button>
         </div>
         <div data-region="vrroom-panel-content">{{{html}}}</div>
-        <div data-region="vrroom-panel-media">{{#images}}<img class="img-fluid" src="{{url}}" alt="{{alt}}">{{/images}}</div>
+        <div data-region="vrroom-panel-media">
+            {{#media}}
+            {{#isimage}}<img class="img-fluid d-block mb-2" src="{{url}}" alt="{{alt}}">{{/isimage}}
+            {{#isaudio}}<audio class="d-block w-100 mb-2" controls preload="metadata" src="{{url}}" aria-label="{{alt}}"></audio>{{/isaudio}}
+            {{#isvideo}}<video class="d-block w-100 mb-2" controls playsinline preload="metadata" src="{{url}}" aria-label="{{alt}}"></video>{{/isvideo}}
+            {{/media}}
+        </div>
         {{#hasquestion}}<div data-region="vrroom-question" data-slot="{{slot}}"></div>{{/hasquestion}}
     </div>
 </section>

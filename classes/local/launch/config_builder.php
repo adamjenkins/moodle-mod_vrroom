@@ -22,7 +22,6 @@ use mod_vrroom\local\attempt\hint_manager;
 use mod_vrroom\local\graph\evaluator;
 use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\questions\mode;
-use mod_vrroom\local\scene\environment_registry;
 use mod_vrroom\local\xapi\iri;
 
 /**
@@ -32,7 +31,7 @@ use mod_vrroom\local\xapi\iri;
  * HTML, names and titles through format_string() (tags stripped, entities decoded, because the
  * client escapes them in its templates), and file references with a pluginfile URL. Hint texts
  * never travel inside the graph: only the hints already requested in the attempt are sent, in
- * the separate `hints` key.
+ * the separate `hints` key. Scenes are formatted by scene_formatter, which other plugins use too.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -44,9 +43,6 @@ final class config_builder {
 
     /** @var string xAPI state id of the resume position before it was kept per attempt; resume_stateid() gives the current one. */
     public const RESUME_STATEID = 'vrroom-resume';
-
-    /** @var string[] File areas a scene may reference. */
-    private const FILE_AREAS = ['models', 'media', 'environment', 'assets'];
 
     /**
      * Build the launch config (§4.5).
@@ -74,7 +70,7 @@ final class config_builder {
 
         $scenes = [];
         foreach (instance_manager::get_scenes((int)$vrroom->id) as $scene) {
-            $scenes[] = self::prepare_scene($scene, $context);
+            $scenes[] = scene_formatter::prepare_scene($scene, $context);
         }
 
         if ($preview) {
@@ -144,11 +140,7 @@ final class config_builder {
                 'mode' => $evaluatoroptions['retry'] ? mode::RETRY : mode::ONCE,
                 'retrypenalty' => $evaluatoroptions['retrypenalty'],
             ],
-            'look' => [
-                'invertx' => (bool)get_user_preferences('mod_vrroom_invertx', 0, $user),
-                'inverty' => (bool)get_user_preferences('mod_vrroom_inverty', 0, $user),
-                'locky' => (bool)get_user_preferences('mod_vrroom_locky', 0, $user),
-            ],
+            'look' => scene_formatter::look($user),
         ];
     }
 
@@ -188,139 +180,5 @@ final class config_builder {
     public static function get_maxbatch(): int {
         $max = (int)get_config('mod_vrroom', 'maxbatch');
         return $max > 0 ? $max : 50;
-    }
-
-    /**
-     * Format a stored scene for the client.
-     *
-     * @param array $scene decoded vrroom-scene/1 document
-     * @param \context_module $context module context
-     * @return array
-     */
-    private static function prepare_scene(array $scene, \context_module $context): array {
-        if (isset($scene['name'])) {
-            $scene['name'] = self::plain((string)$scene['name'], $context);
-        }
-        if (isset($scene['environment']['file']) && is_array($scene['environment']['file'])) {
-            $scene['environment']['file'] = self::file_ref($scene['environment']['file'], $context);
-        }
-        if (isset($scene['environment']) && is_array($scene['environment']) && ($scene['environment']['type'] ?? '') === 'pack') {
-            $scene['environment'] = self::prepare_pack_environment($scene['environment']);
-        }
-        foreach (['spawn', 'zones', 'interactables'] as $list) {
-            if (empty($scene[$list]) || !is_array($scene[$list])) {
-                continue;
-            }
-            foreach ($scene[$list] as $i => $item) {
-                if (!is_array($item)) {
-                    continue;
-                }
-                if (isset($item['name'])) {
-                    $item['name'] = self::plain((string)$item['name'], $context);
-                }
-                if (isset($item['file']) && is_array($item['file'])) {
-                    $item['file'] = self::file_ref($item['file'], $context);
-                }
-                if (($item['kind'] ?? '') === 'text' && isset($item['text'])) {
-                    $item['text'] = self::plain((string)$item['text'], $context);
-                }
-                if (isset($item['content']) && is_array($item['content'])) {
-                    $item['content'] = self::prepare_content($item['content'], $context);
-                }
-                $scene[$list][$i] = $item;
-            }
-        }
-        return $scene;
-    }
-
-    /**
-     * Add the model URL, room name and credit of a room from a room pack, or mark it missing.
-     *
-     * The viewer falls back to a plain hall sized from the stored bounds when there is no URL.
-     *
-     * @param array $environment environment block of type 'pack'
-     * @return array
-     */
-    private static function prepare_pack_environment(array $environment): array {
-        unset($environment['url'], $environment['roomname'], $environment['credit'], $environment['missing']);
-        $def = null;
-        if (is_string($environment['pack'] ?? null) && is_string($environment['room'] ?? null)) {
-            $def = environment_registry::get_pack_room($environment['pack'], $environment['room']);
-        }
-        if ($def === null) {
-            $environment['missing'] = true;
-            return $environment;
-        }
-        $environment['url'] = $def['url'];
-        $environment['roomname'] = $def['name'];
-        $environment['credit'] = $def['credit'];
-        return $environment;
-    }
-
-    /**
-     * Format hotspot content: html from text/textformat, plain title, media file URLs.
-     *
-     * @param array $content hotspot content
-     * @param \context_module $context module context
-     * @return array
-     */
-    private static function prepare_content(array $content, \context_module $context): array {
-        $format = isset($content['textformat']) ? (string)$content['textformat'] : (string)FORMAT_HTML;
-        $content['html'] = format_text((string)($content['text'] ?? ''), $format, ['context' => $context]);
-        unset($content['text']);
-        if (isset($content['title'])) {
-            $content['title'] = self::plain((string)$content['title'], $context);
-        }
-        if (!empty($content['media']) && is_array($content['media'])) {
-            foreach ($content['media'] as $i => $media) {
-                if (is_array($media) && isset($media['area'])) {
-                    $content['media'][$i] = self::file_ref($media, $context);
-                } else if (is_array($media) && isset($media['file']) && is_array($media['file'])) {
-                    $media['file'] = self::file_ref($media['file'], $context);
-                    $content['media'][$i] = $media;
-                }
-            }
-        }
-        return $content;
-    }
-
-    /**
-     * Add a pluginfile URL to a file reference (only for VR room's own areas).
-     *
-     * @param array $ref ['area', 'itemid', 'filepath', 'filename']
-     * @param \context_module $context module context
-     * @return array
-     */
-    private static function file_ref(array $ref, \context_module $context): array {
-        $area = (string)($ref['area'] ?? '');
-        if (!in_array($area, self::FILE_AREAS, true) || !isset($ref['filename'])) {
-            unset($ref['url']);
-            return $ref;
-        }
-        $filepath = (string)($ref['filepath'] ?? '/');
-        $ref['url'] = \moodle_url::make_pluginfile_url(
-            $context->id,
-            'mod_vrroom',
-            $area,
-            (int)($ref['itemid'] ?? 0),
-            $filepath === '' ? '/' : $filepath,
-            (string)$ref['filename']
-        )->out(false);
-        return $ref;
-    }
-
-    /**
-     * A plain-text label: filtered, tags stripped, entities decoded (client templates escape it).
-     *
-     * @param string $text
-     * @param \context_module $context
-     * @return string
-     */
-    private static function plain(string $text, \context_module $context): string {
-        return html_entity_decode(
-            strip_tags(format_string($text, true, ['context' => $context, 'escape' => false])),
-            ENT_QUOTES | ENT_HTML5,
-            'UTF-8'
-        );
     }
 }

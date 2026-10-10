@@ -21,6 +21,10 @@
  * 'dragging-changed' switching the orbit camera off while dragging and the change committed when
  * the drag ends.
  *
+ * A photo room (360° photo surroundings) is shown from its centre: dragging looks around, the
+ * wheel zooms by field of view, there is no gizmo, and a click on the photo with a thing selected
+ * moves that thing to the clicked direction (mod_vrroom/editor_photo writes its placement).
+ *
  * @module     mod_vrroom/editor_view
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -38,6 +42,7 @@ import {COLLECTIONS, clone, findRef, findScene} from 'mod_vrroom/editor_model';
 import {findAsset} from 'mod_vrroom/editor_assets';
 import {displayName} from 'mod_vrroom/editor_inspector';
 import {boundsOf, keepInside, moveStation} from 'mod_vrroom/editor_layout';
+import {EYE, directionToAngles, isPhotoScene, placementOf, setPlacement} from 'mod_vrroom/editor_photo';
 
 /** Gizmo modes each kind of thing allows. */
 const MODES = Object.freeze({
@@ -66,6 +71,13 @@ const EYEHEIGHT = 1.6;
 
 /** Highest surface (metres above the start point) that still counts as the floor. */
 const FLOORTOLERANCE = 0.4;
+
+/** Field of view (degrees) of the editor camera, and its limits when zooming in a photo room. */
+const FOV = 60;
+const PHOTOFOV = [30, 90];
+
+/** Orbit target distance (metres) in a photo room: just ahead of the eye, so dragging turns the view. */
+const PHOTOTARGET = 0.01;
 
 /**
  * Whether the browser can create a WebGL context.
@@ -201,7 +213,7 @@ const writeTransform = (draft, ref, t, mode, report) => { // eslint-disable-line
  * @param {Object} model The editor model.
  * @param {Object} context Editor context ({assets, actions: {deleteSelection, onMode, showMessage, keptInside,
  *     onClearance}}).
- * @returns {Object} {setMode(mode), getMode(), getPlacement(), frame(), destroy()}
+ * @returns {Object} {setMode(mode), getMode(), getPlacement(), getLookDirection(), isPhotoMode(), frame(), destroy()}
  */
 export const init = (stage, model, context) => {
     const canvas = stage.querySelector('[data-region="vrroom-editor-canvas"]');
@@ -209,7 +221,7 @@ export const init = (stage, model, context) => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     const scene3 = new THREE.Scene();
     scene3.background = new THREE.Color('#20242a');
-    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.05, 500);
+    const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.05, 500);
     camera.position.set(0, 6, 12);
     // Hubs rooms keep their baked lighting (MOZ_lightmap), as in the viewer.
     const loader = registerMozLightmap(new GLTFLoader());
@@ -234,6 +246,28 @@ export const init = (stage, model, context) => {
     let mode = 'translate';
     let selectionbox = null;
     let queue = Promise.resolve();
+    // Whether the drawn room is a photo room (camera at the centre, no gizmo).
+    let photomode = false;
+
+    /**
+     * Set the orbit camera up for a photo room (look around from the centre) or a walkable room.
+     *
+     * @param {boolean} on Photo room.
+     */
+    const setPhotoMode = (on) => {
+        photomode = on;
+        orbit.enablePan = !on;
+        orbit.enableZoom = !on;
+        orbit.rotateSpeed = on ? -0.35 : 1;
+        orbit.minDistance = on ? 0 : 0.5;
+        orbit.maxDistance = on ? PHOTOTARGET * 2 : 120;
+        // Pitch up to about 85 degrees either way.
+        orbit.minPolarAngle = on ? 5 * Math.PI / 180 : 0;
+        orbit.maxPolarAngle = on ? 175 * Math.PI / 180 : Math.PI;
+        camera.fov = FOV;
+        camera.updateProjectionMatrix();
+        canvas.classList.toggle('vrroom-editor-photomode', on);
+    };
 
     /**
      * URL of a file reference, from the editor's asset list (a pack room from the environment list).
@@ -321,6 +355,11 @@ export const init = (stage, model, context) => {
         }
         selectionbox = new THREE.BoxHelper(object, SELECTIONCOLOUR);
         scene3.add(selectionbox);
+        if (photomode) {
+            // Things in a photo room move by clicking the photo or by the inspector's direction fields.
+            gizmo.detach();
+            return;
+        }
         const modes = modesFor(ref);
         if (!modes.includes(mode)) {
             gizmo.detach();
@@ -381,6 +420,13 @@ export const init = (stage, model, context) => {
         const p = vec3(spawn.position, [0, 0, 0]);
         const yaw = (Number(spawn.yaw) || 0) * Math.PI / 180;
         const forward = [-Math.sin(yaw), 0, -Math.cos(yaw)];
+        if (photomode) {
+            // At the centre, at eye height, looking where the start point faces.
+            camera.position.set(0, EYE, 0);
+            orbit.target.set(PHOTOTARGET * forward[0], EYE, PHOTOTARGET * forward[2]);
+            orbit.update();
+            return;
+        }
         let x = p[0] - 3 * forward[0];
         let y = p[1] + 3;
         let z = p[2] - 3 * forward[2];
@@ -452,6 +498,15 @@ export const init = (stage, model, context) => {
             return;
         }
         const cramped = [];
+        if (photomode) {
+            // Nobody walks in a photo room: nothing can be cramped.
+            const key = JSON.stringify([scene.id, cramped]);
+            if (key !== lastclearance) {
+                lastclearance = key;
+                context.actions.onClearance(cramped);
+            }
+            return;
+        }
         (Array.isArray(scene.spawn) ? scene.spawn : []).forEach((spawn, index) => {
             if (!spawn) {
                 return;
@@ -484,11 +539,20 @@ export const init = (stage, model, context) => {
             return Promise.resolve();
         }
         const doc = clone(scene);
+        const photo = isPhotoScene(scene);
+        if (photo && doc.environment.file) {
+            // Smaller copies of the photo, when the server lists them with the asset (the run mode picks one).
+            const asset = findAsset(context.assets, doc.environment.file);
+            if (asset && asset.variants && typeof asset.variants === 'object') {
+                doc.environment.variants = clone(asset.variants);
+            }
+        }
         return buildScene(THREE, doc, {
             loader: loader,
             textureloader: textureloader,
             resolveUrl: resolveUrl,
             editor: true,
+            maxTextureSize: renderer.capabilities.maxTextureSize,
             hidden: hiddenSet(),
             roomName: (sceneid) => {
                 const target = findScene(model.getDocument(), sceneid);
@@ -505,6 +569,11 @@ export const init = (stage, model, context) => {
             }
             handle = newhandle;
             scene3.add(handle.root);
+            // A new room, or a room that became (or stopped being) a photo room: camera set up afresh.
+            const switched = photo !== photomode;
+            if (switched || movecamera) {
+                setPhotoMode(photo);
+            }
             scene3.background = handle.environment && handle.environment.background
                 ? handle.environment.background : new THREE.Color('#20242a');
             built = {
@@ -513,7 +582,7 @@ export const init = (stage, model, context) => {
                 objects: snapshot(scene),
                 hidden: JSON.stringify(Array.from(hiddenSet())),
             };
-            if (movecamera) {
+            if (movecamera || switched) {
                 placeCamera(scene);
             }
             attachGizmo();
@@ -619,6 +688,36 @@ export const init = (stage, model, context) => {
     });
     gizmo.addEventListener('mouseUp', commitTransform);
 
+    /**
+     * Move the selected thing of a photo room to a direction from the centre, keeping its distance.
+     * With nothing (or no thing of this room) selected, nothing happens.
+     *
+     * @param {Object} direction THREE.Vector3 from the eye.
+     */
+    const moveSelectionTo = (direction) => {
+        const ref = model.getSelection();
+        const scene = model.getActiveScene();
+        if (!ref || !scene || ref.kind !== 'interactable' || ref.scene !== scene.id) {
+            return;
+        }
+        const target = findRef(model.getDocument(), ref);
+        if (!target) {
+            return;
+        }
+        const angles = directionToAngles(direction.x, direction.y, direction.z);
+        getString('editorchange_move', 'mod_vrroom', displayName(target)).then((label) => {
+            model.transact(label, (draft) => {
+                const item = findRef(draft, ref);
+                if (!item) {
+                    return false;
+                }
+                setPlacement(item, angles.yaw, angles.pitch, placementOf(item).distance);
+                return true;
+            });
+            return null;
+        }).catch(Notification.exception);
+    };
+
     // Click selection.
     const raycaster = new THREE.Raycaster();
     let down = null;
@@ -649,10 +748,26 @@ export const init = (stage, model, context) => {
                 return;
             }
         }
+        if (photomode) {
+            // A click on the photo itself places the selected thing there.
+            moveSelectionTo(raycaster.ray.direction.clone());
+            return;
+        }
         model.select(null);
     };
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointerup', onPointerUp);
+
+    // In a photo room the wheel zooms by field of view (the camera stays at the centre).
+    const onWheel = (e) => {
+        if (!photomode) {
+            return;
+        }
+        e.preventDefault();
+        camera.fov = Math.min(Math.max(camera.fov + Math.sign(e.deltaY) * 3, PHOTOFOV[0]), PHOTOFOV[1]);
+        camera.updateProjectionMatrix();
+    };
+    canvas.addEventListener('wheel', onWheel, {passive: false});
 
     /**
      * Change the gizmo mode.
@@ -674,6 +789,18 @@ export const init = (stage, model, context) => {
     const frame = () => {
         const object = objectFor(model.getSelection());
         if (!object) {
+            return;
+        }
+        if (photomode) {
+            // From the centre: turn the view towards it.
+            const at = new THREE.Vector3();
+            object.getWorldPosition(at);
+            const direction = at.sub(camera.position);
+            if (direction.lengthSq() > 1e-8) {
+                direction.normalize();
+                orbit.target.copy(camera.position).addScaledVector(direction, PHOTOTARGET);
+                orbit.update();
+            }
             return;
         }
         const box = new THREE.Box3().setFromObject(object);
@@ -727,6 +854,9 @@ export const init = (stage, model, context) => {
      * @returns {number[]} [x, 0, z]
      */
     const getPlacement = () => {
+        if (photomode) {
+            return [0, 0, 0];
+        }
         const direction = new THREE.Vector3();
         camera.getWorldDirection(direction);
         direction.y = 0;
@@ -742,6 +872,20 @@ export const init = (stage, model, context) => {
             z = Math.min(Math.max(z, bounds.min[2]), bounds.max[2]);
         }
         return [r3(x), 0, r3(z)];
+    };
+
+    /**
+     * Where the camera looks in a photo room (a new thing goes there).
+     *
+     * @returns {Object|null} {yaw, pitch} in degrees, or null outside a photo room.
+     */
+    const getLookDirection = () => {
+        if (!photomode) {
+            return null;
+        }
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        return directionToAngles(direction.x, direction.y, direction.z);
     };
 
     // Size and frame loop.
@@ -785,6 +929,8 @@ export const init = (stage, model, context) => {
         setMode: setMode,
         getMode: () => mode,
         getPlacement: getPlacement,
+        getLookDirection: getLookDirection,
+        isPhotoMode: () => photomode,
         frame: frame,
         /** Release the renderer and everything else. */
         destroy: () => {
@@ -796,6 +942,7 @@ export const init = (stage, model, context) => {
             canvas.removeEventListener('pointerdown', onPointerDown);
             canvas.removeEventListener('pointerup', onPointerUp);
             canvas.removeEventListener('keydown', onKeyDown);
+            canvas.removeEventListener('wheel', onWheel);
             disposeRoom();
             gizmo.dispose();
             scene3.remove(gizmohelper);

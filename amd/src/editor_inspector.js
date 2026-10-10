@@ -20,6 +20,9 @@
  * The hotspot authoring fields (title, text, position, linked question) follow mod_gear's hotspot
  * form; here they edit the vrroom-scene/1 document through the shared model.
  *
+ * In a photo room (a 360° photo as the surroundings) things are placed by direction: the fields
+ * are direction, height angle and distance from the centre instead of position and rotation.
+ *
  * @module     mod_vrroom/editor_inspector
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -33,6 +36,7 @@ import {getStrings, getString} from 'core/str';
 import {findRef, findScene} from 'mod_vrroom/editor_model';
 import {assetsOfKind, findAsset, parseKey, refKey, toRef} from 'mod_vrroom/editor_assets';
 import {boundsOf, fitToEnvironment, keepInside, moveStation} from 'mod_vrroom/editor_layout';
+import {LIMITS, dropPlacements, isPhotoScene, makePhotoScene, placementOf, setPlacement} from 'mod_vrroom/editor_photo';
 
 /** Lang strings the inspector uses, by key (component mod_vrroom unless given). */
 const STRINGKEYS = [
@@ -47,6 +51,8 @@ const STRINGKEYS = [
     'editoraddhotspot', 'editoraddmodel', 'editoraddimage', 'editoraddtext', 'editoraddzone', 'editoraddspawn',
     'editoraddportal', 'editoraddgrabbable', 'editoraddmedia', 'editoraddprop', 'editorquestionunavailable',
     'editorenvironmentmissing', 'envpreviewmissing', 'envpreviewmodel', 'envpreviewnone',
+    'editorenvironmentpanorama', 'editorpanoramaupload', 'editorpanoramapreview', 'editornorthoffset',
+    'editorplacementyaw', 'editorplacementpitch', 'editorplacementdistance',
 ];
 
 /** Core text format strings. */
@@ -176,7 +182,7 @@ const start = (container, model, context, str) => {
     /* Field builders. */
     const field = (id, label, path, type, extra = {}) => Object.assign({
         id: id, label: label, path: path, type: type,
-        isnumber: type === 'number' || type === 'numbernull',
+        isnumber: ['number', 'numbernull', 'placement', 'northoffset'].includes(type),
         istext: type === 'text',
         istextarea: type === 'textarea',
         isselect: ['select', 'selectnull', 'selectint', 'fileref', 'grabsource', 'envsource', 'targetscene'].includes(type),
@@ -244,6 +250,11 @@ const start = (container, model, context, str) => {
         const fields = [];
         let kind = ref.kind;
 
+        const photo = isPhotoScene(scene);
+        const features = (context.info && context.info.features) || {};
+        // An editor whose kinds leave out models (an assignment's tour) offers no model surroundings.
+        const allowmodels = !Array.isArray(features.kinds) || features.kinds.includes('model');
+
         if (ref.kind === 'environment') {
             const env = scene.environment || {};
             fields.push(textField(str.editorrenamescene, 'name', scene.name));
@@ -259,25 +270,41 @@ const start = (container, model, context, str) => {
                 const selected = entry.kind === 'pack' ? envkey === id : (env.type === 'preset' && env.preset === id);
                 groups.get(label).push(option(`preset:${id}`, String(entry.name || id), selected));
             });
-            const models = assetsOfKind(context.assets, 'model', ['environment', 'assets']);
+            const models = allowmodels ? assetsOfKind(context.assets, 'model', ['environment', 'assets']) : [];
             const modeloptions = models.map((asset) => option(`file:${refKey(asset)}`, asset.filename,
                 env.type === 'model' && findAsset([asset], env.file)));
             if (env.type === 'model' && env.file && !findAsset(models, env.file)) {
                 modeloptions.push(option(`file:${refKey(env.file)}`, String(env.file.filename || ''), true));
             }
+            // 360° photos, and an entry that uploads a new one.
+            const photos = assetsOfKind(context.assets, 'panorama', ['environment', 'assets']);
+            const photooptions = photos.map((asset) => option(`photo:${refKey(asset)}`, asset.filename,
+                photo && findAsset([asset], env.file)));
+            if (photo && env.file && !findAsset(photos, env.file)) {
+                photooptions.push(option(`photo:${refKey(env.file)}`, String(env.file.filename || ''), true));
+            }
+            photooptions.push(option('upload:panorama', str.editorpanoramaupload, false));
             const optgroups = Array.from(groups, ([label, options]) => ({label: label, options: options}));
             if (modeloptions.length) {
                 optgroups.push({label: str.editorenvironmentmodel, options: modeloptions});
             }
+            optgroups.push({label: str.editorenvironmentpanorama, options: photooptions});
             // A room from a room pack shows its credit, or that this site lacks it.
-            const extra = {options: [], optgroups: optgroups, uploadkind: 'model'};
+            const extra = {options: [], optgroups: optgroups, uploadkind: allowmodels ? 'model' : null};
             if (envkey !== null) {
                 const entry = context.presets[envkey];
                 extra.hint = entry && !entry.missing && entry.creditlabel ? entry.creditlabel : str.editorenvironmentmissing;
                 extra.hintid = 'vrroom-insp-environment-hint';
             }
             // A picture of the chosen room; the inspector re-renders on every change, so it follows the select.
-            if (env.type === 'model') {
+            if (photo) {
+                // The full photo can be far larger than a page should load: a phone-sized copy when the
+                // server lists one, else a placeholder.
+                const asset = env.file ? findAsset(context.assets, env.file) : null;
+                const small = asset && asset.variants && asset.variants.mobile ? String(asset.variants.mobile) : null;
+                extra.preview = {url: small, alt: String((env.file && env.file.filename) || ''),
+                    caption: String((env.file && env.file.filename) || ''), placeholder: small ? '' : str.editorpanoramapreview};
+            } else if (env.type === 'model') {
                 extra.preview = {url: null, alt: '', caption: String((env.file && env.file.filename) || ''),
                     placeholder: str.envpreviewmodel};
             } else {
@@ -298,8 +325,16 @@ const start = (container, model, context, str) => {
                 extra.preview = {url: url, alt: name, caption: name, placeholder: placeholder};
             }
             fields.push(field('environment', str.editorenvironment, 'environment', 'envsource', extra));
+            if (photo) {
+                fields.push(field('environment-northoffset', str.editornorthoffset, 'environment.northoffset', 'northoffset',
+                    {value: num(env.northoffset), step: '1', min: '-180', max: '180'}));
+            }
             fields.push(field('environment-sky', str.editorsky, 'environment.sky', 'colour',
                 {value: /^#[0-9a-fA-F]{6}$/.test(env.sky || '') ? env.sky.toLowerCase() : '#20242a'}));
+            if (photo) {
+                // No AR in a photo room.
+                return {heading: kindlabels.environment, fields: fields, candelete: false, canduplicate: false};
+            }
             const arscale = scene.xr && scene.xr.arscale !== null && scene.xr.arscale !== undefined ? num(scene.xr.arscale) : '';
             fields.push(field('xr-arscale', str.editorarscale, 'xr.arscale', 'numbernull', {value: arscale, step: '0.01',
                 min: '0.01', max: '1', hint: str.editorarscalehint, hintid: 'vrroom-insp-xr-arscale-hint'}));
@@ -308,7 +343,10 @@ const start = (container, model, context, str) => {
 
         if (ref.kind === 'spawn') {
             fields.push(textField(str.editorname, 'name', object.name));
-            fields.push(...vectorFields(POSITION, 'position', object.position, [0, 0, 0]));
+            if (!photo) {
+                // In a photo room every start point is the centre; only the direction it faces counts.
+                fields.push(...vectorFields(POSITION, 'position', object.position, [0, 0, 0]));
+            }
             fields.push(numberField(str.editoryaw, 'yaw', num(object.yaw), '1'));
             const spawns = Array.isArray(scene.spawn) ? scene.spawn : [];
             return {heading: kindlabels.spawn, fields: fields, candelete: spawns.length > 1, canduplicate: true};
@@ -337,12 +375,24 @@ const start = (container, model, context, str) => {
         const zones = Array.isArray(scene.zones) ? scene.zones : [];
         const items = Array.isArray(scene.interactables) ? scene.interactables : [];
         fields.push(textField(str.editorname, 'name', object.name));
-        fields.push(...vectorFields(POSITION, 'position', object.position, [0, 0, 0]));
-        if (kind !== 'hotspot') {
-            fields.push(...vectorFields(ROTATION, 'rotation', object.rotation, [0, 0, 0], '1'));
+        if (photo) {
+            const p = placementOf(object);
+            fields.push(field('placement-yaw', str.editorplacementyaw, 'placement.yaw', 'placement',
+                {value: num(p.yaw), step: '1', min: String(LIMITS.yaw[0]), max: String(LIMITS.yaw[1])}));
+            fields.push(field('placement-pitch', str.editorplacementpitch, 'placement.pitch', 'placement',
+                {value: num(p.pitch), step: '1', min: String(LIMITS.pitch[0]), max: String(LIMITS.pitch[1])}));
+            fields.push(field('placement-distance', str.editorplacementdistance, 'placement.distance', 'placement',
+                {value: num(p.distance), step: '0.1', min: String(LIMITS.distance[0]), max: String(LIMITS.distance[1])}));
+        } else {
+            fields.push(...vectorFields(POSITION, 'position', object.position, [0, 0, 0]));
+            if (kind !== 'hotspot') {
+                fields.push(...vectorFields(ROTATION, 'rotation', object.rotation, [0, 0, 0], '1'));
+            }
         }
-        fields.push(selectField(str.editorzone, 'zone', 'selectnull', [option('', str.editornozone, !object.zone)]
-            .concat(zones.map((z) => option(z.id, displayName(z), object.zone === z.id)))));
+        if (!photo || zones.length) {
+            fields.push(selectField(str.editorzone, 'zone', 'selectnull', [option('', str.editornozone, !object.zone)]
+                .concat(zones.map((z) => option(z.id, displayName(z), object.zone === z.id)))));
+        }
 
         const opensField = () => selectField(str.editoropens, 'opens', 'selectnull',
             [option('', str.editornothing, !object.opens)].concat(items
@@ -365,7 +415,9 @@ const start = (container, model, context, str) => {
             if (content.question && !questions.some((o) => Number(o.slot) === Number(content.question))) {
                 qoptions.push(option(String(content.question), str.editorquestionunavailable, true));
             }
-            fields.push(selectField(str.editorquestion, 'content.question', 'selectint', qoptions));
+            if (features.questions !== false) {
+                fields.push(selectField(str.editorquestion, 'content.question', 'selectint', qoptions));
+            }
         } else if (kind === 'model') {
             fields.push(fileField(str.editorfile, 'file', object.file || null, 'model', ['models', 'assets'], 'fileref', null));
             fields.push(numberField(str.editorfit, 'fit', num(object.fit, 1), '0.1', {min: '0.01'}));
@@ -380,8 +432,11 @@ const start = (container, model, context, str) => {
             fields.push(numberField(str.editorwidth, 'width', num(object.width, 2), '0.1', {min: '0.01'}));
         } else if (kind === 'portal') {
             const target = object.target || {};
-            fields.push(numberField(str.editorwidth, 'width', num(object.width, 1.2), '0.1', {min: '0.01'}));
-            fields.push(numberField(str.editorheight, 'height', num(object.height, 2.2), '0.1', {min: '0.01'}));
+            if (!photo) {
+                // In a photo room a portal is a round marker: its size is the run mode's.
+                fields.push(numberField(str.editorwidth, 'width', num(object.width, 1.2), '0.1', {min: '0.01'}));
+                fields.push(numberField(str.editorheight, 'height', num(object.height, 2.2), '0.1', {min: '0.01'}));
+            }
             fields.push(selectField(str.editortargetscene, 'target.scene', 'targetscene',
                 (doc.scenes || []).map((s) => option(s.id, displayName(s), target.scene === s.id))));
             const targetscene = findScene(doc, target.scene);
@@ -456,6 +511,28 @@ const start = (container, model, context, str) => {
                         moveStation(scene, target.id, target.center.map((v, i) => Number(v) - before[i]), bounds);
                     }
                 }
+                return true;
+            }
+            case 'placement': {
+                const value = Number(raw);
+                const key = path.split('.')[1];
+                if (raw === '' || !Number.isFinite(value) || !LIMITS[key]) {
+                    return false;
+                }
+                if (key !== 'yaw' && (value < LIMITS[key][0] || value > LIMITS[key][1])) {
+                    return false;
+                }
+                const p = placementOf(target);
+                p[key] = value;
+                setPlacement(target, p.yaw, p.pitch, p.distance);
+                return true;
+            }
+            case 'northoffset': {
+                const value = Number(raw);
+                if (raw === '' || !Number.isFinite(value) || value < -180 || value > 180 || !scene.environment) {
+                    return false;
+                }
+                scene.environment.northoffset = Math.round(value * 10) / 10;
                 return true;
             }
             case 'numbernull': {
@@ -540,9 +617,18 @@ const start = (container, model, context, str) => {
      * @returns {boolean}
      */
     const applyEnvironment = (scene, value) => {
+        if (value.startsWith('photo:')) {
+            const ref = parseKey(value.slice(6));
+            return ref ? makePhotoScene(scene, ref) : false;
+        }
+        const wasphoto = isPhotoScene(scene);
         const before = boundsOf(scene);
         const changed = changeEnvironment(scene, value);
         if (changed) {
+            if (wasphoto) {
+                // Positions stand; directions only mean something in a photo room.
+                dropPlacements(scene);
+            }
             report.fitted = fitToEnvironment(scene, before, changed.start);
         }
         return !!changed;
@@ -642,6 +728,11 @@ const start = (container, model, context, str) => {
         const path = input.dataset.path;
         const type = input.dataset.type;
         const raw = type === 'checkbox' ? input.checked : input.value;
+        if (type === 'envsource' && raw === 'upload:panorama') {
+            // The "Upload a 360° photo" entry of the surroundings list.
+            uploadFor(input, 'panorama', 'environment');
+            return;
+        }
         const object = findRef(model.getDocument(), ref);
         const name = ref.kind === 'environment'
             ? displayName(findScene(model.getDocument(), ref.scene)) : displayName(object);
@@ -658,18 +749,22 @@ const start = (container, model, context, str) => {
     /**
      * Upload a file and put it where the button says.
      *
-     * @param {HTMLElement} button The Upload button.
+     * @param {HTMLElement} button The Upload button (or the field that asked for the upload).
+     * @param {string} [kindoverride] Upload kind, when not the button's.
+     * @param {string} [pathoverride] Field path, when not the button's.
      */
-    const uploadFor = (button) => {
+    const uploadFor = (button, kindoverride, pathoverride) => {
         const ref = model.getSelection();
         if (!ref) {
             return;
         }
-        const path = button.dataset.path;
-        const kind = button.dataset.kind;
+        const path = pathoverride || button.dataset.path;
+        const kind = kindoverride || button.dataset.kind;
         let key = null;
         context.actions.upload(kind, button).then((asset) => {
             if (!asset || destroyed) {
+                // Cancelled: the list shows the stored surroundings again.
+                refresh();
                 return null;
             }
             key = refKey(toRef(asset));
@@ -681,7 +776,7 @@ const start = (container, model, context, str) => {
             transactAndReport(label, (draft) => {
                 if (path === 'environment') {
                     const scene = findScene(draft, ref.scene);
-                    return scene ? applyEnvironment(scene, `file:${key}`) : false;
+                    return scene ? applyEnvironment(scene, `${kind === 'panorama' ? 'photo' : 'file'}:${key}`) : false;
                 }
                 const type = path === 'file' && findRef(draft, ref) && findRef(draft, ref).kind === 'grabbable'
                     ? 'grabsource' : 'fileref';

@@ -19,6 +19,12 @@
  *
  * The click-to-raycast-to-hotspot-panel flow follows mod_gear's viewer.
  *
+ * A 360° photo room (environment type panorama) is seen from its centre: no walking and no
+ * teleport, drag or touch to look (or move the phone), keys turn and tilt, the wheel or a pinch
+ * zooms (field of view 30° to 90°, reset in each room), up to ±85° up and down. The photo sphere
+ * follows the head in VR, snap turn stays, AR and mixed reality are not offered there, and the
+ * others of a live room stand on a ring around the centre.
+ *
  * @module     vrroomruntime_builtin/viewer
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -62,6 +68,19 @@ const MIN_HFOV = 72;
 
 /** Widest vertical field of view a portrait screen gets (degrees). */
 const MAX_FOV = 110;
+
+/** Zoom range of a 360° photo room: narrowest and widest vertical field of view (degrees). */
+const PANORAMA_FOV = [30, 90];
+
+/** How far up and down the view tilts in a 360° photo room, and elsewhere (degrees). */
+const PANORAMA_PITCH = 85;
+const ROOM_PITCH = 80;
+
+/** How far a click or a controller ray selects in a 360° photo room (m): past the furthest item. */
+const PANORAMA_REACH = 45;
+
+/** How far a controller ray selects elsewhere (m), as xrinput's default. */
+const XR_REACH = 30;
 
 /**
  * Where each session's walker last stood in the 3D room, so switching to the list view and back
@@ -132,8 +151,10 @@ const clockText = (seconds) => {
  */
 const prepareRoom = (base, values) => {
     const {root, session, config, live, stage, canvas, scenes} = base;
-    const [loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace] = values;
-    const strings = {loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace};
+    const [loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace,
+        panoramafailed] = values;
+    const strings = {loading, modelfailed, locked, entervr, enterar, entermr, exitxr, xrinsecure, xrfailed, xrplace,
+        panoramafailed};
     if (!startScene(config)) {
         throw new Error('No scene in the launch config');
     }
@@ -157,11 +178,14 @@ const prepareRoom = (base, values) => {
     const roomOptions = () => ({
         loader: loader,
         textureloader: textureloader,
+        // A GPU that cannot hold an 8192 px texture gets the phone copy of a 360° photo.
+        maxTextureSize: renderer.capabilities ? renderer.capabilities.maxTextureSize : undefined,
         hidden: session.getState().hidden,
-        onLoadError: (error) => {
+        onLoadError: (error, item) => {
             Log.debug(error);
             if (!stopped) {
-                showMessage(root, strings.modelfailed, 'warning');
+                const photo = item && item.kind === 'environment' && item.type === 'panorama';
+                showMessage(root, photo ? strings.panoramafailed : strings.modelfailed, 'warning');
             }
         },
         roomName: (sceneid) => {
@@ -223,6 +247,7 @@ export const start = (root, session, config, options = {}) => {
         {key: 'xrinsecure', component: 'vrroomruntime_builtin'},
         {key: 'xrfailed', component: 'vrroomruntime_builtin'},
         {key: 'xrplace', component: 'vrroomruntime_builtin'},
+        {key: 'panoramaloadfailed', component: 'vrroomruntime_builtin'},
     ]).then((values) => prepareRoom({root, session, config, live, stage, canvas, scenes}, values)).then((handle) => {
         pending.resolve();
         return handle;
@@ -288,6 +313,11 @@ const run = (p) => {
         .find((i) => i.id === id) || null;
     const spawnsOf = (doc) => (Array.isArray(doc.spawn) ? doc.spawn : []);
     const zonesOf = (doc) => (Array.isArray(doc.zones) ? doc.zones : []);
+    // Whether the current room is a 360° photo, seen from its centre.
+    const isPanorama = () => !!(current.doc.environment && current.doc.environment.type === 'panorama');
+    const panoramaSphere = () => (current.handle.environment ? current.handle.environment.panorama || null : null);
+    // The zoomed field of view of a photo room (null: not zoomed).
+    let zoomfov = null;
 
     scene3.add(current.handle.root);
 
@@ -299,6 +329,7 @@ const run = (p) => {
         getSceneId: () => current.doc.id,
         getGrip: (h) => (xrinput ? xrinput.getGrip(h) : null),
         getHand: (i) => renderer.xr.getHand(i),
+        isPanorama: () => isPanorama(),
     }) : null;
     if (avatars) {
         avatars.setRoom(current.handle.root, current.doc.id);
@@ -556,6 +587,10 @@ const run = (p) => {
         const spawn = firstSpawn(current.doc, spawnid);
         const base = vec3(spawn.position, [0, 0, 0]);
         const yaw = Number(spawn.yaw) || 0;
+        if (isPanorama()) {
+            // Everyone looks from the centre of the photo; the others are drawn on a ring around it.
+            return {position: [0, 0, 0], yaw: yaw, free: true};
+        }
         current.handle.root.updateMatrixWorld(true);
         const avoid = avatars ? avatars.getPeerPositions() : [];
         const others = avoid.length > 0 || (p.live && p.live.isJoined() && p.live.getPeers().length > 0);
@@ -580,7 +615,7 @@ const run = (p) => {
     let spreadclock = 0;
     const markAtStart = (spawnid) => {
         const position = controls.getPosition();
-        atstart = p.live ? {x: position[0], z: position[2], spawnid: spawnid} : null;
+        atstart = p.live && !isPanorama() ? {x: position[0], z: position[2], spawnid: spawnid} : null;
     };
     const spreadIfJoined = (dt) => {
         spreadclock += dt;
@@ -611,7 +646,7 @@ const run = (p) => {
         placedat = {handle: current.handle, x: position[0], z: position[2], spawnid: spawnid, saved: saved};
     };
     const recheckSpawn = (handle) => {
-        if (stopped || xrmode || !placedat || placedat.handle !== handle || handle !== current.handle) {
+        if (stopped || xrmode || !placedat || placedat.handle !== handle || handle !== current.handle || isPanorama()) {
             return;
         }
         const position = controls.getPosition();
@@ -661,6 +696,9 @@ const run = (p) => {
         env.shell.forEach((mesh) => {
             mesh.visible = xrmode !== 'mr';
         });
+        if (env.panorama) {
+            env.panorama.visible = xrmode !== 'ar' && xrmode !== 'mr';
+        }
         if (env.ceiling) {
             env.ceiling.visible = xrmode !== 'ar' && xrmode !== 'mr';
         }
@@ -715,7 +753,12 @@ const run = (p) => {
             controls.setBounds(handle.environment.bounds);
             applyLook();
             applyState();
+            applyRoomKind();
             placeAtSpawn(spawnid);
+            if (isPanorama() && (xrmode === 'ar' || xrmode === 'mr') && xr) {
+                // A photo is seen from its centre: augmented and mixed reality do not show it.
+                xr.exit();
+            }
             return getString('scenechanged', 'vrroomruntime_builtin', plainText(doc.name || ''));
         }).then((text) => {
             if (text && !stopped) {
@@ -804,7 +847,10 @@ const run = (p) => {
                 });
             }
         };
-        add(handle.environment && handle.environment.group);
+        // A 360° photo is no wall: there is no walking in it anyway.
+        if (handle.environment && !handle.environment.panorama) {
+            add(handle.environment.group);
+        }
         handle.props.forEach((record) => add(record.mesh));
         handle.items.forEach((record) => {
             if (record.kind === 'model') {
@@ -832,18 +878,26 @@ const run = (p) => {
             return false;
         },
         onActivate: () => {
-            const item = pick({x: 0, y: 0}, REACH);
+            const item = pick({x: 0, y: 0}, isPanorama() ? PANORAMA_REACH : REACH);
             if (item) {
                 activate(item);
             }
         },
         onTouch: () => stage.classList.add('vrroom-touch'),
+        onZoom: (factor) => zoomBy(factor),
     });
     // The bar under the room: fullscreen and reversed dragging (the user's preferences).
     const stagebar = createStagebar(root, controls, (p.config && p.config.look) || {});
     // The first place: the saved one when a person still fits there, else a free spot at the start point.
     const placeFirst = (place) => {
         current.handle.root.updateMatrixWorld(true);
+        if (isPanorama()) {
+            // The centre of the photo, facing the saved direction or the start point's.
+            const yaw = place && Number.isFinite(Number(place.yaw)) ? Number(place.yaw) : safeSpawn(null).yaw;
+            controls.teleport([0, 0, 0], yaw);
+            rememberSpawn(null, place || null);
+            return;
+        }
         if (place && controls.canStand(vec3(place.position, [0, 0, 0]))) {
             controls.teleport(place.position, place.yaw);
             rememberSpawn(null, place);
@@ -956,7 +1010,10 @@ const run = (p) => {
             },
             onSelect: (object) => onXrSelect(object),
             onTeleport: (point) => xrinput.moveHeadTo([point.x, 0, point.z], null),
-            teleportAllowed: () => xrmode === 'vr' && !switching,
+            // A photo room allows snap turn but no teleport.
+            teleportAllowed: () => xrmode === 'vr' && !switching && !isPanorama(),
+            snapAllowed: () => xrmode === 'vr' && !switching,
+            reach: () => (isPanorama() ? PANORAMA_REACH : XR_REACH),
             bounds: () => current.handle.environment.bounds,
             onGrabStart: (itemid) => {
                 const item = findItem(itemid);
@@ -1018,7 +1075,18 @@ const run = (p) => {
         // A portrait phone keeps a useful width of view, so a board ahead (the story of an escape
         // room) is not cut off at both sides.
         const keepwidth = 2 * Math.atan(Math.tan(MIN_HFOV * DEG / 2) / camera.aspect) / DEG;
-        camera.fov = Math.min(MAX_FOV, Math.max(FOV, keepwidth));
+        camera.fov = zoomfov !== null ? zoomfov : Math.min(MAX_FOV, Math.max(FOV, keepwidth));
+        camera.updateProjectionMatrix();
+    };
+    // Zoom a photo room by multiplying its field of view (wheel, pinch), within 30° to 90°.
+    const zoomBy = (factor) => {
+        const f = Number(factor);
+        if (!isPanorama() || xrmode || !Number.isFinite(f) || f <= 0) {
+            return;
+        }
+        const base = zoomfov !== null ? zoomfov : camera.fov;
+        zoomfov = Math.max(PANORAMA_FOV[0], Math.min(PANORAMA_FOV[1], base * f));
+        camera.fov = zoomfov;
         camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize);
@@ -1162,10 +1230,18 @@ const run = (p) => {
         xrnote.textContent = strings.xrinsecure;
         xrnote.classList.remove('d-none');
     }
+    // What the device offers (from detect()); AR and mixed reality are not offered in a photo room.
+    let xrinfo = null;
+    const updateXrButtons = () => {
+        if (arbutton && xrinfo && xrinfo.ar) {
+            arbutton.classList.toggle('d-none', isPanorama());
+        }
+    };
     detect().then((info) => {
         if (stopped) {
             return undefined;
         }
+        xrinfo = info;
         if (vrbutton && info.vr) {
             vrbutton.textContent = strings.entervr;
             vrbutton.classList.remove('d-none');
@@ -1173,6 +1249,7 @@ const run = (p) => {
         if (arbutton && info.ar) {
             arbutton.textContent = info.headset ? strings.entermr : strings.enterar;
             arbutton.classList.remove('d-none');
+            updateXrButtons();
         }
         if (info.vr || info.ar) {
             // Ready before the first click, so entering XR keeps the user's gesture.
@@ -1235,6 +1312,38 @@ const run = (p) => {
         });
     });
 
+    // What changes between walkable rooms and 360° photos: walking, tilt, zoom, the phone toggle,
+    // the AR button and the controls help read by screen readers.
+    const helpwalk = root.querySelector('[data-region="vrroom-controlshelp"]');
+    const helppanorama = root.querySelector('[data-region="vrroom-controlshelp-panorama"]');
+    const applyRoomKind = () => {
+        const panorama = isPanorama();
+        controls.setWalk(!panorama);
+        controls.setPitchLimit(panorama ? PANORAMA_PITCH : ROOM_PITCH);
+        zoomfov = null;
+        resize();
+        stagebar.setPanorama(panorama);
+        updateXrButtons();
+        stage.classList.toggle('vrroom-panorama', panorama);
+        const help = panorama ? helppanorama : helpwalk;
+        if (help && help.id) {
+            canvas.setAttribute('aria-describedby', help.id);
+        }
+    };
+    applyRoomKind();
+
+    // Keep the photo sphere around the head, so a photo shows no parallax when the head moves.
+    const headpos = new THREE.Vector3();
+    const followHead = () => {
+        const sphere = panoramaSphere();
+        if (!sphere || !sphere.parent) {
+            return;
+        }
+        camera.getWorldPosition(headpos);
+        sphere.parent.worldToLocal(headpos);
+        sphere.position.copy(headpos);
+    };
+
     // Frame loop. THREE.Timer (not the deprecated THREE.Clock) skips the time a hidden tab was away.
     const timer = new THREE.Timer();
     timer.connect(document);
@@ -1263,6 +1372,7 @@ const run = (p) => {
                 updateWrist();
             }
         }
+        followHead();
         testZones();
         spreadIfJoined(dt);
         current.handle.update(dt, timer.getElapsed());

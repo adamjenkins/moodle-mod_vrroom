@@ -23,6 +23,9 @@
     also holds the bar under the room (fullscreen, reversed or locked dragging), list view, progress
     panel and the live region for screen readers. While the viewport is fullscreen, stagebar.js moves
     the live room panel into it under the bar, so the live controls stay in reach, and puts it back after.
+    The bar's "look around by moving your phone" toggle stays hidden until a 360° photo room is shown
+    on a device with orientation events. Shown by another plugin (standalone.js), the shell has no
+    launch buttons, no progress panel and no live room panel.
 
     Classes required for JS:
     * none
@@ -35,16 +38,20 @@
     * canstart - show the buttons that start or resume an attempt
     * canpreview - show the preview buttons
     * nolaunch - neither applies; the message region shows a notice
+    * standalone - shown by another plugin (vrroomruntime_builtin/standalone): no launch bar, no
+      progress panel, no live room panel; cmid is then that plugin's unique id
 
     Example context (json):
     {
         "cmid": 12,
         "canstart": true,
         "canpreview": true,
-        "nolaunch": false
+        "nolaunch": false,
+        "standalone": false
     }
 }}
-<div class="vrroom-shell" data-region="vrroom-shell">
+<div class="vrroom-shell{{#standalone}} vrroom-standalone{{/standalone}}" data-region="vrroom-shell">
+    {{^standalone}}
     <div class="vrroom-launchbar d-flex flex-wrap gap-2 mb-3" data-region="vrroom-launchbar">
         {{#canstart}}
         <button type="button" class="btn btn-primary" data-action="vrroom-enter-3d">{{#str}}enter3d, vrroomruntime_builtin{{/str}}</button>
@@ -55,17 +62,23 @@
         <button type="button" class="btn btn-outline-secondary" data-action="vrroom-preview-list">{{#str}}previewlist, vrroomruntime_builtin{{/str}}</button>
         {{/canpreview}}
     </div>
+    {{/standalone}}
     <div class="alert alert-warning{{^nolaunch}} d-none{{/nolaunch}}" data-region="vrroom-message" role="status">{{#nolaunch}}{{#str}}nolaunch, vrroomruntime_builtin{{/str}}{{/nolaunch}}</div>
+    {{^standalone}}
     <section class="vrroom-liveroom d-none mb-3" data-region="vrroom-liveroom" aria-label="{{#str}}liveroom, vrroomruntime_builtin{{/str}}"></section>
+    {{/standalone}}
     <div class="vrroom-viewport" data-region="vrroom-viewport">
     <div class="vrroom-stage d-none" data-region="vrroom-stage">
         <canvas class="vrroom-canvas" data-region="vrroom-canvas" tabindex="0" role="application" aria-label="{{#str}}viewerlabel, vrroomruntime_builtin{{/str}}" aria-describedby="vrroom-controlshelp-{{cmid}}"></canvas>
-        <p class="visually-hidden" id="vrroom-controlshelp-{{cmid}}">{{#str}}controlshelp, vrroomruntime_builtin{{/str}}</p>
+        <p class="visually-hidden" id="vrroom-controlshelp-{{cmid}}" data-region="vrroom-controlshelp">{{#str}}controlshelp, vrroomruntime_builtin{{/str}}</p>
+        <p class="visually-hidden" id="vrroom-controlshelp-panorama-{{cmid}}" data-region="vrroom-controlshelp-panorama">{{#str}}controlshelppanorama, vrroomruntime_builtin{{/str}}</p>
         <div class="vrroom-hud" data-region="vrroom-hud">
             <span class="vrroom-crosshair" aria-hidden="true"></span>
             <div class="vrroom-stick" data-region="vrroom-stick" aria-hidden="true"><span class="vrroom-stick-knob" data-region="vrroom-stick-knob"></span></div>
             <div class="vrroom-hud-buttons d-flex flex-wrap gap-2">
+                {{^standalone}}
                 <button type="button" class="btn btn-light btn-sm" data-action="vrroom-toggle-progress" aria-expanded="false" aria-controls="vrroom-progress-{{cmid}}">{{#str}}progress, vrroomruntime_builtin{{/str}}</button>
+                {{/standalone}}
                 <button type="button" class="btn btn-light btn-sm" data-action="vrroom-switch-list">{{#str}}switchtolist, vrroomruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-vr">{{#str}}entervr, vrroomruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-ar">{{#str}}enterar, vrroomruntime_builtin{{/str}}</button>
@@ -90,9 +103,15 @@
             <input class="form-check-input" type="checkbox" id="vrroom-locky-{{cmid}}" data-action="vrroom-locky">
             <label class="form-check-label" for="vrroom-locky-{{cmid}}">{{#str}}locklooky, vrroomruntime_builtin{{/str}}</label>
         </div>
+        <div class="form-check mb-0 d-none" data-region="vrroom-motionlook">
+            <input class="form-check-input" type="checkbox" id="vrroom-motionlook-{{cmid}}" data-action="vrroom-motionlook">
+            <label class="form-check-label" for="vrroom-motionlook-{{cmid}}">{{#str}}motionlook, vrroomruntime_builtin{{/str}}</label>
+        </div>
     </div>
     </div>
     <div class="vrroom-list d-none" data-region="vrroom-list"></div>
+    {{^standalone}}
     <aside class="vrroom-progress d-none" id="vrroom-progress-{{cmid}}" data-region="vrroom-progress"></aside>
+    {{/standalone}}
     <div class="visually-hidden" aria-live="polite" aria-atomic="true" data-region="vrroom-live"></div>
 </div>

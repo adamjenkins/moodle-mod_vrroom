@@ -19,6 +19,7 @@ namespace mod_vrroom\local\editor;
 use mod_vrroom\local\attempt\attempt_manager;
 use mod_vrroom\local\graph\graph_validator;
 use mod_vrroom\local\instance_manager;
+use mod_vrroom\local\panorama;
 use mod_vrroom\local\questions\bank;
 use mod_vrroom\local\questions\slots;
 use mod_vrroom\local\scene\environment_registry;
@@ -58,12 +59,16 @@ final class editor_manager {
     /** @var string[] Text formats a hotspot text may have (FORMAT_MOODLE, FORMAT_HTML, FORMAT_PLAIN, FORMAT_MARKDOWN). */
     public const TEXT_FORMATS = ['0', '1', '2', '4'];
 
-    /** @var array Asset kind => file extensions. */
+    /**
+     * @var array Asset kind => file extensions. asset_kind() takes the first kind that matches, so a
+     * 360° photo (panorama, listed last) is an image by extension; uploads and list_assets() mark it.
+     */
     public const KIND_EXTENSIONS = [
         'model' => ['glb'],
         'image' => ['png', 'jpg', 'jpeg', 'gif', 'webp'],
         'audio' => ['mp3', 'ogg', 'oga', 'm4a'],
         'video' => ['mp4', 'webm'],
+        'panorama' => ['jpg', 'jpeg', 'png', 'webp'],
     ];
 
     /** @var int Seconds a save waits for another save of the same activity to finish. */
@@ -173,6 +178,9 @@ final class editor_manager {
             'maxzones' => scene_validator::MAX_ZONES,
             'maxhints' => graph_validator::MAX_HINTS,
             'maxbytes' => self::get_max_bytes(),
+            'panorama' => panorama::limits(),
+            // What this editor offers; another plugin embedding the editor turns parts off.
+            'features' => ['logic' => true, 'questions' => true],
         ];
 
         return [
@@ -229,7 +237,7 @@ final class editor_manager {
      * @return array ['revision' => string, 'graphversion' => int, 'scenesupdated' => bool, 'graphupdated' => bool,
      *     'customised' => int]
      * @throws \moodle_exception erroreditortoolarge, erroreditorinvalid, erroreditorconflict, erroreditorasset,
-     *     erroreditorbadglb, errorquestionduplicate
+     *     erroreditorbadglb, erroreditorpanorama, errorquestionduplicate
      */
     public static function save(\cm_info $cm, \context_module $context, \stdClass $vrroom, string $documentjson): array {
         global $DB;
@@ -361,6 +369,32 @@ final class editor_manager {
             );
             if (!$file || !self::is_glb($file)) {
                 throw new \moodle_exception('erroreditorbadglb', 'mod_vrroom', '', s((string)$ref['filename']));
+            }
+        }
+        // 360° photos must be 2:1 and within the site's size limits; anything else looks wrong in the viewer.
+        foreach ($scenes as $i => $scene) {
+            $environment = $scene['environment'] ?? null;
+            if (!scene_validator::is_panorama($environment)) {
+                continue;
+            }
+            $ref = $environment['file'];
+            $file = $fs->get_file(
+                $context->id,
+                'mod_vrroom',
+                (string)$ref['area'],
+                (int)$ref['itemid'],
+                (string)$ref['filepath'],
+                (string)$ref['filename']
+            );
+            $problem = $file ? panorama::check($file) : 'panoramabadtype';
+            if ($problem !== null) {
+                throw new \moodle_exception(
+                    'erroreditorinvalid',
+                    'mod_vrroom',
+                    '',
+                    self::message(self::panorama_problem($scene, $problem, $context)),
+                    "scenes[{$i}].environment.file: {$problem}"
+                );
             }
         }
         foreach ($scenes as $i => $scene) {
@@ -757,7 +791,8 @@ final class editor_manager {
      * Refuse start points and zone centres outside the walkable area of their room.
      *
      * The walkable area is what the viewer clamps the student to (scene_validator::walkable_bounds()).
-     * Rooms whose area is not known (an uploaded room model without stored bounds) are not checked.
+     * Rooms whose area is not known (an uploaded room model without stored bounds) are not checked, nor
+     * are 360° photo rooms (their area is the zero box at the centre).
      * A start point or zone that is stored outside already, in a room whose area did not change, is
      * left alone, so that rooms saved before this check stay editable.
      *
@@ -787,7 +822,8 @@ final class editor_manager {
 
         foreach ($scenes as $i => $scene) {
             $bounds = scene_validator::walkable_bounds($scene['environment']);
-            if ($bounds === null) {
+            // Unknown, or the zero box of a 360° photo room (nobody walks there, so nothing is outside).
+            if ($bounds === null || ($bounds['min'] == [0.0, 0.0, 0.0] && $bounds['max'] == [0.0, 0.0, 0.0])) {
                 continue;
             }
             $old = $before[$scene['id']] ?? null;
@@ -826,11 +862,13 @@ final class editor_manager {
      * message. The ones a teacher can reach (too many rooms or objects, a room without a start point,
      * a portal into a deleted room) are explained with the names of the rooms and objects.
      *
+     * Other plugins that store rooms (the virtual tour assignment submission) use it for their own saves.
+     *
      * @param array $scenes The rooms as sent.
      * @param \context $context Context to format names in.
      * @return string|null Plain-text message, or null when none of these is the problem.
      */
-    private static function scene_set_problem(array $scenes, \context $context): ?string {
+    public static function scene_set_problem(array $scenes, \context $context): ?string {
         if (!array_is_list($scenes) || count($scenes) < 1 || count($scenes) > scene_validator::MAX_SCENES) {
             return get_string('erroreditorroomcount', 'mod_vrroom', scene_validator::MAX_SCENES);
         }
@@ -876,6 +914,22 @@ final class editor_manager {
             }
         }
         return null;
+    }
+
+    /**
+     * A teacher-facing message for a 360° photo that panorama::check() refused.
+     *
+     * @param array $scene The room whose photo it is.
+     * @param string $problem The string identifier panorama::check() returned.
+     * @param \context $context Context to format the room name in.
+     * @return string Plain text.
+     */
+    public static function panorama_problem(array $scene, string $problem, \context $context): string {
+        $a = (object)[
+            'room' => self::label($scene['name'] ?? '', $context),
+            'problem' => panorama::message($problem),
+        ];
+        return get_string('erroreditorpanorama', 'mod_vrroom', $a);
     }
 
     /**
@@ -981,15 +1035,38 @@ final class editor_manager {
     /**
      * Every file of the areas the editor can use.
      *
+     * The smaller copies of 360° photos (in variants/ folders) are never listed. An image that has
+     * such copies, or that is 2:1, is marked 'panorama' => true (its kind stays image).
+     *
      * @param \context_module $context The module context.
-     * @return array[] Each ['area', 'itemid', 'filepath', 'filename', 'url', 'mimetype', 'kind', 'filesize'].
+     * @return array[] Each ['area', 'itemid', 'filepath', 'filename', 'url', 'mimetype', 'kind', 'filesize'],
+     *     plus 'panorama' => true for a 360° photo.
      */
     public static function list_assets(\context_module $context): array {
         $fs = get_file_storage();
         $assets = [];
         foreach (self::AREAS as $area) {
-            foreach ($fs->get_area_files($context->id, 'mod_vrroom', $area, false, 'itemid, filepath, filename', false) as $file) {
-                $assets[] = self::asset_entry($file);
+            $files = $fs->get_area_files($context->id, 'mod_vrroom', $area, false, 'itemid, filepath, filename', false);
+            // Folders holding smaller copies, by item id and the original's filepath.
+            $withvariants = [];
+            foreach ($files as $file) {
+                if (panorama::is_variant($file)) {
+                    $parent = substr($file->get_filepath(), 0, -strlen(panorama::VARIANTS_DIR . '/'));
+                    $withvariants[(int)$file->get_itemid()][$parent] = true;
+                }
+            }
+            foreach ($files as $file) {
+                if (panorama::is_variant($file)) {
+                    continue;
+                }
+                $entry = self::asset_entry($file);
+                if (
+                    $entry['kind'] === 'image' && in_array($entry['mimetype'], panorama::IMAGE_MIMETYPES, true)
+                        && (isset($withvariants[(int)$file->get_itemid()][$file->get_filepath()]) || panorama::has_ratio($file))
+                ) {
+                    $entry['panorama'] = true;
+                }
+                $assets[] = $entry;
             }
         }
         return $assets;
@@ -1054,6 +1131,9 @@ final class editor_manager {
 
     /**
      * Delete the editor uploads no room refers to.
+     *
+     * Uploads are pruned by item id, so the smaller copies of a 360° photo (same item id, variants/
+     * folder) stay while the photo is used and go with it.
      *
      * @param \context_module $context The module context.
      * @param array $scenes The rooms as saved.
@@ -1151,15 +1231,20 @@ final class editor_manager {
     }
 
     /**
-     * Remove what only the launch config adds: file URLs, formatted hotspot HTML and a pack room's
-     * URL, name, credit and missing flag.
+     * Remove what only the launch config adds: file URLs, formatted hotspot HTML, a pack room's
+     * URL, name, credit and missing flag, a 360° photo's variants, and hotspot media kinds.
+     *
+     * Other plugins that store rooms (the virtual tour assignment submission) use it for their own saves.
      *
      * @param array $scene A decoded scene document.
      * @return array
      */
-    private static function strip_runtime_keys(array $scene): array {
+    public static function strip_runtime_keys(array $scene): array {
         if (isset($scene['environment']['file']) && is_array($scene['environment']['file'])) {
             unset($scene['environment']['file']['url']);
+        }
+        if (isset($scene['environment']) && is_array($scene['environment'])) {
+            unset($scene['environment']['variants']);
         }
         if (isset($scene['environment']) && is_array($scene['environment']) && ($scene['environment']['type'] ?? null) === 'pack') {
             unset(
@@ -1182,7 +1267,10 @@ final class editor_manager {
                     if (isset($item['content']['media']) && is_array($item['content']['media'])) {
                         foreach ($item['content']['media'] as $m => $media) {
                             if (is_array($media)) {
-                                unset($media['url']);
+                                unset($media['url'], $media['kind']);
+                                if (isset($media['file']) && is_array($media['file'])) {
+                                    unset($media['file']['url']);
+                                }
                                 $item['content']['media'][$m] = $media;
                             }
                         }

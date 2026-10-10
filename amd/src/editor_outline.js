@@ -48,7 +48,7 @@ const GROUPS = [
  *
  * @param {HTMLElement} container The outline region.
  * @param {Object} model The editor model.
- * @param {Object} context Editor context ({info, actions: {addScene, deleteScene, moveScene}}).
+ * @param {Object} context Editor context ({info, presets, actions: {addScene(kind, trigger), deleteScene, moveScene}}).
  * @returns {Promise<Object>} {refresh(), destroy()}
  */
 export const init = (container, model, context) => getStrings(GROUPS.map(([, , key]) => ({key: key, component: 'mod_vrroom'})))
@@ -158,6 +158,7 @@ const start = (container, model, context, headings) => {
         return {
             scenes: scenes.map((scene, i) => ({id: scene.id, object: scene, number: i + 1, active: i === index, start: i === 0})),
             canaddscene: scenes.length < maxscenes,
+            haspresets: Object.keys(context.presets || {}).length > 0,
             canmoveup: index > 0,
             canmovedown: index >= 0 && index < scenes.length - 1,
             candelete: index >= 0 && scenes.length > 1,
@@ -208,7 +209,10 @@ const start = (container, model, context, headings) => {
                 }
                 break;
             case 'vrroom-editor-addscene':
-                context.actions.addScene();
+                context.actions.addScene('preset', button);
+                break;
+            case 'vrroom-editor-addphotoscene':
+                context.actions.addScene('photo', button);
                 break;
             case 'vrroom-editor-scene-up':
                 if (active) {

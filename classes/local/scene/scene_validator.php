@@ -51,6 +51,16 @@ final class scene_validator {
     public const MAX_SCENES = 20;
     /** @var int Longest scene id (vrroom_scenes.idnumber and vrroom_events.sceneid are char(36)). */
     public const MAX_SCENE_ID_LENGTH = 36;
+    /** @var float Largest placement yaw magnitude, in degrees. */
+    public const PLACEMENT_MAX_YAW = 180.0;
+    /** @var float Largest placement pitch magnitude, in degrees. */
+    public const PLACEMENT_MAX_PITCH = 85.0;
+    /** @var float Nearest placement distance, in metres. */
+    public const PLACEMENT_MIN_DISTANCE = 0.5;
+    /** @var float Farthest placement distance, in metres. */
+    public const PLACEMENT_MAX_DISTANCE = 40.0;
+    /** @var string[] Environment keys a 360° photo room must not carry. */
+    public const PANORAMA_FORBIDDEN_KEYS = ['bounds', 'lights', 'shape'];
 
     /**
      * Validate a scene document.
@@ -85,6 +95,7 @@ final class scene_validator {
         }
 
         self::validate_environment($scene['environment'] ?? null, $errors);
+        $panorama = self::is_panorama($scene['environment'] ?? null);
 
         $seen = [];
         $checkid = function ($id, string $where) use (&$seen, &$errors): void {
@@ -217,6 +228,13 @@ final class scene_validator {
                 $errors[] = "{$where}.name must be a string";
             }
             self::check_vector($item['position'] ?? null, "{$where}.position", $errors);
+            if (array_key_exists('placement', $item)) {
+                if (!$panorama) {
+                    $errors[] = "{$where}.placement is only allowed in a 360° photo room";
+                } else {
+                    self::check_placement($item['placement'], "{$where}.placement", $errors);
+                }
+            }
             foreach (['rotation', 'scale'] as $key) {
                 if (array_key_exists($key, $item)) {
                     self::check_vector($item[$key], "{$where}.{$key}", $errors);
@@ -391,6 +409,7 @@ final class scene_validator {
      * This mirrors runtime/builtin/amd/src/environment.js: the stored bounds when there are any, else
      * for a preset the size of its procedural shape (a courtyard's radius less 1 m, a hall's width and
      * length). A room model uploaded without bounds is measured by the viewer only, so it has none here.
+     * A 360° photo room has nowhere to walk: its area is the zero box at the centre.
      *
      * @param mixed $environment The scene's environment block.
      * @return array|null ['min' => [x, y, z], 'max' => [x, y, z]] as floats, or null when not known.
@@ -398,6 +417,9 @@ final class scene_validator {
     public static function walkable_bounds($environment): ?array {
         if (!is_array($environment)) {
             return null;
+        }
+        if (self::is_panorama($environment)) {
+            return ['min' => [0.0, 0.0, 0.0], 'max' => [0.0, 0.0, 0.0]];
         }
         $bounds = $environment['bounds'] ?? null;
         if (is_array($bounds)) {
@@ -483,8 +505,26 @@ final class scene_validator {
             if (array_key_exists('file', $environment)) {
                 $errors[] = 'environment.file is not allowed for a room from a room pack';
             }
+        } else if ($type === 'panorama') {
+            self::check_file($environment['file'] ?? null, ['environment', 'assets'], 'environment.file', $errors);
+            if (
+                array_key_exists('northoffset', $environment)
+                    && (!self::is_number($environment['northoffset']) || abs($environment['northoffset']) > 180)
+            ) {
+                $errors[] = 'environment.northoffset must be a number from -180 to 180';
+            }
+            foreach (self::PANORAMA_FORBIDDEN_KEYS as $key) {
+                if (array_key_exists($key, $environment)) {
+                    $errors[] = "environment.{$key} is not allowed for a 360° photo room (it has no floor, walls or lights)";
+                }
+            }
+            if (array_key_exists('sky', $environment) && !self::is_colour($environment['sky'])) {
+                $errors[] = 'environment.sky must be a #rrggbb colour';
+            }
+            // Bounds, lights and shape were reported above, so the shared checks below are skipped.
+            return;
         } else {
-            $errors[] = 'environment.type must be "preset", "model" or "pack"';
+            $errors[] = 'environment.type must be "preset", "model", "pack" or "panorama"';
         }
         if (array_key_exists('sky', $environment) && !self::is_colour($environment['sky'])) {
             $errors[] = 'environment.sky must be a #rrggbb colour';
@@ -517,6 +557,47 @@ final class scene_validator {
                         $errors[] = "environment.lights[{$i}].intensity must be a finite number";
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Whether an environment block is a 360° photo (panorama) environment.
+     *
+     * @param mixed $environment The environment value.
+     * @return bool
+     */
+    public static function is_panorama($environment): bool {
+        return is_array($environment) && ($environment['type'] ?? null) === 'panorama';
+    }
+
+    /**
+     * Check an item's placement by direction (360° photo rooms).
+     *
+     * @param mixed $placement The placement value: {yaw, pitch, distance?}.
+     * @param string $where Path for messages.
+     * @param string[] $errors Errors, appended to.
+     */
+    private static function check_placement($placement, string $where, array &$errors): void {
+        if (!is_array($placement) || ($placement !== [] && array_is_list($placement))) {
+            $errors[] = "{$where} must be an object";
+            return;
+        }
+        $yaw = $placement['yaw'] ?? null;
+        if (!self::is_number($yaw) || abs($yaw) > self::PLACEMENT_MAX_YAW) {
+            $errors[] = "{$where}.yaw must be a number from -180 to 180";
+        }
+        $pitch = $placement['pitch'] ?? null;
+        if (!self::is_number($pitch) || abs($pitch) > self::PLACEMENT_MAX_PITCH) {
+            $errors[] = "{$where}.pitch must be a number from -85 to 85";
+        }
+        if (array_key_exists('distance', $placement)) {
+            $distance = $placement['distance'];
+            if (
+                !self::is_number($distance) || $distance < self::PLACEMENT_MIN_DISTANCE
+                    || $distance > self::PLACEMENT_MAX_DISTANCE
+            ) {
+                $errors[] = "{$where}.distance must be a number from 0.5 to 40";
             }
         }
     }

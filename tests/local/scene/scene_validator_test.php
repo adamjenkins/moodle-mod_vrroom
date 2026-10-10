@@ -297,7 +297,141 @@ JSON
 
         $broken = $scene;
         $broken['environment']['type'] = 'hubs';
-        $this->assertContains('environment.type must be "preset", "model" or "pack"', scene_validator::validate($broken));
+        $this->assertContains(
+            'environment.type must be "preset", "model", "pack" or "panorama"',
+            scene_validator::validate($broken)
+        );
+    }
+
+    /**
+     * A 360° photo room: one spawn at the centre and items placed by direction.
+     *
+     * @return array
+     */
+    public static function panorama_scene(): array {
+        return [
+            'schema' => 'vrroom-scene/1',
+            'id' => 'b0c1d2e3-f4a5-4b6c-8d7e-9f0a1b2c3d4e',
+            'name' => 'Courtyard photo',
+            'environment' => [
+                'type' => 'panorama',
+                'file' => ['area' => 'environment', 'itemid' => 1, 'filepath' => '/', 'filename' => 'yard.jpg'],
+                'northoffset' => -35.5,
+                'sky' => '#101418',
+            ],
+            'spawn' => [['id' => 'sp-yard', 'position' => [0, 0, 0], 'yaw' => 0]],
+            'interactables' => [
+                ['id' => 'h-well', 'kind' => 'hotspot', 'name' => 'Well',
+                    'placement' => ['yaw' => 30, 'pitch' => -10.5, 'distance' => 6],
+                    'position' => [-2.9, 0.56, -5.1],
+                    'content' => ['title' => 'Well', 'text' => 'Old', 'textformat' => '1', 'media' => []]],
+                ['id' => 'i-sign', 'kind' => 'image', 'placement' => ['yaw' => -180, 'pitch' => 85],
+                    'position' => [0, 5.58, 0.35], 'rotation' => [0, -180, 0],
+                    'file' => ['area' => 'assets', 'itemid' => 3, 'filepath' => '/', 'filename' => 'sign.png']],
+            ],
+        ];
+    }
+
+    /**
+     * The panorama environment: valid with a photo in environment or assets; bad keys and values refused.
+     */
+    public function test_panorama_environment(): void {
+        $scene = self::panorama_scene();
+        $this->assertSame([], scene_validator::validate($scene));
+        $this->assertTrue(scene_validator::is_panorama($scene['environment']));
+        $this->assertFalse(scene_validator::is_panorama(self::valid_scene()['environment']));
+
+        // The photo may be an editor upload, and northoffset and sky are optional.
+        $scene['environment']['file']['area'] = 'assets';
+        unset($scene['environment']['northoffset'], $scene['environment']['sky']);
+        $this->assertSame([], scene_validator::validate($scene));
+
+        $cases = [
+            'environment.file must be a file reference' => function (array $env): array {
+                unset($env['file']);
+                return $env;
+            },
+            'environment.file.area must be one of environment, assets' => function (array $env): array {
+                $env['file']['area'] = 'media';
+                return $env;
+            },
+            'environment.northoffset must be a number from -180 to 180' => function (array $env): array {
+                $env['northoffset'] = 181;
+                return $env;
+            },
+            'environment.northoffset must be a number' => function (array $env): array {
+                $env['northoffset'] = '10';
+                return $env;
+            },
+            'environment.bounds is not allowed for a 360° photo room' => function (array $env): array {
+                $env['bounds'] = ['min' => [0, 0, 0], 'max' => [0, 0, 0]];
+                return $env;
+            },
+            'environment.lights is not allowed for a 360° photo room' => function (array $env): array {
+                $env['lights'] = [];
+                return $env;
+            },
+            'environment.shape is not allowed for a 360° photo room' => function (array $env): array {
+                $env['shape'] = ['kind' => 'hall'];
+                return $env;
+            },
+            'environment.sky must be a #rrggbb colour' => function (array $env): array {
+                $env['sky'] = 'blue';
+                return $env;
+            },
+        ];
+        foreach ($cases as $expected => $change) {
+            $broken = $scene;
+            $broken['environment'] = $change($scene['environment']);
+            $errors = scene_validator::validate($broken);
+            $this->assertNotEmpty($errors, $expected);
+            $this->assertStringContainsString($expected, implode("\n", $errors));
+        }
+
+        // A panorama room set validates like any other (portals between photo rooms).
+        $second = self::panorama_scene();
+        $second['id'] = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f';
+        $second['spawn'][0]['id'] = 'sp-hall';
+        $second['interactables'] = [];
+        $scene['interactables'][] = ['id' => 'pn-yard', 'kind' => 'portal', 'name' => 'Hall',
+            'placement' => ['yaw' => 0, 'pitch' => -10], 'position' => [0, 0.91, -3.94],
+            'target' => ['scene' => $second['id'], 'spawn' => 'sp-hall']];
+        $this->assertSame([], scene_validator::validate_set([$scene, $second]));
+    }
+
+    /**
+     * Placement by direction: numbers in range, and only in a 360° photo room.
+     */
+    public function test_placement(): void {
+        $scene = self::panorama_scene();
+        $cases = [
+            'interactables[0].placement must be an object' => [1, 2],
+            'interactables[0].placement.yaw must be a number from -180 to 180' => ['yaw' => 180.5, 'pitch' => 0],
+            'interactables[0].placement.pitch must be a number from -85 to 85' => ['yaw' => 0, 'pitch' => -86],
+            'interactables[0].placement.distance must be a number from 0.5 to 40' => ['yaw' => 0, 'pitch' => 0, 'distance' => 0.4],
+            'interactables[0].placement.yaw must be a number' => ['pitch' => 0],
+        ];
+        foreach ($cases as $expected => $placement) {
+            $broken = $scene;
+            $broken['interactables'][0]['placement'] = $placement;
+            $this->assertStringContainsString($expected, implode("\n", scene_validator::validate($broken)), $expected);
+        }
+        $far = $scene;
+        $far['interactables'][0]['placement'] = ['yaw' => 0, 'pitch' => 0, 'distance' => 40];
+        $this->assertSame([], scene_validator::validate($far));
+
+        // The position is still required next to the placement.
+        $broken = $scene;
+        unset($broken['interactables'][0]['position']);
+        $this->assertContains('interactables[0].position must be 3 finite numbers', scene_validator::validate($broken));
+
+        // Not in a 3D room.
+        $room = self::valid_scene();
+        $room['interactables'][0]['placement'] = ['yaw' => 0, 'pitch' => 0];
+        $this->assertContains(
+            'interactables[0].placement is only allowed in a 360° photo room',
+            scene_validator::validate($room)
+        );
     }
 
     /**
@@ -381,6 +515,12 @@ JSON
         $model['bounds'] = ['min' => [-1, 0], 'max' => [1, 0, 2]];
         $this->assertNull(scene_validator::walkable_bounds($model));
         $this->assertNull(scene_validator::walkable_bounds(null));
+
+        // A 360° photo room: nowhere to walk.
+        $this->assertSame(
+            ['min' => [0.0, 0.0, 0.0], 'max' => [0.0, 0.0, 0.0]],
+            scene_validator::walkable_bounds(self::panorama_scene()['environment'])
+        );
     }
 
     /**

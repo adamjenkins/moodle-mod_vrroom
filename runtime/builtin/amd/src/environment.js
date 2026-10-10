@@ -14,11 +14,17 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Environment builder: the procedural presets (hall, courtyard) and uploaded GLB environments.
+ * Environment builder: the procedural presets (hall, courtyard), uploaded GLB environments and
+ * 360° photos (panoramas).
  *
  * Every floor, wall and ceiling mesh (and an uploaded environment model) is tagged with
  * userData.vrroomShell, so augmented and mixed reality can hide the room's shell while keeping its
  * lights and contents.
+ *
+ * A panorama is drawn on the inside of a sphere around the viewer, never as scene.background:
+ * three.js turns an equirectangular background into a cube render target of 6 × height² texels,
+ * far too much for a phone with an 8192 × 4096 photo. The phone-sized copy (variants.mobile) is
+ * used where the GPU or the device is small.
  *
  * @module     vrroomruntime_builtin/environment
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -27,6 +33,21 @@
 
 /** Wall thickness of the hall preset in metres. */
 const WALL = 0.2;
+
+/** Radius of the panorama sphere (m); items are placed up to 40 m away, inside it. */
+export const PANORAMA_RADIUS = 50;
+
+/** Height of the centre of a panorama: the viewer's eye height (m), as in placement.js. */
+const PANORAMA_CENTRE = 1.6;
+
+/** Largest texture side a phone-class GPU is assumed to handle (px). */
+const MOBILE_TEXTURE = 4096;
+
+/** Largest shorter screen side of a phone (CSS px). */
+const PHONE_SCREEN = 600;
+
+/** Walking bounds of a panorama: nowhere to walk. */
+const ZERO_BOUNDS = {min: [0, 0, 0], max: [0, 0, 0]};
 
 /**
  * A finite number or a default.
@@ -207,20 +228,174 @@ const readBounds = (bounds) => {
 };
 
 /**
+ * Whether this device looks like a phone: a coarse pointer and a small screen.
+ *
+ * @returns {boolean}
+ */
+export const isPhone = () => {
+    try {
+        if (typeof window === 'undefined' || !window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) {
+            return false;
+        }
+        const scr = window.screen || {};
+        const side = Math.min(Number(scr.width) || Infinity, Number(scr.height) || Infinity);
+        return side <= PHONE_SCREEN;
+    } catch (e) {
+        return false;
+    }
+};
+
+/**
+ * The URL of the photo to show for a panorama environment: the phone copy when the GPU's largest
+ * texture is 4096 px or less or the device is a phone, else the desktop copy, else the original.
+ *
+ * Options: maxTextureSize (renderer.capabilities.maxTextureSize; unknown when missing), phone
+ * (bool; default isPhone()), resolveUrl(fileref) → URL|null for the original (default its url).
+ *
+ * @param {Object} env The panorama environment ({file, variants?: {desktop?, mobile?}}).
+ * @param {Object} [options] Options.
+ * @returns {string|null}
+ */
+export const choosePanoramaUrl = (env, options = {}) => {
+    const e = env || {};
+    const variants = e.variants && typeof e.variants === 'object' ? e.variants : {};
+    const valid = (url) => (typeof url === 'string' && url !== '' ? url : null);
+    const maxtexture = Number(options.maxTextureSize);
+    const phone = typeof options.phone === 'boolean' ? options.phone : isPhone();
+    const small = phone || (Number.isFinite(maxtexture) && maxtexture > 0 && maxtexture <= MOBILE_TEXTURE);
+    if (small && valid(variants.mobile)) {
+        return variants.mobile;
+    }
+    if (valid(variants.desktop)) {
+        return variants.desktop;
+    }
+    const file = e.file && typeof e.file === 'object' ? e.file : null;
+    if (!file) {
+        return null;
+    }
+    if (typeof options.resolveUrl === 'function') {
+        return valid(options.resolveUrl(file));
+    }
+    return valid(file.url);
+};
+
+/**
+ * The yaw (degrees) the centre of the photo faces: its north offset.
+ *
+ * @param {Object} env The panorama environment.
+ * @returns {number}
+ */
+const northOffset = (env) => {
+    const n = Number(env && env.northoffset);
+    return Number.isFinite(n) ? Math.max(-180, Math.min(180, n)) : 0;
+};
+
+/**
+ * The sphere a panorama is drawn on, without its photo yet (plain sky colour).
+ *
+ * The geometry is mirrored on x (mesh scale −1) and seen from inside (BackSide), so the photo is
+ * not reversed; it is turned so the centre of the photo is straight ahead (−z) at north offset 0
+ * and at yaw = north offset otherwise. It is centred at eye height; the viewer moves it with the
+ * head in VR so the photo shows no parallax.
+ *
+ * @param {Object} THREE three.js namespace.
+ * @param {Object} env The panorama environment.
+ * @param {Object} background Its sky colour (THREE.Color).
+ * @returns {Object} THREE.Mesh named vrroom-panorama
+ */
+export const makePanoramaSphere = (THREE, env, background) => {
+    const material = new THREE.MeshBasicMaterial({color: background.clone(), side: THREE.BackSide, depthWrite: false});
+    material.toneMapped = false;
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(PANORAMA_RADIUS, 64, 32), material);
+    sphere.name = 'vrroom-panorama';
+    sphere.scale.set(-1, 1, 1);
+    // SphereGeometry puts u = 0.5 at +x; mirrored it is at −x, and a quarter turn back brings it to −z.
+    sphere.rotation.set(0, (northOffset(env) - 90) * Math.PI / 180, 0);
+    sphere.position.set(0, PANORAMA_CENTRE, 0);
+    sphere.renderOrder = -1;
+    sphere.userData.vrroomPanorama = true;
+    return sphere;
+};
+
+/**
+ * A panorama environment without its photo: lights, the plain sphere and zero bounds. Used while
+ * the photo is missing or failed to load, so a broken photo never turns into a hall.
+ *
+ * @param {Object} THREE three.js namespace.
+ * @param {Object} environment The panorama environment.
+ * @returns {Object} {group, bounds, background, ceiling, shell, panorama}
+ */
+export const buildPanoramaPlaceholder = (THREE, environment) => {
+    const env = environment || {};
+    const group = new THREE.Group();
+    group.name = 'vrroom-environment';
+    addLights(THREE, env.lights, group);
+    const background = colour(THREE, env.sky, '#20242a');
+    const sphere = makePanoramaSphere(THREE, env, background);
+    group.add(sphere);
+    return {group: group, bounds: {min: ZERO_BOUNDS.min.slice(), max: ZERO_BOUNDS.max.slice()}, background: background,
+        ceiling: null, shell: [], panorama: sphere};
+};
+
+/**
+ * Build a panorama environment: the sphere with the photo on it.
+ *
+ * @param {Object} THREE three.js namespace.
+ * @param {Object} env The panorama environment.
+ * @param {Function|null} resolveUrl fileref → URL or null.
+ * @param {Object} options {textureloader, maxTextureSize, phone}
+ * @returns {Promise<Object>} {group, bounds, background, ceiling, shell, panorama}; rejected when
+ *     the photo has no URL or fails to load (the caller keeps a plain sky then)
+ */
+const buildPanorama = (THREE, env, resolveUrl, options) => {
+    const url = choosePanoramaUrl(env, {
+        maxTextureSize: options.maxTextureSize,
+        phone: options.phone,
+        resolveUrl: resolveUrl,
+    });
+    if (!url) {
+        return Promise.reject(new Error('The 360° photo of this room has no file.'));
+    }
+    const textureloader = options.textureloader || new THREE.TextureLoader();
+    return textureloader.loadAsync(url).then((texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        // No mipmaps: a sphere seen from its centre is hardly minified, and they would add a third.
+        texture.generateMipmaps = false;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.needsUpdate = true;
+        const result = buildPanoramaPlaceholder(THREE, env);
+        const material = result.panorama.material;
+        material.map = texture;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+        return result;
+    });
+};
+
+/**
  * Build the environment of a vrroom-scene/1 document.
  *
  * The result is {group, bounds, background, ceiling, shell}: the group holds the lights and the
  * shell; ceiling is the ceiling mesh or null; shell lists the floor, wall and ceiling meshes (or
- * the uploaded model) that augmented and mixed reality hide.
+ * the uploaded model) that augmented and mixed reality hide. A panorama also has panorama: the
+ * photo sphere (never a pick target or an obstacle), zero bounds and an empty shell.
+ *
+ * Options: textureloader (THREE.TextureLoader for the photo), maxTextureSize (the renderer's),
+ * phone (bool, default: detected).
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object} environment The scene's environment.
  * @param {Object} loader A GLTFLoader (used for model environments).
  * @param {Function|null} resolveUrl fileref → URL or null; default: the file reference's url.
- * @returns {Promise<Object>} {group, bounds, background, ceiling, shell}
+ * @param {Object} [options] Options.
+ * @returns {Promise<Object>} {group, bounds, background, ceiling, shell, panorama?}
  */
-export const buildEnvironment = (THREE, environment, loader, resolveUrl = null) => {
+export const buildEnvironment = (THREE, environment, loader, resolveUrl = null, options = {}) => {
     const env = environment || {};
+    if (env.type === 'panorama') {
+        return buildPanorama(THREE, env, resolveUrl, options || {});
+    }
     const group = new THREE.Group();
     group.name = 'vrroom-environment';
     addLights(THREE, env.lights, group);

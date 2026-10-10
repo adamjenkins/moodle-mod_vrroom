@@ -9,6 +9,32 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Added
 
+- 360° photo rooms (server side): a new environment type `panorama` (`{type:'panorama', file,
+  northoffset?, sky?}`; no bounds, lights or shape) and an optional `placement {yaw, pitch, distance?}`
+  on every item of a photo room, from which the item's position is derived
+  (`\mod_vrroom\local\panorama::placement_position()`). Uploads of kind `panorama` (jpg, png, webp) must
+  be 2:1 and within new site settings `panomaxwidth` (16384 px), `panomaxsize` (50 MB); smaller copies
+  are made beside the photo at `variants/desktop.*` and `variants/mobile.*` (`panodesktopwidth` 8192 px,
+  `panomobilewidth` 4096 px) and sent to the viewer as `environment.variants`. Hotspot media may be
+  audio and video as well as images (`content.media[].kind` in the launch config). The room editor's
+  save checks every photo, its file list marks 360° photos and hides the copies.
+- 360° photo rooms in the built-in viewer: the photo is drawn on a sphere around the viewer (the
+  phone or desktop copy chosen by screen and texture limit), with look-around by dragging, keys, mouse
+  wheel or pinch zoom, an optional "look by moving your phone" toggle, no walking or teleport, round
+  arrow markers to other photos, and live-room avatars on a ring around the centre. Points placed by
+  direction (`vrroomruntime_builtin/placement`). Hotspot panels play audio and video. New entry
+  `vrroomruntime_builtin/standalone` shows rooms on another plugin's page.
+- Room editor photo mode: "New photo room", 360° photos in the surroundings list, look-around in the
+  photo, click the photo to move the selected point there, direction/height/distance fields. The editor
+  takes an injectable backend (services, upload form, features), so other plugins can reuse it.
+  `mod_vrroom/panorama_picker`: a flat-photo direction picker for forms.
+- Virtual tour template (`vrroomtemplate_tour`): upload up to 20 360° photos, joined by arrows, and
+  stops placed by direction (picked on the photo), with text, picture, audio or video; visit all or in
+  order, with points, completion and a grade.
+- `\mod_vrroom\local\launch\scene_formatter` (scene formatting moved out of `config_builder`, unchanged
+  for VR room) with `standalone_config()`, and public `editor_manager::strip_runtime_keys()` and
+  `scene_set_problem()`, so other plugins (the virtual tour assignment submission) can store, check and
+  show rooms. `$plugin->version` 2026101100 (new settings, API addition).
 - Webcams in built-in live rooms: a Camera button next to the microphone; a person's video shows on
   the face screen of their avatar and fades in and out without reconnecting (one video transceiver per
   connection, `replaceTrack`, about 320×240 at 15 fps). Per-person "Hide video for me". Site setting

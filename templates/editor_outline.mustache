@@ -22,13 +22,14 @@
 
     Data attributes required for JS:
     * data-action="vrroom-editor-scene" with data-scene
-    * data-action="vrroom-editor-addscene", "vrroom-editor-scene-up", "vrroom-editor-scene-down", "vrroom-editor-scene-delete"
+    * data-action="vrroom-editor-addscene", "vrroom-editor-addphotoscene", "vrroom-editor-scene-up", "vrroom-editor-scene-down", "vrroom-editor-scene-delete"
     * data-action="vrroom-editor-select" with data-kind and data-id
     * data-group on each section
 
     Context variables required for this template:
     * scenes - list of rooms: id, name, active, start
     * canaddscene - whether another room may be added
+    * haspresets - whether built-in surroundings exist (the "Add room" button; photo rooms are always offered)
     * canmoveup, canmovedown, candelete - what the chosen room allows
     * groups - list of groups: group, heading, items (kind, id, name, selected)
 
@@ -38,6 +39,7 @@
             {"id": "5d1c2c6e-6c2f-4d0e-9a51-7b1d0e9c2a11", "name": "Gallery", "active": true, "start": true}
         ],
         "canaddscene": true,
+        "haspresets": true,
         "canmoveup": false,
         "canmovedown": false,
         "candelete": false,
@@ -63,7 +65,10 @@
         {{/scenes}}
     </ul>
     <div class="d-flex flex-wrap gap-1">
+        {{#haspresets}}
         <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-editor-addscene"{{^canaddscene}} disabled{{/canaddscene}}>{{#str}}editoraddscene, mod_vrroom{{/str}}</button>
+        {{/haspresets}}
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-editor-addphotoscene"{{^canaddscene}} disabled{{/canaddscene}}>{{#str}}editoraddphotoscene, mod_vrroom{{/str}}</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-editor-scene-up"{{^canmoveup}} disabled{{/canmoveup}}>{{#str}}editormovesceneup, mod_vrroom{{/str}}</button>
         <button type="button" class="btn btn-outline-secondary btn-sm" data-action="vrroom-editor-scene-down"{{^canmovedown}} disabled{{/canmovedown}}>{{#str}}editormovescenedown, mod_vrroom{{/str}}</button>
         <button type="button" class="btn btn-outline-danger btn-sm" data-action="vrroom-editor-scene-delete"{{^candelete}} disabled{{/candelete}}>{{#str}}editordeletescene, mod_vrroom{{/str}}</button>

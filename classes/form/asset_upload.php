@@ -17,12 +17,14 @@
 namespace mod_vrroom\form;
 
 use mod_vrroom\local\editor\editor_manager;
+use mod_vrroom\local\panorama;
 
 /**
- * Upload one file for the room editor (a model, an image, audio or video) into the assets area.
+ * Upload one file for the room editor (a model, an image, audio, video or a 360° photo) into the assets area.
  *
  * Shown by core_form/modalform from mod_vrroom/editor_assets. Each upload gets its own item id, so
- * the editor can refer to it and the save can delete it again when no room uses it.
+ * the editor can refer to it and the save can delete it again when no room uses it. A 360° photo is
+ * checked (2:1, size limits from the site settings) and gets its smaller copies beside it.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -30,7 +32,7 @@ use mod_vrroom\local\editor\editor_manager;
  */
 class asset_upload extends \core_form\dynamic_form {
     /** @var string[] Kinds of file this form takes. */
-    public const KINDS = ['model', 'image', 'audio', 'video'];
+    public const KINDS = ['model', 'image', 'audio', 'video', 'panorama'];
 
     /**
      * The form fields.
@@ -54,7 +56,8 @@ class asset_upload extends \core_form\dynamic_form {
     }
 
     /**
-     * A model that is not a real binary glTF 2.0 file is a field error, shown in the form.
+     * A model that is not a real binary glTF 2.0 file, or a 360° photo of the wrong shape or size, is a
+     * field error, shown in the form. A refused photo is removed from the draft area.
      *
      * @param array $data Submitted data.
      * @param array $files Files.
@@ -63,7 +66,8 @@ class asset_upload extends \core_form\dynamic_form {
     public function validation($data, $files) {
         global $USER;
         $errors = parent::validation($data, $files);
-        if ($this->get_kind() !== 'model' || empty($data['assetfile'])) {
+        $kind = $this->get_kind();
+        if (!in_array($kind, ['model', 'panorama'], true) || empty($data['assetfile'])) {
             return $errors;
         }
         $draft = get_file_storage()->get_area_files(
@@ -75,7 +79,13 @@ class asset_upload extends \core_form\dynamic_form {
             false
         );
         foreach ($draft as $file) {
-            if (!editor_manager::is_glb($file)) {
+            if ($kind === 'panorama') {
+                $problem = panorama::check($file);
+                if ($problem !== null) {
+                    $errors['assetfile'] = panorama::message($problem);
+                    $file->delete();
+                }
+            } else if (!editor_manager::is_glb($file)) {
                 $errors['assetfile'] = get_string('erroreditorbadglb', 'mod_vrroom', s($file->get_filename()));
             }
         }
@@ -149,7 +159,7 @@ class asset_upload extends \core_form\dynamic_form {
         $fs = get_file_storage();
         $files = $fs->get_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid, 'id', false);
         $file = count($files) === 1 ? reset($files) : null;
-        if ($file === null || editor_manager::asset_kind($file->get_filename()) !== $kind) {
+        if ($file === null || !self::extension_matches($file->get_filename(), $kind)) {
             $name = $file ? $file->get_filename() : '';
             $fs->delete_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid);
             throw new \moodle_exception('erroreditorinvalid', 'mod_vrroom', '', s($name !== '' ? $name : 'file'));
@@ -159,7 +169,38 @@ class asset_upload extends \core_form\dynamic_form {
             $fs->delete_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid);
             throw new \moodle_exception('erroreditorbadglb', 'mod_vrroom', '', s($file->get_filename()));
         }
+        if ($kind === 'panorama') {
+            // Checked in validation(); checked again on the stored file, which is what the room uses.
+            $problem = panorama::check($file);
+            if ($problem !== null) {
+                $fs->delete_area_files($context->id, 'mod_vrroom', editor_manager::ASSET_AREA, $itemid);
+                throw new \moodle_exception($problem, 'mod_vrroom');
+            }
+            panorama::make_variants($file);
+            $entry = editor_manager::asset_entry($file);
+            $entry['kind'] = 'panorama';
+            $entry['panorama'] = true;
+            return $entry;
+        }
         return editor_manager::asset_entry($file);
+    }
+
+    /**
+     * Whether a file name's extension belongs to a kind.
+     *
+     * A 360° photo is a jpg, png or webp image, which asset_kind() calls an image, so it is matched on
+     * its own extension list.
+     *
+     * @param string $filename
+     * @param string $kind One of KINDS.
+     * @return bool
+     */
+    private static function extension_matches(string $filename, string $kind): bool {
+        if ($kind === 'panorama') {
+            $extension = \core_text::strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            return in_array($extension, editor_manager::KIND_EXTENSIONS['panorama'], true);
+        }
+        return editor_manager::asset_kind($filename) === $kind;
     }
 
     /**
@@ -186,7 +227,7 @@ class asset_upload extends \core_form\dynamic_form {
         return [
             'subdirs' => 0,
             'maxfiles' => 1,
-            'maxbytes' => editor_manager::get_max_bytes(),
+            'maxbytes' => $kind === 'panorama' ? panorama::max_bytes() : editor_manager::get_max_bytes(),
             'accepted_types' => $types ?: ['.glb'],
         ];
     }

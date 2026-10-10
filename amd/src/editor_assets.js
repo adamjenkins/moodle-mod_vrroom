@@ -15,7 +15,8 @@
 
 /**
  * Files of the room editor: the list the server sent, lookups, and uploads through Moodle's file
- * picker in a modal form (mod_vrroom\form\asset_upload).
+ * picker in a modal form (mod_vrroom\form\asset_upload by default; another plugin's editor names
+ * its own dynamic form and arguments).
  *
  * @module     mod_vrroom/editor_assets
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -34,7 +35,19 @@ const KIND_AREAS = Object.freeze({
     image: ['media', 'assets'],
     audio: ['media', 'assets'],
     video: ['media', 'assets'],
+    panorama: ['environment', 'assets'],
 });
+
+/** The upload form of the activity's own editor. */
+export const DEFAULT_FORM = Object.freeze({formClass: 'mod_vrroom\\form\\asset_upload'});
+
+/**
+ * Whether an asset is a 360° photo (the server flags those; a fresh upload of kind panorama is one).
+ *
+ * @param {Object} asset Asset entry.
+ * @returns {boolean}
+ */
+const isPhoto = (asset) => asset.kind === 'panorama' || (asset.kind === 'image' && !!asset.panorama);
 
 /**
  * Whether two file references name the same file.
@@ -88,12 +101,14 @@ export const parseKey = (key) => {
 /**
  * The assets of a kind that may be used where these areas are allowed.
  *
+ * Kind panorama means the images flagged as 360° photos.
+ *
  * @param {Array} assets The asset list.
- * @param {string} kind model, image, audio or video.
+ * @param {string} kind model, image, audio, video or panorama.
  * @param {string[]} areas Allowed areas.
  * @returns {Array}
  */
-export const assetsOfKind = (assets, kind, areas) => assets.filter((a) => a.kind === kind &&
+export const assetsOfKind = (assets, kind, areas) => assets.filter((a) => (kind === 'panorama' ? isPhoto(a) : a.kind === kind) &&
     areas.includes(a.area) && (KIND_AREAS[kind] || []).includes(a.area));
 
 /**
@@ -108,16 +123,18 @@ export const findAsset = (assets, ref) => assets.find((a) => sameRef(a, ref)) ||
 /**
  * Open the upload form and resolve with the new asset.
  *
- * @param {number} cmid Course module id.
- * @param {string} kind model, image, audio or video.
+ * @param {Object} form The dynamic form and its arguments (kind is added).
+ * @param {string} form.formClass The dynamic form class.
+ * @param {Object} form.args The form's arguments.
+ * @param {string} kind model, image, audio, video or panorama.
  * @param {Array} assets The asset list; the new asset is added to it.
  * @param {HTMLElement|null} returnfocus Element to focus when the form closes.
  * @returns {Promise<Object|null>} The asset, or null when the form was cancelled.
  */
-export const upload = (cmid, kind, assets, returnfocus) => new Promise((resolve) => {
+export const upload = ({formClass, args}, kind, assets, returnfocus) => new Promise((resolve) => {
     const form = new ModalForm({
-        formClass: 'mod_vrroom\\form\\asset_upload',
-        args: {cmid: cmid, kind: kind},
+        formClass: formClass || DEFAULT_FORM.formClass,
+        args: Object.assign({}, args || {}, {kind: kind}),
         modalConfig: {title: getString('editoruploadtitle', 'mod_vrroom')},
         returnFocus: returnfocus || null,
     });
@@ -126,6 +143,11 @@ export const upload = (cmid, kind, assets, returnfocus) => new Promise((resolve)
         const asset = event.detail;
         done = true;
         if (asset && asset.filename) {
+            // A 360° photo is an image flagged as one, as the server lists it after a reload.
+            if (asset.kind === 'panorama') {
+                asset.kind = 'image';
+                asset.panorama = true;
+            }
             assets.push(asset);
             resolve(asset);
         } else {
@@ -166,17 +188,17 @@ export const upload = (cmid, kind, assets, returnfocus) => new Promise((resolve)
  * Nothing is chosen until the teacher picks a file (a new object never silently reuses the last
  * upload). With no file of the kind yet, the upload form opens straight away.
  *
- * @param {number} cmid Course module id.
- * @param {string} kind model, image, audio or video.
+ * @param {Object} form {formClass, args}: the upload form, as for upload().
+ * @param {string} kind model, image, audio, video or panorama.
  * @param {Array} assets The asset list; an uploaded asset is added to it.
  * @param {string[]} areas Allowed areas.
  * @param {HTMLElement|null} returnfocus Element to focus when the dialogue closes.
  * @returns {Promise<Object|null>} The asset, or null when nothing was chosen.
  */
-export const choose = (cmid, kind, assets, areas, returnfocus) => {
+export const choose = (form, kind, assets, areas, returnfocus) => {
     const existing = assetsOfKind(assets, kind, areas);
     if (!existing.length) {
-        return upload(cmid, kind, assets, returnfocus);
+        return upload(form, kind, assets, returnfocus);
     }
     const id = `vrroom-chooser-${Date.now()}`;
     return ModalSaveCancel.create({
@@ -219,7 +241,7 @@ export const choose = (cmid, kind, assets, areas, returnfocus) => {
             }
             done = true;
             modal.destroy();
-            resolve(upload(cmid, kind, assets, returnfocus));
+            resolve(upload(form, kind, assets, returnfocus));
         });
     }));
 };

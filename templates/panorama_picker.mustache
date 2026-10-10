@@ -1,0 +1,46 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_vrroom/panorama_picker
+
+    The body of the direction picker (mod_vrroom/panorama_picker): the flat 360° photo with a
+    crosshair on the chosen direction. Clicking the photo moves the crosshair; so do the arrow keys
+    (Shift for bigger steps); Enter uses the direction.
+
+    Classes required for JS:
+    * none
+
+    Data attributes required for JS:
+    * none (the elements are found by id: {{id}}, {{id}}-mark, {{id}}-value)
+
+    Context variables required for this template:
+    * id - unique id of the picking area
+    * url - URL of the photo
+
+    Example context (json):
+    {
+        "id": "vrroom-pick-1",
+        "url": "https://example.com/pluginfile.php/1/user/draft/2/photo.jpg"
+    }
+}}
+<p class="small mb-2" id="{{id}}-help">{{#str}}panoramapickerhelp, mod_vrroom{{/str}}</p>
+<div class="vrroom-panopicker position-relative" id="{{id}}" tabindex="0" role="application"
+     aria-label="{{#str}}panoramapickertitle, mod_vrroom{{/str}}" aria-describedby="{{id}}-help {{id}}-value">
+    <img class="vrroom-panopicker-image d-block w-100 rounded" src="{{url}}" alt="" draggable="false">
+    <span class="vrroom-panopicker-mark" id="{{id}}-mark" aria-hidden="true"></span>
+</div>
+<p class="small text-body-secondary mt-2 mb-0" id="{{id}}-value" aria-live="polite"></p>

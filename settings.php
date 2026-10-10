@@ -68,6 +68,41 @@ if ($ADMIN->fulltree) {
         new lang_string('tokenttl_desc', 'mod_vrroom'),
         3600
     ));
+
+    // 360° photos (photo rooms): the largest original accepted and the smaller copies made for viewing.
+    $settings->add(new admin_setting_heading(
+        'mod_vrroom/panoramaheading',
+        new lang_string('panoramasettings', 'mod_vrroom'),
+        new lang_string('panoramasettings_desc', 'mod_vrroom')
+    ));
+    $settings->add(new admin_setting_configtext(
+        'mod_vrroom/panomaxsize',
+        new lang_string('panomaxsize', 'mod_vrroom'),
+        new lang_string('panomaxsize_desc', 'mod_vrroom'),
+        \mod_vrroom\local\panorama::DEFAULT_MAX_SIZE_MB,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'mod_vrroom/panomaxwidth',
+        new lang_string('panomaxwidth', 'mod_vrroom'),
+        new lang_string('panomaxwidth_desc', 'mod_vrroom'),
+        \mod_vrroom\local\panorama::DEFAULT_MAX_WIDTH,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'mod_vrroom/panodesktopwidth',
+        new lang_string('panodesktopwidth', 'mod_vrroom'),
+        new lang_string('panodesktopwidth_desc', 'mod_vrroom'),
+        \mod_vrroom\local\panorama::DEFAULT_DESKTOP_WIDTH,
+        PARAM_INT
+    ));
+    $settings->add(new admin_setting_configtext(
+        'mod_vrroom/panomobilewidth',
+        new lang_string('panomobilewidth', 'mod_vrroom'),
+        new lang_string('panomobilewidth_desc', 'mod_vrroom'),
+        \mod_vrroom\local\panorama::DEFAULT_MOBILE_WIDTH,
+        PARAM_INT
+    ));
 }
 $ADMIN->add('modvrroomfolder', $settings);
 // Tell core the settings structure is already added.

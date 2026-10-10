@@ -27,6 +27,11 @@
  * them exactly as in the HTML panel. Question types the view does not support show a card that
  * asks the student to leave VR to answer.
  *
+ * A hotspot's media: its first video (else its first picture) is shown on a plane under the panel
+ * (a video plays there, and selecting it pauses or resumes it); without a video its first audio
+ * plays without a visible player. A
+ * "Play / pause" button controls the video or audio, which stops when the panel closes.
+ *
  * @module     vrroomruntime_builtin/xrpanel
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -36,6 +41,7 @@ import Ajax from 'core/ajax';
 import Log from 'core/log';
 import {getStrings} from 'core/str';
 import {plainText, startScene} from 'vrroomruntime_builtin/util';
+import {mediaItems} from 'vrroomruntime_builtin/media';
 
 /** Canvas width of a panel in pixels. */
 const CANVAS_WIDTH = 1024;
@@ -96,11 +102,14 @@ const LOOKS = {
 /** Line height factor. */
 const LINE = 1.3;
 
+/** Gap between the panel and its picture or video (m). */
+const MEDIA_GAP = 0.03;
+
 /** Strings the panels use, all from vrroomruntime_builtin. */
 const STRINGKEYS = [
     'xropenquestion', 'xrsubmit', 'xrclose', 'xrexittoanswer', 'xrcorrect', 'xrpartiallycorrect',
     'xrincorrect', 'xrchooseone', 'xrchoosemany', 'xrloading', 'xranswered', 'gethint', 'tryagain',
-    'nomorehints', 'retrynotice', 'questionlocked', 'questionpreview',
+    'nomorehints', 'retrynotice', 'questionlocked', 'questionpreview', 'xrplaypause',
 ];
 
 /**
@@ -317,6 +326,9 @@ class XrPanels {
         this.measure = document.createElement('canvas').getContext('2d');
         this.camerapos = new THREE.Vector3();
         this.panelpos = new THREE.Vector3();
+        this.panelheight = 0;
+        this.mediaelement = null;
+        this.mediaplane = null;
         this.unsubscribe = this.session.on((message) => this.onSessionChange(message));
     }
 
@@ -358,9 +370,17 @@ class XrPanels {
         const content = (hotspot && hotspot.content) || {};
         const slot = content.question === null || content.question === undefined ? null : Number(content.question);
         const title = plainText(content.title || (hotspot && hotspot.name) || '');
+        const media = mediaItems(content, title);
+        // A video is shown (and played) first; otherwise the first picture is shown.
+        const visual = media.find((m) => m.isvideo) || media.find((m) => m.isimage) || null;
+        const playable = media.find((m) => m.isvideo) || media.find((m) => m.isaudio) || null;
+        this.releaseMedia();
         const buttons = [];
         if (slot !== null) {
             buttons.push({action: 'question', label: this.str('xropenquestion'), look: 'primary'});
+        }
+        if (playable) {
+            buttons.push({action: 'media', label: this.str('xrplaypause'), look: 'secondary'});
         }
         buttons.push({action: 'close', label: this.str('xrclose'), look: 'secondary'});
         this.generation++;
@@ -370,6 +390,130 @@ class XrPanels {
             paragraphs: [{text: htmlToText(content.html || ''), style: 'body'}],
             buttons: buttons,
         });
+        this.showMedia(visual, playable);
+    }
+
+    /**
+     * Show a hotspot's picture or video under the panel and start its video or audio.
+     *
+     * Opening the panel is the user's select, so the browser lets the media play.
+     *
+     * @param {Object|null} visual The picture or video to show ({url, isimage, isvideo}).
+     * @param {Object|null} playable The video or audio to play ({url, isvideo, isaudio}).
+     */
+    showMedia(visual, playable) {
+        const THREE = this.THREE;
+        const generation = this.generation;
+        let element = null;
+        if (playable) {
+            element = document.createElement(playable.isvideo ? 'video' : 'audio');
+            element.preload = 'auto';
+            if (playable.isvideo) {
+                element.playsInline = true;
+                element.setAttribute('playsinline', '');
+            }
+            element.src = playable.url;
+            this.mediaelement = element;
+            Promise.resolve(element.play()).catch((error) => Log.debug(error));
+        }
+        if (!visual) {
+            return;
+        }
+        let material;
+        let plane = null;
+        if (visual.isvideo && element && playable === visual) {
+            const texture = new THREE.VideoTexture(element);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            material = new THREE.MeshBasicMaterial({map: texture, depthTest: false, depthWrite: false, toneMapped: false});
+        } else if (visual.isimage) {
+            material = new THREE.MeshBasicMaterial({color: 0x2b2f36, depthTest: false, depthWrite: false, toneMapped: false});
+            new THREE.TextureLoader().loadAsync(visual.url).then((texture) => {
+                if (generation !== this.generation || this.mediaplane !== plane) {
+                    texture.dispose();
+                    return undefined;
+                }
+                texture.colorSpace = THREE.SRGBColorSpace;
+                material.map = texture;
+                material.color.set(0xffffff);
+                material.needsUpdate = true;
+                const image = texture.image || {};
+                if (image.width > 0 && image.height > 0) {
+                    this.sizeMediaPlane(image.height / image.width);
+                }
+                return undefined;
+            }).catch((error) => Log.debug(error));
+        } else {
+            return;
+        }
+        plane = new THREE.Mesh(new THREE.PlaneGeometry(PANEL_WIDTH, PANEL_WIDTH * 9 / 16), material);
+        plane.renderOrder = 1000;
+        plane.name = 'vrroom-xr-panel-media';
+        plane.userData.vrroomPanelAction = visual.isvideo ? 'media' : 'panel';
+        this.mediaplane = plane;
+        this.group.add(plane);
+        this.meshes.push(plane);
+        this.targets.push(plane);
+        this.sizeMediaPlane(9 / 16);
+        if (visual.isvideo && element) {
+            element.addEventListener('loadedmetadata', () => {
+                if (this.mediaplane === plane && element.videoWidth > 0 && element.videoHeight > 0) {
+                    this.sizeMediaPlane(element.videoHeight / element.videoWidth);
+                }
+            });
+        }
+    }
+
+    /**
+     * Give the media plane an aspect ratio and put it just under the panel.
+     *
+     * @param {number} aspect Height / width.
+     */
+    sizeMediaPlane(aspect) {
+        const plane = this.mediaplane;
+        if (!plane) {
+            return;
+        }
+        const height = PANEL_WIDTH * Math.max(0.2, Math.min(2, aspect));
+        plane.geometry.dispose();
+        plane.geometry = new this.THREE.PlaneGeometry(PANEL_WIDTH, height);
+        plane.position.set(0, -(this.panelheight * PX) / 2 - MEDIA_GAP - height / 2, 0.002);
+    }
+
+    /**
+     * Pause or resume the panel's video or audio.
+     */
+    toggleMedia() {
+        const element = this.mediaelement;
+        if (!element) {
+            return;
+        }
+        if (element.paused || element.ended) {
+            if (element.ended) {
+                element.currentTime = 0;
+            }
+            Promise.resolve(element.play()).catch((error) => Log.debug(error));
+        } else {
+            element.pause();
+        }
+    }
+
+    /**
+     * Stop the panel's video or audio and let it go (its plane goes with the panel's meshes).
+     */
+    releaseMedia() {
+        const element = this.mediaelement;
+        this.mediaelement = null;
+        this.mediaplane = null;
+        if (!element) {
+            return;
+        }
+        try {
+            element.pause();
+            element.removeAttribute('src');
+            element.load();
+        } catch (e) {
+            // A media element that never loaded has nothing to release.
+        }
     }
 
     /**
@@ -380,6 +524,7 @@ class XrPanels {
      */
     openQuestion(slot) {
         const n = Number(slot);
+        this.releaseMedia();
         const generation = ++this.generation;
         const objective = this.session.getObjectiveForSlot(n);
         const title = this.questionTitle(n, objective);
@@ -405,6 +550,7 @@ class XrPanels {
      * @param {string} text Plain text.
      */
     showMessage(text) {
+        this.releaseMedia();
         this.generation++;
         this.context = {kind: 'message'};
         this.showNotice('', String(text || ''));
@@ -414,6 +560,7 @@ class XrPanels {
      * Close the panel.
      */
     close() {
+        this.releaseMedia();
         this.generation++;
         this.card = null;
         this.context = null;
@@ -671,10 +818,16 @@ class XrPanels {
      *
      * @param {string} action The action.
      */
+    // One branch per panel button.
+    // eslint-disable-next-line complexity
     act(action) {
         const context = this.context;
         if (action === 'close') {
             this.close();
+            return;
+        }
+        if (action === 'media') {
+            this.toggleMedia();
             return;
         }
         if (!context) {
@@ -932,6 +1085,7 @@ class XrPanels {
             y -= GAP;
         }
         const height = Math.max(160, Math.ceil(y + PAD));
+        this.panelheight = height;
 
         this.buildBackground(blocks, height, rtl);
         rects.forEach((rect) => this.buildButton(rect, height, rtl));

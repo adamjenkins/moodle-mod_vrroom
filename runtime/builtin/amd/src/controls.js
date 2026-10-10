@@ -17,6 +17,10 @@
  * First-person controls for desktop and touch: keyboard walking, drag to look, click or tap to
  * walk to a floor point, a virtual stick on touch screens, and Enter to activate.
  *
+ * In a 360° photo room walking is off (setWalk(false)): no WASD moves, no stick and no tap to walk;
+ * the turning keys turn, the up and down keys tilt, the wheel and a pinch zoom (onZoom), and on a
+ * phone the view can follow the device's orientation (setMotionLook).
+ *
  * With a rig (a group holding the camera) the controls move and turn the rig and only pitch the
  * camera inside it, so an immersive WebXR session can take over the camera's pose while teleport
  * and snap turn keep moving the rig.
@@ -40,6 +44,12 @@ const LOOK = 0.005;
 
 /** Pitch limit (±80°). */
 const PITCH = 80 * Math.PI / 180;
+
+/** Tilting speed of the up and down keys when walking is off, in radians per second. */
+const TILT = 1.2;
+
+/** Zoom factor per wheel pixel (the field of view is multiplied by exp(deltaY · WHEEL)). */
+const WHEEL = 0.0015;
 
 /** Pointer travel under which a press counts as a click (px). */
 const CLICK = 5;
@@ -88,19 +98,39 @@ const TURNS = {
 };
 
 /**
+ * Whether the view can follow the device's orientation: the browser has orientation events and the
+ * device is a touch device (desktop browsers have the event type but never fire it).
+ *
+ * @returns {boolean}
+ */
+export const motionLookAvailable = () => {
+    try {
+        if (typeof window === 'undefined' || typeof window.DeviceOrientationEvent === 'undefined') {
+            return false;
+        }
+        const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+        return coarse || 'ontouchstart' in window;
+    } catch (e) {
+        return false;
+    }
+};
+
+/**
  * Attach controls to a camera and canvas.
  *
  * Options: bounds {min, max}; eyeHeight (default 1.6); stick (HTMLElement of the virtual stick);
  * rig (THREE.Object3D that holds the camera; optional); onClick(ndc {x, y}) → true when the click
  * hit something (no walking then); onActivate() (Enter); onTouch() (first touch input seen);
  * invertX, invertY (reverse the drag-to-look direction on that axis); lockY (dragging never tilts);
- * obstacles() → THREE.Mesh[] the walker may not pass through (walls, furniture), or none.
+ * obstacles() → THREE.Mesh[] the walker may not pass through (walls, furniture), or none;
+ * onZoom(factor) (wheel or pinch while walking is off: multiply the field of view by factor).
  *
  * @param {Object} camera THREE.PerspectiveCamera.
  * @param {HTMLCanvasElement} canvas The canvas.
  * @param {Object} options Options.
  * @returns {Object} {update(dt), teleport(position, yaw), findStart(position, yaw, opts), canStand(position),
- *     getPosition(), getYaw(), setBounds(bounds), setInvert(x, y), setLockY(locked), setEnabled(enabled), detach()}
+ *     getPosition(), getYaw(), setBounds(bounds), setInvert(x, y), setLockY(locked), setEnabled(enabled),
+ *     setWalk(on), setPitchLimit(degrees), setMotionLook(on) → Promise<boolean>, isMotionLook(), detach()}
  */
 export const attach = (camera, canvas, options = {}) => {
     const eye = Number.isFinite(options.eyeHeight) ? options.eyeHeight : 1.6;
@@ -126,6 +156,20 @@ export const attach = (camera, canvas, options = {}) => {
     const origin = new THREE.Vector3();
     const direction = new THREE.Vector3();
     const listeners = [];
+    // Walking (off in a 360° photo room), the pitch limit, touch pointers for a pinch.
+    let walk = true;
+    let pitchlimit = PITCH;
+    const touches = new Map();
+    let pinch = null;
+    // Looking by moving the device: {listening, on, sample: {alpha, beta, gamma, orient}|null, offset|null}.
+    const motion = {listening: false, on: false, sample: null, offset: null};
+    const zee = new THREE.Vector3(0, 0, 1);
+    const devicequaternion = new THREE.Quaternion();
+    const screenturn = new THREE.Quaternion();
+    // The camera looks out of the back of the device, not out of its top: −90° about x.
+    const backturn = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
+    const deviceeuler = new THREE.Euler();
+    const lookdir = new THREE.Vector3();
 
     camera.rotation.order = 'YXZ';
 
@@ -525,10 +569,20 @@ export const attach = (camera, canvas, options = {}) => {
         if (e.pointerType === 'touch' && options.onTouch) {
             options.onTouch();
         }
+        if (e.pointerType === 'touch') {
+            touches.set(e.pointerId, {x: e.clientX, y: e.clientY});
+            if (!walk && touches.size === 2) {
+                // Two fingers: a pinch zooms; it is no drag and no tap.
+                const [a, b] = Array.from(touches.values());
+                pinch = {distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y))};
+                drag = null;
+                return;
+            }
+        }
         if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') {
             return;
         }
-        if (drag) {
+        if (drag || pinch) {
             return;
         }
         drag = {id: e.pointerId, x: e.clientX, y: e.clientY, lastx: e.clientX, lasty: e.clientY, moved: 0};
@@ -540,6 +594,21 @@ export const attach = (camera, canvas, options = {}) => {
         canvas.focus({preventScroll: true});
     });
     listen(canvas, 'pointermove', (e) => {
+        if (touches.has(e.pointerId)) {
+            touches.set(e.pointerId, {x: e.clientX, y: e.clientY});
+        }
+        if (pinch) {
+            if (touches.size >= 2 && enabled) {
+                const [a, b] = Array.from(touches.values());
+                const distance = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+                if (options.onZoom) {
+                    // Fingers apart (a longer distance) zoom in: a narrower view.
+                    options.onZoom(pinch.distance / distance);
+                }
+                pinch.distance = distance;
+            }
+            return;
+        }
         if (!drag || e.pointerId !== drag.id) {
             return;
         }
@@ -549,13 +618,23 @@ export const attach = (camera, canvas, options = {}) => {
         drag.lasty = e.clientY;
         drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
         if (drag.moved >= CLICK) {
-            yaw -= (invertx ? -dx : dx) * LOOK;
-            if (!locky) {
-                pitch = Math.max(-PITCH, Math.min(PITCH, pitch - (inverty ? -dy : dy) * LOOK));
+            const turn = (invertx ? -dx : dx) * LOOK;
+            if (motion.on && motion.offset !== null) {
+                // The device sets the view; dragging turns it on top of that.
+                motion.offset -= turn;
+            } else {
+                yaw -= turn;
+            }
+            if (!locky && !motion.on) {
+                pitch = Math.max(-pitchlimit, Math.min(pitchlimit, pitch - (inverty ? -dy : dy) * LOOK));
             }
         }
     });
     const endDrag = (e, cancelled) => {
+        touches.delete(e.pointerId);
+        if (pinch && touches.size < 2) {
+            pinch = null;
+        }
         if (!drag || e.pointerId !== drag.id) {
             return;
         }
@@ -566,12 +645,45 @@ export const attach = (camera, canvas, options = {}) => {
         }
         const point = ndc(e.clientX, e.clientY);
         const handled = options.onClick ? options.onClick(point) : false;
-        if (!handled) {
+        if (!handled && walk) {
             walkToFloor(point);
         }
     };
     listen(canvas, 'pointerup', (e) => endDrag(e, false));
     listen(canvas, 'pointercancel', (e) => endDrag(e, true));
+
+    // The wheel zooms while walking is off (it scrolls the page otherwise).
+    listen(canvas, 'wheel', (e) => {
+        if (!enabled || walk || !options.onZoom) {
+            return;
+        }
+        e.preventDefault();
+        options.onZoom(Math.exp(Math.max(-200, Math.min(200, Number(e.deltaY) || 0)) * WHEEL));
+    }, {passive: false});
+
+    // The device's orientation (looking by moving the phone).
+    const onOrientation = (e) => {
+        if (e.alpha === null && e.beta === null && e.gamma === null) {
+            return;
+        }
+        const scr = window.screen && window.screen.orientation ? window.screen.orientation.angle : window.orientation;
+        motion.sample = {
+            alpha: (Number(e.alpha) || 0) * Math.PI / 180,
+            beta: (Number(e.beta) || 0) * Math.PI / 180,
+            gamma: (Number(e.gamma) || 0) * Math.PI / 180,
+            orient: (Number(scr) || 0) * Math.PI / 180,
+        };
+    };
+    // Yaw and pitch of the device's view from the last orientation sample.
+    const deviceLook = () => {
+        const sample = motion.sample;
+        deviceeuler.set(sample.beta, sample.alpha, -sample.gamma, 'YXZ');
+        devicequaternion.setFromEuler(deviceeuler);
+        devicequaternion.multiply(backturn);
+        devicequaternion.multiply(screenturn.setFromAxisAngle(zee, -sample.orient));
+        lookdir.set(0, 0, -1).applyQuaternion(devicequaternion);
+        return {yaw: Math.atan2(-lookdir.x, -lookdir.z), pitch: Math.asin(Math.max(-1, Math.min(1, lookdir.y)))};
+    };
 
     // Virtual stick (touch).
     const stick = options.stick || null;
@@ -596,7 +708,7 @@ export const attach = (camera, canvas, options = {}) => {
     };
     if (stick) {
         listen(stick, 'pointerdown', (e) => {
-            if (!enabled) {
+            if (!enabled || !walk) {
                 return;
             }
             if (options.onTouch && e.pointerType === 'touch') {
@@ -654,7 +766,28 @@ export const attach = (camera, canvas, options = {}) => {
                     right += MOVES[code][1];
                 }
             });
-            yaw += Math.sign(turn) * TURN * step;
+            if (motion.on && motion.offset !== null) {
+                motion.offset += Math.sign(turn) * TURN * step;
+            } else {
+                yaw += Math.sign(turn) * TURN * step;
+            }
+            if (motion.on && motion.sample) {
+                const look = deviceLook();
+                if (motion.offset === null) {
+                    // Carry on from where the view is now.
+                    motion.offset = yaw - look.yaw;
+                }
+                yaw = look.yaw + motion.offset;
+                pitch = locky ? 0 : Math.max(-pitchlimit, Math.min(pitchlimit, look.pitch));
+            }
+            if (!walk) {
+                // No walking: the forward and back keys tilt the view instead.
+                if (!locky && !motion.on && forward !== 0) {
+                    pitch = Math.max(-pitchlimit, Math.min(pitchlimit, pitch + Math.sign(forward) * TILT * step));
+                }
+                apply();
+                return;
+            }
             forward -= stickinput.y;
             right += stickinput.x;
             const speed = WALK * (shift ? 2 : 1);
@@ -696,6 +829,8 @@ export const attach = (camera, canvas, options = {}) => {
             if (yawdeg !== null && yawdeg !== undefined && Number.isFinite(Number(yawdeg))) {
                 yaw = Number(yawdeg) * Math.PI / 180;
                 pitch = 0;
+                // Looking by moving the device carries on from the new facing.
+                motion.offset = null;
             }
             target = null;
             apply();
@@ -814,10 +949,92 @@ export const attach = (camera, canvas, options = {}) => {
             }
         },
 
+        /**
+         * Allow or stop walking (a 360° photo room stands still at its centre). Turning, looking and
+         * clicking stay; without walking the stick is hidden and the wheel and a pinch zoom.
+         *
+         * @param {boolean} on Whether the walker may move.
+         */
+        setWalk(on) {
+            walk = !!on;
+            target = null;
+            stickinput.x = 0;
+            stickinput.y = 0;
+            stickpointer = null;
+            setKnob(0, 0);
+            pinch = null;
+            if (stick) {
+                stick.classList.toggle('d-none', !walk);
+            }
+        },
+
+        /**
+         * Set how far up and down the view may tilt.
+         *
+         * @param {number} degrees Limit in degrees (1 to 89).
+         */
+        setPitchLimit(degrees) {
+            const value = Number(degrees);
+            pitchlimit = Number.isFinite(value) ? Math.max(1, Math.min(89, value)) * Math.PI / 180 : PITCH;
+            pitch = Math.max(-pitchlimit, Math.min(pitchlimit, pitch));
+            if (enabled) {
+                // Not while an immersive session moves the rig.
+                apply();
+            }
+        },
+
+        /**
+         * Look around by moving the device, or stop. On iOS this asks for permission, so call it
+         * straight from the user's click or change event.
+         *
+         * @param {boolean} on Whether the view follows the device.
+         * @returns {Promise<boolean>} whether it is on now
+         */
+        setMotionLook(on) {
+            if (!on) {
+                motion.on = false;
+                motion.offset = null;
+                return Promise.resolve(false);
+            }
+            if (!motionLookAvailable()) {
+                return Promise.resolve(false);
+            }
+            const start = () => {
+                if (!motion.listening) {
+                    motion.listening = true;
+                    listen(window, 'deviceorientation', onOrientation);
+                }
+                motion.on = true;
+                motion.offset = null;
+                motion.sample = null;
+                return true;
+            };
+            const Orientation = window.DeviceOrientationEvent;
+            if (Orientation && typeof Orientation.requestPermission === 'function') {
+                // Called synchronously from the gesture; the answer comes later.
+                return Promise.resolve(Orientation.requestPermission())
+                    .then((answer) => (answer === 'granted' ? start() : false))
+                    .catch(() => false);
+            }
+            return Promise.resolve(start());
+        },
+
+        /**
+         * Whether the view follows the device's orientation.
+         *
+         * @returns {boolean}
+         */
+        isMotionLook() {
+            return motion.on;
+        },
+
         /** Remove every listener. */
         detach() {
             listeners.forEach((remove) => remove());
             listeners.length = 0;
+            motion.listening = false;
+            motion.on = false;
+            touches.clear();
             keys.clear();
         },
     };

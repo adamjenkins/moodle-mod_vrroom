@@ -31,6 +31,7 @@ import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
 import {createProgress} from 'vrroomruntime_builtin/panels';
 import {renderQuestion} from 'vrroomruntime_builtin/question';
+import {mediaItems} from 'vrroomruntime_builtin/media';
 import {BADGES, region, plainText, announce, showMessage, clearMessage, startScene} from 'vrroomruntime_builtin/util';
 
 /**
@@ -107,13 +108,15 @@ const itemContext = (item, scene, hidden, usable) => {
     const slot = questionSlot(item, content);
     const mediaurl = fileUrl(item, 'media');
     const usebutton = item.kind === 'grabbable' || usable.has(String(item.id));
+    const title = plainText(item.kind === 'hotspot' ? (content.title || item.name) : item.name);
     return {
         id: item.id,
         sceneid: scene.id,
         kind: item.kind,
         name: plainText(item.name || ''),
-        title: plainText(item.kind === 'hotspot' ? (content.title || item.name) : item.name),
+        title: title,
         html: item.kind === 'hotspot' ? (content.html || '') : '',
+        contentmedia: item.kind === 'hotspot' ? mediaItems(content, title) : [],
         text: item.kind === 'text' ? plainText(item.text || '') : '',
         imageurl: fileUrl(item, 'image'),
         ismodel: item.kind === 'model',
@@ -190,7 +193,8 @@ const playMedia = (media) => {
  * @param {HTMLElement} root The VR room root element (holding the shell).
  * @param {Object} session The session.
  * @param {Object} config Launch config; config.canswitch3d shows the switch button,
- *     config.onFinish finishes the attempt, config.onSwitch3d switches to the 3D room.
+ *     config.onFinish finishes the attempt, config.onSwitch3d switches to the 3D room;
+ *     config.standalone (shown by another plugin) leaves out the progress panel.
  * @returns {Promise<Object>} {stop()}
  */
 export const start = (root, session, config) => {
@@ -487,6 +491,10 @@ export const start = (root, session, config) => {
 
             session.start('builtin-list', startscene ? startscene.id : null);
 
+            if (config.standalone) {
+                // No tasks and no attempt to finish.
+                return null;
+            }
             return createProgress(region(root, 'vrroom-list-progress'), session, {
                 root: root,
                 onFinish: config.onFinish,

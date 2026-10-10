@@ -23,6 +23,9 @@
  * when fullscreen ends. The drag settings are the user preferences mod_vrroom_invertx,
  * mod_vrroom_inverty and mod_vrroom_locky, so they apply in every VR room activity.
  *
+ * In a 360° photo room on a device with orientation events the bar also offers "Look around by
+ * moving your phone" (controls.setMotionLook); it is not remembered, as iOS asks again each time.
+ *
  * @module     vrroomruntime_builtin/stagebar
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -32,6 +35,7 @@ import Log from 'core/log';
 import {getStrings} from 'core/str';
 import {setUserPreference} from 'core_user/repository';
 import {region} from 'vrroomruntime_builtin/util';
+import {motionLookAvailable} from 'vrroomruntime_builtin/controls';
 
 /** @var {string} Preference that reverses left/right dragging. */
 const PREFX = 'mod_vrroom_invertx';
@@ -85,14 +89,16 @@ const exitFullscreen = () => Promise.resolve(
  * @param {HTMLElement} root The viewer root.
  * @param {Object} controls The controls from vrroomruntime_builtin/controls (setInvert()).
  * @param {Object} look {invertx, inverty, locky} from the launch config (the user's preferences).
- * @returns {Object} {dispose()}
+ * @returns {Object} {setPanorama(on), dispose()}
  */
 export const createStagebar = (root, controls, look) => {
     const viewport = region(root, 'vrroom-viewport');
     const bar = region(root, 'vrroom-stagebar');
     if (!viewport || !bar) {
-        return {dispose: () => null};
+        return {setPanorama: () => null, dispose: () => null};
     }
+    const motionrow = region(root, 'vrroom-motionlook');
+    const boxmotion = bar.querySelector('[data-action="vrroom-motionlook"]');
     const button = bar.querySelector('[data-action="vrroom-fullscreen"]');
     const boxx = bar.querySelector('[data-action="vrroom-invertx"]');
     const boxy = bar.querySelector('[data-action="vrroom-inverty"]');
@@ -127,6 +133,18 @@ export const createStagebar = (root, controls, look) => {
         Promise.resolve(setUserPreference(name, on ? 1 : 0)).catch((error) => Log.debug(error));
     };
     const onChange = (e) => {
+        if (boxmotion && e.target === boxmotion) {
+            const wanted = e.target.checked;
+            // Straight from the change event: iOS asks for permission only during a gesture.
+            controls.setMotionLook(wanted).then((on) => {
+                boxmotion.checked = on;
+                return undefined;
+            }).catch((error) => {
+                Log.debug(error);
+                boxmotion.checked = false;
+            });
+            return;
+        }
         if (e.target === boxlock) {
             locky = e.target.checked;
             controls.setLockY(locky);
@@ -208,6 +226,25 @@ export const createStagebar = (root, controls, look) => {
     }
 
     return {
+        /**
+         * Show the "look around by moving your phone" toggle (photo rooms on devices with
+         * orientation events), or hide it and stop following the device.
+         *
+         * @param {boolean} on Whether the current room is a 360° photo.
+         */
+        setPanorama(on) {
+            const show = !!on && !!motionrow && !!boxmotion && motionLookAvailable();
+            if (motionrow) {
+                motionrow.classList.toggle('d-none', !show);
+            }
+            if (!show) {
+                if (boxmotion) {
+                    boxmotion.checked = false;
+                }
+                controls.setMotionLook(false).catch(() => null);
+            }
+        },
+
         /** Remove the listeners and leave fullscreen if the room is shown that way. */
         dispose() {
             bar.removeEventListener('change', onChange);
