@@ -19,6 +19,8 @@
  *
  * The photo is equirectangular: its middle is straight ahead (yaw 0), its left and right edges are
  * behind, its top is straight up. So yaw = (0.5 - x / width) * 360 and pitch = (0.5 - y / height) * 180.
+ * A photo wider than 2:1 covers less than 180° from top to bottom (span = 360 * height / width,
+ * centred on the horizon, as the viewer shows it), so its pitch is (0.5 - y / height) * span.
  *
  * The photo is a URL, or the file in a form's draft area (a filemanager not saved yet), found
  * through repository/draftfiles_ajax.php as Moodle's own file manager finds it.
@@ -77,22 +79,40 @@ const normalise = (yaw, pitch) => ({
 });
 
 /**
+ * How many degrees from top to bottom a photo covers (as the viewer's panoramaSpan()).
+ *
+ * @param {number} width Pixels.
+ * @param {number} height Pixels.
+ * @returns {number} Degrees, more than 0 and at most 180.
+ */
+export const spanOf = (width, height) => {
+    const w = Number(width);
+    const h = Number(height);
+    return w > 0 && h > 0 ? Math.min(180, 360 * h / w) : 180;
+};
+
+/**
  * The direction of a point of the photo.
  *
  * @param {number} fx x / width, 0..1.
  * @param {number} fy y / height, 0..1.
+ * @param {number} [span] Degrees the photo covers from top to bottom.
  * @returns {Object} {yaw, pitch}
  */
-export const directionAt = (fx, fy) => normalise((0.5 - fx) * 360, (0.5 - fy) * 180);
+export const directionAt = (fx, fy, span = 180) => normalise((0.5 - fx) * 360, (0.5 - fy) * span);
 
 /**
- * Where a direction lies on the photo.
+ * Where a direction lies on the photo (a pitch beyond a narrow photo's edge is put on that edge).
  *
  * @param {number} yaw Degrees.
  * @param {number} pitch Degrees.
+ * @param {number} [span] Degrees the photo covers from top to bottom.
  * @returns {Object} {fx, fy}, each 0..1.
  */
-export const pointOf = (yaw, pitch) => ({fx: 0.5 - wrap(yaw) / 360, fy: 0.5 - pitch / 180});
+export const pointOf = (yaw, pitch, span = 180) => ({
+    fx: 0.5 - wrap(yaw) / 360,
+    fy: Math.min(Math.max(0.5 - pitch / span, 0), 1),
+});
 
 /**
  * The value of a draft item id option: a number, or the id of the field that holds one (read when
@@ -159,10 +179,16 @@ const openPicker = (yawinput, pitchinput, url, button) => {
         const area = () => body.querySelector(`#${id}`);
         const mark = () => body.querySelector(`#${id}-mark`);
         const status = () => body.querySelector(`#${id}-value`);
+        /** Degrees the photo covers from top to bottom (180 until it has loaded). */
+        const span = () => {
+            const a = area();
+            const image = a ? a.querySelector('img') : null;
+            return image ? spanOf(image.naturalWidth, image.naturalHeight) : 180;
+        };
 
         /** Show the current direction: the mark on the photo and the numbers under it. */
         const draw = () => {
-            const where = pointOf(current.yaw, current.pitch);
+            const where = pointOf(current.yaw, current.pitch, span());
             const m = mark();
             if (m) {
                 m.style.left = `${where.fx * 100}%`;
@@ -195,6 +221,11 @@ const openPicker = (yawinput, pitchinput, url, button) => {
             const a = area();
             if (a) {
                 a.focus();
+                // The mark of a photo wider than 2:1 moves once its shape is known.
+                const image = a.querySelector('img');
+                if (image && !image.complete) {
+                    image.addEventListener('load', draw, {once: true});
+                }
             }
         });
         root.on('click', `#${id}`, (e) => {
@@ -209,7 +240,7 @@ const openPicker = (yawinput, pitchinput, url, button) => {
             }
             const fx = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
             const fy = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
-            current = directionAt(fx, fy);
+            current = directionAt(fx, fy, spanOf(image.naturalWidth, image.naturalHeight));
             draw();
         });
         root.on('keydown', `#${id}`, (e) => {

@@ -12,8 +12,9 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 - 360° photo rooms (server side): a new environment type `panorama` (`{type:'panorama', file,
   northoffset?, sky?}`; no bounds, lights or shape) and an optional `placement {yaw, pitch, distance?}`
   on every item of a photo room, from which the item's position is derived
-  (`\mod_vrroom\local\panorama::placement_position()`). Uploads of kind `panorama` (jpg, png, webp) must
-  be 2:1 and within new site settings `panomaxwidth` (16384 px), `panomaxsize` (50 MB); smaller copies
+  (`\mod_vrroom\local\panorama::placement_position()`). Uploads of kind `panorama` (jpg, png, webp) may
+  be any shape (2:1 is best; a wider photo is shown as a band round the horizon, a narrower one
+  stretched) and must be within new site settings `panomaxwidth` (16384 px), `panomaxsize` (50 MB); smaller copies
   are made beside the photo at `variants/desktop.*` and `variants/mobile.*` (`panodesktopwidth` 8192 px,
   `panomobilewidth` 4096 px) and sent to the viewer as `environment.variants`. Hotspot media may be
   audio and video as well as images (`content.media[].kind` in the launch config). The room editor's

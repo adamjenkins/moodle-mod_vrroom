@@ -371,7 +371,7 @@ final class editor_manager {
                 throw new \moodle_exception('erroreditorbadglb', 'mod_vrroom', '', s((string)$ref['filename']));
             }
         }
-        // 360° photos must be 2:1 and within the site's size limits; anything else looks wrong in the viewer.
+        // 360° photos must be images within the site's size limits (any shape: 2:1 looks best).
         foreach ($scenes as $i => $scene) {
             $environment = $scene['environment'] ?? null;
             if (!scene_validator::is_panorama($environment)) {
@@ -1036,7 +1036,8 @@ final class editor_manager {
      * Every file of the areas the editor can use.
      *
      * The smaller copies of 360° photos (in variants/ folders) are never listed. An image that has
-     * such copies, or that is 2:1, is marked 'panorama' => true (its kind stays image).
+     * such copies, that is in the environment area (only 360° photos are uploaded there) or that is
+     * at least 1.5 times as wide as it is high, is marked 'panorama' => true (its kind stays image).
      *
      * @param \context_module $context The module context.
      * @return array[] Each ['area', 'itemid', 'filepath', 'filename', 'url', 'mimetype', 'kind', 'filesize'],
@@ -1062,7 +1063,8 @@ final class editor_manager {
                 $entry = self::asset_entry($file);
                 if (
                     $entry['kind'] === 'image' && in_array($entry['mimetype'], panorama::IMAGE_MIMETYPES, true)
-                        && (isset($withvariants[(int)$file->get_itemid()][$file->get_filepath()]) || panorama::has_ratio($file))
+                        && ($area === 'environment' || isset($withvariants[(int)$file->get_itemid()][$file->get_filepath()])
+                            || panorama::has_ratio($file))
                 ) {
                     $entry['panorama'] = true;
                 }

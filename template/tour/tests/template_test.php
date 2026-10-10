@@ -615,7 +615,7 @@ final class template_test extends \advanced_testcase {
                 $this->make_draft('lobby.jpg', $this->make_photo()),
                 0,
                 $this->make_draft('untitled.jpg', $this->make_photo()),
-                $this->make_draft('square.jpg', $this->make_photo(1024, 1024)),
+                $this->make_draft('small.jpg', $this->make_photo(800, 400)),
                 0,
             ],
             'tour_northoffset' => [200, 0, 0, 0, 0],
@@ -638,7 +638,7 @@ final class template_test extends \advanced_testcase {
         $this->assertSame(get_string('errorphototitle', $component), $errors['tour_phototitle[2]']);
         $limits = (object)panorama::limits();
         $limits->maxsize = display_size((int)$limits->maxbytes);
-        $this->assertSame(get_string('panoramabadratio', 'mod_vrroom', $limits), $errors['tour_photofile[3]']);
+        $this->assertSame(get_string('panoramatoosmall', 'mod_vrroom', $limits), $errors['tour_photofile[3]']);
         $this->assertSame(get_string('errorstopphoto', $component), $errors['tour_stopphoto[0]']);
         $this->assertSame(get_string('erroryaw', $component), $errors['tour_yaw[1]']);
         $this->assertSame(get_string('errorpitch', $component), $errors['tour_pitch[1]']);

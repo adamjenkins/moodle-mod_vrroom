@@ -19,7 +19,8 @@ namespace mod_vrroom\local;
 /**
  * 360° photos (equirectangular panoramas): size limits, checks, smaller copies and placement maths.
  *
- * A panorama is a 2:1 photo. Beside the original, in the same component, area and itemid, the
+ * A panorama is an equirectangular photo, best 2:1 (a wider one is shown as a band around the
+ * horizon, a narrower one stretched; neither is refused). Beside the original, in the same component, area and itemid, the
  * smaller copies the viewer prefers live at `<original filepath>variants/` as `desktop.<ext>` and
  * `mobile.<ext>` (jpg for jpeg and png photos, webp for webp ones). They are found by that
  * convention, never stored in the scene document.
@@ -39,8 +40,8 @@ final class panorama {
     public const VARIANT_NAMES = ['desktop', 'mobile'];
     /** @var int Narrowest photo accepted, in pixels. */
     public const MIN_WIDTH = 1024;
-    /** @var float Allowed deviation of the height from width/2, as a fraction of width/2. */
-    public const RATIO_TOLERANCE = 0.02;
+    /** @var float Width/height from which an uploaded image is taken for a 360° photo in the lists. */
+    public const LISTED_MIN_RATIO = 1.5;
     /** @var int Default largest original width, in pixels. */
     public const DEFAULT_MAX_WIDTH = 16384;
     /** @var int Default width of the desktop copy, in pixels. */
@@ -177,8 +178,8 @@ final class panorama {
      * @return string|null a mod_vrroom lang string identifier, or null when fine
      */
     public static function check_dimensions(int $width, int $height, int $bytes): ?string {
-        if (!self::is_ratio($width, $height)) {
-            return 'panoramabadratio';
+        if ($width <= 0 || $height <= 0) {
+            return 'panoramabadtype';
         }
         if ($width < self::MIN_WIDTH) {
             return 'panoramatoosmall';
@@ -193,22 +194,10 @@ final class panorama {
     }
 
     /**
-     * Whether width and height make a 2:1 photo (height = width/2 within RATIO_TOLERANCE).
+     * Whether a stored image is shaped like a 360° photo: a JPEG, PNG or WebP image at least
+     * LISTED_MIN_RATIO times as wide as it is high (no other checks).
      *
-     * @param int $width
-     * @param int $height
-     * @return bool
-     */
-    public static function is_ratio(int $width, int $height): bool {
-        if ($width <= 0 || $height <= 0) {
-            return false;
-        }
-        $half = $width / 2;
-        return abs($height - $half) <= $half * self::RATIO_TOLERANCE;
-    }
-
-    /**
-     * Whether a stored image file has the 2:1 shape of a 360° photo (no other checks).
+     * Only used to offer an uploaded image as a 360° photo; any shape may be used as one.
      *
      * @param \stored_file $file
      * @return bool
@@ -218,7 +207,9 @@ final class panorama {
             return false;
         }
         $info = self::image_info($file);
-        return is_array($info) && self::is_ratio((int)($info['width'] ?? 0), (int)($info['height'] ?? 0));
+        $width = (int)($info['width'] ?? 0);
+        $height = (int)($info['height'] ?? 0);
+        return is_array($info) && $height > 0 && $width >= $height * self::LISTED_MIN_RATIO;
     }
 
     /**

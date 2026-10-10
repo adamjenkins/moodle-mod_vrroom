@@ -28,7 +28,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    buildEnvironment, buildPanoramaPlaceholder, choosePanoramaUrl, PANORAMA_RADIUS,
+    buildEnvironment, buildPanoramaPlaceholder, choosePanoramaUrl, PANORAMA_RADIUS, panoramaSpan,
 } from '../../runtime/builtin/amd/src/environment.js';
 import {buildPortalMarker, PORTAL_MARKER_RADIUS} from '../../runtime/builtin/amd/src/markers.js';
 import {layoutKey} from '../../runtime/builtin/amd/src/spawn.js';
@@ -142,6 +142,44 @@ test('the centre of the photo is straight ahead; its left quarter is to the left
     const expected = placementPosition(90, 0, 1);
     assert.ok(Math.abs(centre.x - expected[0]) < 0.01 && Math.abs(centre.z - expected[2]) < 0.01,
         `centre at ${centre.toArray()}`);
+});
+
+test('a photo of any shape is shown: 2:1 or narrower fills the sphere, a wider one is a band round the horizon', async() => {
+    assert.equal(panoramaSpan(4096, 2048), 180);
+    assert.equal(panoramaSpan(1024, 1024), 180);
+    assert.equal(panoramaSpan(8000, 1000), 45);
+    assert.equal(panoramaSpan(0, 0), 180);
+
+    const shaped = async(width, height) => {
+        const loader = {loadAsync: () => {
+            const texture = new THREE.Texture();
+            texture.image = {width, height};
+            return Promise.resolve(texture);
+        }};
+        return (await buildEnvironment(THREE, {type: 'panorama', file: FILE}, null, null,
+            {textureloader: loader, phone: false})).panorama;
+    };
+    const heights = (sphere) => {
+        const pos = sphere.geometry.attributes.position;
+        let top = -Infinity;
+        let bottom = Infinity;
+        for (let i = 0; i < pos.count; i++) {
+            top = Math.max(top, pos.getY(i));
+            bottom = Math.min(bottom, pos.getY(i));
+        }
+        return [top, bottom];
+    };
+    const full = heights(await shaped(2048, 1024));
+    assert.ok(Math.abs(full[0] - PANORAMA_RADIUS) < 1e-6 && Math.abs(full[1] + PANORAMA_RADIUS) < 1e-6);
+    const square = heights(await shaped(1024, 1024));
+    assert.ok(Math.abs(square[0] - PANORAMA_RADIUS) < 1e-6);
+    // 8000 x 1000 covers 45°: from 22.5° above the horizon to 22.5° below it.
+    const band = await shaped(8000, 1000);
+    const [top, bottom] = heights(band);
+    const edge = PANORAMA_RADIUS * Math.sin(22.5 * Math.PI / 180);
+    assert.ok(Math.abs(top - edge) < 1e-6, `top ${top}`);
+    assert.ok(Math.abs(bottom + edge) < 1e-6, `bottom ${bottom}`);
+    assert.ok(band.material.map);
 });
 
 test('a photo that fails to load is rejected, and the placeholder keeps a plain sky (no hall)', async() => {

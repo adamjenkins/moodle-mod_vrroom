@@ -77,14 +77,15 @@ final class panorama_test extends \advanced_testcase {
     }
 
     /**
-     * check(): type, 2:1 within 2%, width from 1024 to the maximum, file size.
+     * check(): type, width from 1024 to the maximum, file size; any shape is accepted.
      */
     public function test_check(): void {
         $this->resetAfterTest();
         $this->assertNull(panorama::check(self::store('ok.jpg', panorama_test_image::make(2048, 1024))));
         $this->assertNull(panorama::check(self::store('ok.png', panorama_test_image::make(2048, 1040, 'png'))));
-        $this->assertSame('panoramabadratio', panorama::check(self::store('wide.jpg', panorama_test_image::make(2048, 1000))));
-        $this->assertSame('panoramabadratio', panorama::check(self::store('square.jpg', panorama_test_image::make(1024, 1024))));
+        $this->assertNull(panorama::check(self::store('wide.jpg', panorama_test_image::make(2048, 1000))));
+        $this->assertNull(panorama::check(self::store('square.jpg', panorama_test_image::make(1024, 1024))));
+        $this->assertNull(panorama::check(self::store('band.jpg', panorama_test_image::make(4096, 700))));
         $this->assertSame('panoramatoosmall', panorama::check(self::store('small.jpg', panorama_test_image::make(1000, 500))));
         $this->assertSame('panoramabadtype', panorama::check(self::store('notes.txt', 'Just text')));
         $this->assertSame('panoramabadtype', panorama::check(self::store('fake.jpg', 'not really a photo')));
@@ -97,10 +98,23 @@ final class panorama_test extends \advanced_testcase {
         $this->assertNull(panorama::check_dimensions(1024, 512, 1048576));
 
         // Every result is a string of this plugin, and the message adds the site's limits.
-        foreach (['panoramabadtype', 'panoramabadratio', 'panoramatoolarge', 'panoramatoosmall', 'panoramatoobig'] as $key) {
+        foreach (['panoramabadtype', 'panoramatoolarge', 'panoramatoosmall', 'panoramatoobig'] as $key) {
             $this->assertTrue(get_string_manager()->string_exists($key, 'mod_vrroom'), $key);
         }
         $this->assertStringContainsString('1500', panorama::message('panoramatoolarge'));
+    }
+
+    /**
+     * has_ratio(): images at least 1.5 times as wide as high are offered as 360° photos.
+     */
+    public function test_has_ratio(): void {
+        $this->resetAfterTest();
+        $this->assertTrue(panorama::has_ratio(self::store('sphere.jpg', panorama_test_image::make(2048, 1024))));
+        $this->assertTrue(panorama::has_ratio(self::store('band.jpg', panorama_test_image::make(4096, 700))));
+        $this->assertTrue(panorama::has_ratio(self::store('near.png', panorama_test_image::make(1500, 1000, 'png'))));
+        $this->assertFalse(panorama::has_ratio(self::store('photo.jpg', panorama_test_image::make(1600, 1200))));
+        $this->assertFalse(panorama::has_ratio(self::store('fake.jpg', 'not a photo')));
+        $this->assertFalse(panorama::has_ratio(self::store('notes.txt', 'Just text')));
     }
 
     /**

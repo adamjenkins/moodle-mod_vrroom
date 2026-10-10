@@ -184,16 +184,22 @@ final class asset_upload_test extends \advanced_testcase {
     }
 
     /**
-     * A 360° photo of the wrong shape is refused in the form, and the draft file is removed.
+     * A 360° photo that is not 2:1 is accepted; one too small is refused in the form, and the draft file is removed.
      */
-    public function test_panorama_bad_ratio(): void {
+    public function test_panorama_shape_and_size(): void {
         $fx = $this->setup_activity();
         $this->setUser($fx->teacher);
-        $draftid = self::draft_with('square.jpg', panorama_test_image::make(1024, 1024));
+        $square = self::draft_with('square.jpg', panorama_test_image::make(1024, 1024));
+        $result = self::submit((int)$fx->module->cmid, 'panorama', $square);
+        $this->assertTrue($result['submitted']);
+        $this->assertSame('square.jpg', json_decode($result['data'], true)['filename']);
+        get_file_storage()->delete_area_files($fx->context->id, 'mod_vrroom', 'assets');
+
+        $draftid = self::draft_with('small.jpg', panorama_test_image::make(800, 400));
         $result = self::submit((int)$fx->module->cmid, 'panorama', $draftid);
         $this->assertFalse($result['submitted']);
         $this->assertStringContainsString(
-            get_string('panoramabadratio', 'mod_vrroom'),
+            get_string('panoramatoosmall', 'mod_vrroom'),
             html_entity_decode($result['html'], ENT_QUOTES)
         );
         $this->assertSame([], get_file_storage()->get_area_files($fx->context->id, 'mod_vrroom', 'assets', false, 'id', false));

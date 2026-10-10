@@ -24,7 +24,7 @@ use mod_vrroom\local\panorama;
  *
  * Shown by core_form/modalform from mod_vrroom/editor_assets. Each upload gets its own item id, so
  * the editor can refer to it and the save can delete it again when no room uses it. A 360° photo is
- * checked (2:1, size limits from the site settings) and gets its smaller copies beside it.
+ * checked (type and size limits from the site settings) and gets its smaller copies beside it.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -45,6 +45,13 @@ class asset_upload extends \core_form\dynamic_form {
         $mform->addElement('hidden', 'kind');
         $mform->setType('kind', PARAM_ALPHA);
 
+        if ($this->get_kind() === 'panorama') {
+            $limits = panorama::limits();
+            $mform->addElement('static', 'panoramahelp', '', get_string('panoramauploadhelp', 'mod_vrroom', (object)[
+                'maxwidth' => (int)$limits['maxwidth'],
+                'maxsize' => display_size((int)$limits['maxbytes']),
+            ]));
+        }
         $mform->addElement(
             'filemanager',
             'assetfile',
@@ -56,7 +63,7 @@ class asset_upload extends \core_form\dynamic_form {
     }
 
     /**
-     * A model that is not a real binary glTF 2.0 file, or a 360° photo of the wrong shape or size, is a
+     * A model that is not a real binary glTF 2.0 file, or a 360° photo of the wrong type or size, is a
      * field error, shown in the form. A refused photo is removed from the draft area.
      *
      * @param array $data Submitted data.

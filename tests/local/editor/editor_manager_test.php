@@ -867,7 +867,7 @@ final class editor_manager_test extends \advanced_testcase {
     }
 
     /**
-     * A 360° photo room saves when its photo is 2:1 and within the limits, and its runtime keys are stripped.
+     * A 360° photo room saves when its photo is within the limits (of any shape), and its runtime keys are stripped.
      */
     public function test_panorama_environment(): void {
         $fx = $this->setup_activity();
@@ -898,24 +898,18 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertArrayNotHasKey('url', $stored['environment']['file']);
         $this->assertSame(12, $stored['environment']['northoffset']);
 
-        // A photo of the wrong shape is refused with the room's name and the reason.
+        // A photo wider than the site allows is refused with the room's name and the reason.
         $document = $this->load_document($fx);
+        set_config('panomaxwidth', 1500, 'mod_vrroom');
+        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s(get_string('panoramatoolarge', 'mod_vrroom')));
+        $this->assertNotNull($photo);
+
+        // A photo that is not 2:1 is fine.
         self::store_file($fx->context, 'environment', 2, 'square.jpg', 'mod_vrroom', panorama_test_image::make(1024, 1024));
         $document['scenes'][0]['environment']['file'] = ['area' => 'environment', 'itemid' => 2, 'filepath' => '/',
             'filename' => 'square.jpg'];
-        $this->assert_save_fails(
-            $fx,
-            $document,
-            'erroreditorinvalid',
-            s(get_string('panoramabadratio', 'mod_vrroom'))
-        );
-
-        // So is a photo wider than the site allows.
-        set_config('panomaxwidth', 1500, 'mod_vrroom');
-        $document['scenes'][0]['environment']['file']['itemid'] = 1;
-        $document['scenes'][0]['environment']['file']['filename'] = 'yard.jpg';
-        $this->assert_save_fails($fx, $document, 'erroreditorinvalid', s(get_string('panoramatoolarge', 'mod_vrroom')));
-        $this->assertNotNull($photo);
+        $this->assertTrue($this->save_document($fx, $document)['scenesupdated']);
+        $this->assertSame('square.jpg', instance_manager::get_scenes($fx->vrroomid)[0]['environment']['file']['filename']);
     }
 
     /**
@@ -930,13 +924,14 @@ final class editor_manager_test extends \advanced_testcase {
         $dropped = self::store_file($fx->context, 'assets', 2, 'hall.jpg', 'mod_vrroom', panorama_test_image::make(2048, 1024));
         $this->assertSame(['desktop', 'mobile'], panorama::make_variants($dropped));
         self::store_file($fx->context, 'assets', 3, 'map.png', 'mod_vrroom', panorama_test_image::make(64, 64, 'png'));
-        // 2:1 without copies (an uploaded image) still counts as a 360° photo.
-        self::store_file($fx->context, 'environment', 4, 'flat.png', 'mod_vrroom', panorama_test_image::make(1200, 600, 'png'));
+        // An image in the environment area counts as a 360° photo, whatever its shape; a wide one without copies does too.
+        self::store_file($fx->context, 'environment', 4, 'flat.png', 'mod_vrroom', panorama_test_image::make(1200, 900, 'png'));
+        self::store_file($fx->context, 'assets', 5, 'band.png', 'mod_vrroom', panorama_test_image::make(1600, 400, 'png'));
 
         $assets = editor_manager::list_assets($fx->context);
         $names = array_column($assets, 'filename');
         // Areas in editor_manager::AREAS order (environment before assets).
-        $this->assertSame(['flat.png', 'yard.jpg', 'hall.jpg', 'map.png'], $names);
+        $this->assertSame(['flat.png', 'yard.jpg', 'hall.jpg', 'map.png', 'band.png'], $names);
         $this->assertNotContains('desktop.jpg', $names);
         $this->assertNotContains('mobile.jpg', $names);
         $byname = array_combine($names, $assets);
@@ -944,6 +939,7 @@ final class editor_manager_test extends \advanced_testcase {
         $this->assertTrue($byname['yard.jpg']['panorama']);
         $this->assertTrue($byname['hall.jpg']['panorama']);
         $this->assertTrue($byname['flat.png']['panorama']);
+        $this->assertTrue($byname['band.png']['panorama']);
         $this->assertArrayNotHasKey('panorama', $byname['map.png']);
 
         // Save a photo room on the kept photo: the other uploads go, the kept photo's copies stay.

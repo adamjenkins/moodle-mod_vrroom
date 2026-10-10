@@ -291,6 +291,41 @@ const northOffset = (env) => {
 };
 
 /**
+ * How many degrees from top to bottom a photo covers, taking its width as the full 360°.
+ *
+ * A 2:1 photo covers 180° (the whole sphere). A wider one, such as a phone's panorama, covers less:
+ * it is shown as a band around the horizon. A narrower one is stretched over the whole sphere.
+ *
+ * @param {number} width Pixels.
+ * @param {number} height Pixels.
+ * @returns {number} Degrees, more than 0 and at most 180.
+ */
+export const panoramaSpan = (width, height) => {
+    const w = Number(width);
+    const h = Number(height);
+    if (!(w > 0) || !(h > 0)) {
+        return 180;
+    }
+    return Math.min(180, 360 * h / w);
+};
+
+/**
+ * The sphere geometry of a photo covering span degrees from top to bottom, centred on the horizon.
+ *
+ * @param {Object} THREE three.js namespace.
+ * @param {number} span Degrees, from panoramaSpan().
+ * @returns {Object} THREE.SphereGeometry
+ */
+const panoramaGeometry = (THREE, span) => {
+    if (span >= 180) {
+        return new THREE.SphereGeometry(PANORAMA_RADIUS, 64, 32);
+    }
+    const length = span * Math.PI / 180;
+    const rows = Math.max(2, Math.round(32 * span / 180));
+    return new THREE.SphereGeometry(PANORAMA_RADIUS, 64, rows, 0, Math.PI * 2, (Math.PI - length) / 2, length);
+};
+
+/**
  * The sphere a panorama is drawn on, without its photo yet (plain sky colour).
  *
  * The geometry is mirrored on x (mesh scale −1) and seen from inside (BackSide), so the photo is
@@ -365,6 +400,13 @@ const buildPanorama = (THREE, env, resolveUrl, options) => {
         texture.magFilter = THREE.LinearFilter;
         texture.needsUpdate = true;
         const result = buildPanoramaPlaceholder(THREE, env);
+        const image = texture.image || {};
+        const span = panoramaSpan(image.naturalWidth || image.width, image.naturalHeight || image.height);
+        if (span < 180) {
+            // Wider than 2:1: a band around the horizon; above and below it the sky colour shows.
+            result.panorama.geometry.dispose();
+            result.panorama.geometry = panoramaGeometry(THREE, span);
+        }
         const material = result.panorama.material;
         material.map = texture;
         material.color.set(0xffffff);
