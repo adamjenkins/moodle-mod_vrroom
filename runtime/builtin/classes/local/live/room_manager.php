@@ -486,10 +486,15 @@ final class room_manager {
     /**
      * The other fresh peers of a peer's room (activity, group and room number), with names made on the server.
      *
+     * How each person looks comes from the listeners of \mod_vrroom\hook\avatar_appearance (such as
+     * local_avatar), dispatched once for the whole list: 'appearance' is the JSON of the appearance
+     * document and 'picture' the profile picture URL, both '' when no listener set them ("today's look").
+     *
      * @param \stdClass $peer The peer whose room it is.
      * @param \context_module $context Module context.
      * @param int $now Current time.
-     * @return array list of ['peerid' => string, 'name' => string, 'kind' => string]
+     * @return array list of ['peerid' => string, 'name' => string, 'kind' => string, 'appearance' => string,
+     *     'picture' => string]
      */
     public static function roster(\stdClass $peer, \context_module $context, int $now): array {
         global $DB;
@@ -511,15 +516,48 @@ final class room_manager {
             'fresh' => $now - self::STALE_AFTER,
         ]));
         $viewfullnames = has_capability('moodle/site:viewfullnames', $context, (int)$peer->userid);
+        $looks = self::appearances($rows, $context);
         $roster = [];
         foreach ($rows as $row) {
+            $peerid = (string)$row->peerid;
             $roster[] = [
-                'peerid' => (string)$row->peerid,
+                'peerid' => $peerid,
                 'name' => fullname($row, $viewfullnames),
                 'kind' => (string)$row->kind,
+                'appearance' => $looks[$peerid]['appearance'] ?? '',
+                'picture' => $looks[$peerid]['picture'] ?? '',
             ];
         }
         return $roster;
+    }
+
+    /**
+     * Ask the avatar_appearance listeners how the listed people look (one dispatch for all of them).
+     *
+     * @param array $rows Presence rows with peerid and userid.
+     * @param \context_module $context Module context.
+     * @return array<string, array{appearance: string, picture: string}> peerid => JSON of the document and picture URL
+     */
+    public static function appearances(array $rows, \context_module $context): array {
+        if (!$rows) {
+            return [];
+        }
+        $peers = [];
+        foreach ($rows as $row) {
+            $peers[] = ['peerid' => (string)$row->peerid, 'userid' => (int)$row->userid];
+        }
+        $hook = new \mod_vrroom\hook\avatar_appearance($peers, $context);
+        \core\di::get(\core\hook\manager::class)->dispatch($hook);
+
+        $looks = [];
+        foreach ($hook->get_appearances() as $peerid => $look) {
+            $json = $look['appearance'] ? json_encode($look['appearance'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '';
+            $looks[(string)$peerid] = [
+                'appearance' => is_string($json) ? $json : '',
+                'picture' => (string)$look['picture'],
+            ];
+        }
+        return $looks;
     }
 
     /**

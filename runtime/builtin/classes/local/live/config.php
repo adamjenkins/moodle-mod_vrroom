@@ -17,7 +17,7 @@
 namespace vrroomruntime_builtin\local\live;
 
 /**
- * Site settings of live mode: whether it is on, the STUN and TURN servers, TURN credentials.
+ * Site settings of live mode: whether it is on, webcams, the STUN and TURN servers, TURN credentials.
  *
  * TURN credentials follow the TURN REST API scheme: the username is "<expiry>:<peer id>" and the
  * credential is base64(HMAC-SHA1(secret, username)). The shared secret never leaves the server.
@@ -53,6 +53,30 @@ final class config {
             return true;
         }
         return (bool)(int)$value;
+    }
+
+    /**
+     * Whether webcams are allowed in live rooms on this site (on when the setting was never saved).
+     *
+     * @return bool
+     */
+    public static function video_allowed(): bool {
+        $value = get_config(self::COMPONENT, 'livevideo');
+        if ($value === false || $value === null) {
+            return true;
+        }
+        return (bool)(int)$value;
+    }
+
+    /**
+     * Whether people may turn on their webcam in an activity's live rooms: the site allows it and
+     * the activity's "Webcams in live rooms" is on (on for a row without the field).
+     *
+     * @param \stdClass $vrroom vrroom row.
+     * @return bool
+     */
+    public static function video_enabled(\stdClass $vrroom): bool {
+        return self::video_allowed() && (int)($vrroom->livevideo ?? 1) === 1;
     }
 
     /**

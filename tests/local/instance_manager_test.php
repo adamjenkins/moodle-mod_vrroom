@@ -441,6 +441,48 @@ final class instance_manager_test extends \advanced_testcase {
     }
 
     /**
+     * "Webcams in live rooms" is saved as 0 or 1 on add and on update (default on), and kept by an
+     * update without the live fields.
+     */
+    public function test_live_video_saved(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        $course = $this->getDataGenerator()->create_course();
+
+        $module = $this->getDataGenerator()->create_module('vrroom', [
+            'course' => $course->id,
+            'stationtitles' => 'Vase',
+            'livemode' => live_settings::MODE_FIXED,
+            'livevideo' => 5,
+        ]);
+        $vrroom = $DB->get_record('vrroom', ['id' => $module->id], '*', MUST_EXIST);
+        $this->assertEquals(1, $vrroom->livevideo);
+
+        $cm = get_coursemodule_from_instance('vrroom', $vrroom->id, $course->id, false, MUST_EXIST);
+        $data = self::form_data_for_update($vrroom, $cm);
+        $data->livevideo = 0;
+        instance_manager::update_instance($data);
+        $this->assertEquals(0, $DB->get_field('vrroom', 'livevideo', ['id' => $vrroom->id]));
+
+        // Without the live fields the stored value stays.
+        $data = self::form_data_for_update($DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST), $cm);
+        unset($data->livemode, $data->liverooms, $data->livemaxusers, $data->livevideo);
+        instance_manager::update_instance($data);
+        $this->assertEquals(0, $DB->get_field('vrroom', 'livevideo', ['id' => $vrroom->id]));
+
+        // With the live fields but no livevideo (a caller that does not know it): the stored value stays.
+        $data = self::form_data_for_update($DB->get_record('vrroom', ['id' => $vrroom->id], '*', MUST_EXIST), $cm);
+        unset($data->livevideo);
+        instance_manager::update_instance($data);
+        $this->assertEquals(0, $DB->get_field('vrroom', 'livevideo', ['id' => $vrroom->id]));
+
+        $data->livevideo = '1';
+        instance_manager::update_instance($data);
+        $this->assertEquals(1, $DB->get_field('vrroom', 'livevideo', ['id' => $vrroom->id]));
+    }
+
+    /**
      * A run mode that runs one live room only never gets "students open rooms": it is stored as
      * "On, fixed rooms" (the companion service relies on this), on add and on update.
      */

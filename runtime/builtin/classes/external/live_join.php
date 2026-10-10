@@ -134,6 +134,18 @@ class live_join extends external_api {
             'peerid' => new external_value(PARAM_ALPHANUM, 'Peer id'),
             'name' => new external_value(PARAM_TEXT, 'Plain full name, made by the server'),
             'kind' => new external_value(PARAM_ALPHA, 'attempt or preview'),
+            'appearance' => new external_value(
+                PARAM_RAW,
+                'JSON of the avatar appearance document (vrroom-avatar/1), \'\' for today\'s look',
+                VALUE_DEFAULT,
+                ''
+            ),
+            'picture' => new external_value(
+                PARAM_URL,
+                'Profile picture URL for the avatar badge, empty for none',
+                VALUE_DEFAULT,
+                ''
+            ),
         ]);
     }
 

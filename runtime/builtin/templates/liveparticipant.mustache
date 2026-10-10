@@ -17,8 +17,9 @@
 {{!
     @template vrroomruntime_builtin/liveparticipant
 
-    One person in the live room list: name, teacher badge, where they are, their microphone state,
-    a speaking indicator and, for the others, "Mute for me".
+    One person in the live room list: name, teacher badge, where they are, their microphone and camera
+    state, a speaking indicator and, for the others, "Mute for me" and (while their camera is on)
+    "Hide video for me".
 
     Classes required for JS:
     * vrroom-live-speaking - the speaking indicator, switched with vrroom-live-speaking-on
@@ -26,6 +27,7 @@
     Data attributes required for JS:
     * data-peerid - the presence the line is for
     * data-action vrroom-live-mutepeer - mute or unmute that person for me
+    * data-action vrroom-live-hidevideo - hide or show that person's video for me
 
     Context variables required for this template:
     * peerid - peer id (hex)
@@ -34,8 +36,12 @@
     * kindpreview - the person is a teacher in preview
     * where - where the person is, plain text
     * micstate - microphone state, plain text (may be empty)
+    * camstate - camera state, plain text (empty while the camera is off)
     * mutedforme - the person is muted for this user
     * mutelabel - label of the mute button, plain text
+    * video - show the "Hide video for me" button
+    * videohiddenforme - the person's video is hidden for this user
+    * videolabel - label of the hide video button, plain text
 
     Example context (json):
     {
@@ -45,8 +51,12 @@
         "kindpreview": true,
         "where": "In VR",
         "micstate": "Microphone on",
+        "camstate": "Camera on",
         "mutedforme": false,
-        "mutelabel": "Mute Alex Learner for me"
+        "mutelabel": "Mute Alex Learner for me",
+        "video": true,
+        "videohiddenforme": false,
+        "videolabel": "Hide video of Alex Learner for me"
     }
 }}
 <div class="vrroom-live-participant d-flex flex-wrap align-items-center gap-2 py-1" data-peerid="{{peerid}}">
@@ -55,7 +65,11 @@
     {{#kindpreview}}<span class="badge bg-secondary text-dark">{{#str}}livekindpreview, vrroomruntime_builtin{{/str}}</span>{{/kindpreview}}
     <span class="small text-muted">{{where}}</span>
     {{#micstate}}<span class="small">{{micstate}}</span>{{/micstate}}
+    {{#camstate}}<span class="small vrroom-live-camstate">{{camstate}}</span>{{/camstate}}
     {{^isself}}
     <button type="button" class="btn btn-link btn-sm p-0" data-action="vrroom-live-mutepeer" aria-pressed="{{#mutedforme}}true{{/mutedforme}}{{^mutedforme}}false{{/mutedforme}}">{{mutelabel}}</button>
+    {{#video}}
+    <button type="button" class="btn btn-link btn-sm p-0" data-action="vrroom-live-hidevideo" aria-pressed="{{#videohiddenforme}}true{{/videohiddenforme}}{{^videohiddenforme}}false{{/videohiddenforme}}">{{videolabel}}</button>
+    {{/video}}
     {{/isself}}
 </div>

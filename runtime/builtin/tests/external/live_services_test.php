@@ -46,6 +46,7 @@ final class live_services_test extends \advanced_testcase {
     public function test_round_trip(): void {
         global $DB;
         $this->resetAfterTest();
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::install(false);
         $this->configure_ice();
         [$cmid, $course, $vrroom] = $this->create_activity();
         [$a, $attempta] = $this->learner($course, $vrroom);
@@ -69,7 +70,10 @@ final class live_services_test extends \advanced_testcase {
 
         $this->setUser($b);
         $joinb = $this->join($cmid, (int)$attemptb->id);
-        $this->assertSame([['peerid' => $joina['peerid'], 'name' => fullname($a), 'kind' => 'attempt']], $joinb['peers']);
+        $this->assertSame(
+            [['peerid' => $joina['peerid'], 'name' => fullname($a), 'kind' => 'attempt', 'appearance' => '', 'picture' => '']],
+            $joinb['peers']
+        );
 
         $sent = external_api::clean_returnvalue(live_send::execute_returns(), live_send::execute($joinb['peerid'], [
             ['to' => $joina['peerid'], 'type' => 'candidates', 'payload' => self::CANDIDATES],
@@ -205,11 +209,48 @@ final class live_services_test extends \advanced_testcase {
     }
 
     /**
+     * Join and poll return each person's appearance and picture from the avatar_appearance listeners.
+     */
+    public function test_appearance_fields(): void {
+        $this->resetAfterTest();
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::install();
+        [$cmid, $course, $vrroom] = $this->create_activity();
+        [$a, $attempta] = $this->learner($course, $vrroom);
+        [$b, $attemptb] = $this->learner($course, $vrroom);
+        $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'slim', 'head' => 'square', 'color' => 'green', 'picture' => true];
+        $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
+        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($a, $doc, $picture): void {
+            foreach ($hook->get_peers() as $peer) {
+                if ($peer['userid'] === (int)$a->id) {
+                    $hook->set_appearance($peer['peerid'], $doc, $picture);
+                }
+            }
+        };
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::$callback = $callback;
+
+        $this->setUser($a);
+        $joina = $this->join($cmid, (int)$attempta->id);
+        $this->setUser($b);
+        $joinb = $this->join($cmid, (int)$attemptb->id);
+        $this->assertCount(1, $joinb['peers']);
+        $this->assertSame($doc, json_decode($joinb['peers'][0]['appearance'], true));
+        $this->assertSame($picture, $joinb['peers'][0]['picture']);
+
+        $this->setUser($a);
+        $poll = external_api::clean_returnvalue(live_poll::execute_returns(), live_poll::execute($joina['peerid'], false));
+        $this->assertSame([$joinb['peerid']], array_column($poll['peers'], 'peerid'));
+        $this->assertSame('', $poll['peers'][0]['appearance']);
+        $this->assertSame('', $poll['peers'][0]['picture']);
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::reset();
+    }
+
+    /**
      * A teacher may join a preview room; a full room is refused.
      */
     public function test_preview_and_full_room(): void {
         global $DB;
         $this->resetAfterTest();
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::install(false);
         [$cmid, $course, $vrroom] = $this->create_activity();
         $DB->set_field('vrroom', 'livemaxusers', 2, ['id' => $vrroom->id]);
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
@@ -222,7 +263,8 @@ final class live_services_test extends \advanced_testcase {
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
         $this->assertSame(
-            [['peerid' => $jointeacher['peerid'], 'name' => fullname($teacher), 'kind' => 'preview']],
+            [['peerid' => $jointeacher['peerid'], 'name' => fullname($teacher), 'kind' => 'preview', 'appearance' => '',
+                'picture' => '']],
             $joina['peers']
         );
 

@@ -19,7 +19,7 @@ namespace mod_vrroom\local;
 use vrroomruntime_builtin\local\live\access;
 
 /**
- * Tests for the live mode settings (mode, number of rooms) and the state the upgrade leaves.
+ * Tests for the live mode settings (mode, number of rooms, webcams) and the state the upgrade leaves.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -96,5 +96,39 @@ final class live_settings_test extends \advanced_testcase {
         $this->assertEquals(1, $vrroom->liverooms);
         $this->assertSame(1, access::max_rooms($vrroom));
         $this->assertSame('fixed', access::room_mode($vrroom));
+    }
+
+    /**
+     * clean_video() stores 0 or 1.
+     */
+    public function test_clean_video(): void {
+        $this->assertSame(1, live_settings::clean_video(1));
+        $this->assertSame(1, live_settings::clean_video('1'));
+        $this->assertSame(1, live_settings::clean_video(9));
+        $this->assertSame(0, live_settings::clean_video(0));
+        $this->assertSame(0, live_settings::clean_video('0'));
+        $this->assertSame(0, live_settings::clean_video(''));
+        $this->assertSame(0, live_settings::clean_video(null));
+    }
+
+    /**
+     * The upgrade adds vrroom.livevideo, not null with default 1, so existing activities allow webcams
+     * (the site setting decides too) and a new activity does as well.
+     */
+    public function test_livevideo_column(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $columns = $DB->get_columns('vrroom');
+        $this->assertArrayHasKey('livevideo', $columns);
+        $this->assertEquals(1, $columns['livevideo']->default_value);
+        $this->assertTrue($columns['livevideo']->not_null);
+
+        $course = $this->getDataGenerator()->create_course();
+        $module = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id, 'livemode' => 1]);
+        $this->assertEquals(1, $DB->get_field('vrroom', 'livevideo', ['id' => $module->id]));
+        $module = $this->getDataGenerator()->create_module('vrroom', ['course' => $course->id, 'livemode' => 1,
+            'livevideo' => 0]);
+        $this->assertEquals(0, $DB->get_field('vrroom', 'livevideo', ['id' => $module->id]));
     }
 }

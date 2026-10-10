@@ -55,6 +55,13 @@ if ($ADMIN->fulltree) {
         1
     ));
 
+    $settings->add(new admin_setting_configcheckbox(
+        'vrroomruntime_builtin/livevideo',
+        new lang_string('livevideo', 'vrroomruntime_builtin'),
+        new lang_string('livevideo_desc', 'vrroomruntime_builtin'),
+        1
+    ));
+
     $settings->add(new \vrroomruntime_builtin\admin\setting_iceurls(
         'vrroomruntime_builtin/livestunurls',
         new lang_string('livestunurls', 'vrroomruntime_builtin'),

@@ -18,7 +18,8 @@
     @template vrroomruntime_builtin/liveroom
 
     The live room panel of the built-in viewer: the notice about what joining shares (IP address
-    included), the group room choice, join and leave, the voice controls and the people in the room.
+    included), the group room choice, join and leave, the voice controls (with the Camera button and a
+    small self view when webcams are allowed) and the people in the room.
     With roomlist, the single Join button is replaced by the list of rooms
     (vrroomruntime_builtin/liveroomlist, rendered into vrroom-live-roomsbody by live/panel).
 
@@ -28,14 +29,16 @@
     Data attributes required for JS:
     * data-region: vrroom-live-notice, vrroom-live-group, vrroom-live-status, vrroom-live-voice, vrroom-live-ptt,
       vrroom-live-insecure, vrroom-live-people, vrroom-live-participants, vrroom-live-count, vrroom-live-current,
-      vrroom-live-rooms, vrroom-live-roomsheading, vrroom-live-roomsbody
-    * data-action: vrroom-live-join, vrroom-live-leave, vrroom-live-mic, vrroom-live-mute, vrroom-live-talk
+      vrroom-live-rooms, vrroom-live-roomsheading, vrroom-live-roomsbody, vrroom-live-camcontrol, vrroom-live-selfview
+    * data-action: vrroom-live-join, vrroom-live-leave, vrroom-live-mic, vrroom-live-mute, vrroom-live-talk,
+      vrroom-live-cam
 
     Context variables required for this template:
     * cmid - course module id
     * canjoin - the user can join a room
     * nogroup - the user is in no group of the activity, so there is no room for them
     * secure - the page may use the microphone (a secure context)
+    * video - webcams are allowed in this room (site and activity setting)
     * hasgroups - the activity has group rooms to choose from
     * groups - [{id, name, selected}] the group rooms the user may join
     * maxpeers - most people in one room
@@ -49,6 +52,7 @@
         "canjoin": true,
         "nogroup": false,
         "secure": true,
+        "video": true,
         "hasgroups": true,
         "groups": [{"id": 7, "name": "Group A", "selected": true}, {"id": 8, "name": "Group B", "selected": false}],
         "maxpeers": 6,
@@ -58,7 +62,7 @@
     }
 }}
 <h3 class="h5" id="vrroom-liveroom-heading-{{cmid}}">{{#str}}liveroom, vrroomruntime_builtin{{/str}}</h3>
-<p class="small" data-region="vrroom-live-notice">{{#notice}}{{notice}}{{/notice}}{{^notice}}{{#str}}livenotice, vrroomruntime_builtin{{/str}}{{/notice}}</p>
+<p class="small" data-region="vrroom-live-notice">{{#notice}}{{notice}}{{/notice}}{{^notice}}{{#video}}{{#str}}livenoticevideo, vrroomruntime_builtin{{/str}}{{/video}}{{^video}}{{#str}}livenotice, vrroomruntime_builtin{{/str}}{{/video}}{{/notice}}</p>
 {{#nogroup}}
 <p class="alert alert-info">{{#str}}livenogroup, vrroomruntime_builtin{{/str}}</p>
 {{/nogroup}}
@@ -100,6 +104,10 @@
             <label class="form-check-label" for="vrroom-live-ptt-{{cmid}}">{{#str}}livepushtotalk, vrroomruntime_builtin{{/str}}</label>
         </div>
         <button type="button" class="btn btn-outline-secondary btn-sm d-none" data-action="vrroom-live-talk" aria-pressed="false">{{#str}}liveholdtotalk, vrroomruntime_builtin{{/str}}</button>
+        <span class="vrroom-live-camcontrol d-inline-flex align-items-center gap-2{{^video}} d-none{{/video}}" data-region="vrroom-live-camcontrol">
+            <button type="button" class="btn btn-outline-primary btn-sm" data-action="vrroom-live-cam" aria-pressed="false">{{#str}}livecamoff, vrroomruntime_builtin{{/str}}</button>
+            <video class="vrroom-live-selfview d-none" data-region="vrroom-live-selfview" muted autoplay playsinline aria-label="{{#str}}liveselfview, vrroomruntime_builtin{{/str}}"></video>
+        </span>
     </div>
     {{/secure}}
     {{^secure}}

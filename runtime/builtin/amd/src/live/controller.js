@@ -14,8 +14,9 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * The live room of one launch: joins and leaves through a transport, runs the voice chat and the
- * panel, and passes poses and states between the transport and the avatar layer of the viewer.
+ * The live room of one launch: joins and leaves through a transport, runs the voice chat, the
+ * webcams and the panel, and passes poses, states and videos between the transport and the avatar
+ * layer of the viewer (the layer registers with attachVideoSink() to get setVideo/setLocalVideo).
  *
  * Only the transport interface (live/transport) is used, so another transport (Phase 4) can be
  * chosen by config.live.transport without changing the avatars, the voice or the panel.
@@ -35,6 +36,7 @@ import {createVoice} from 'vrroomruntime_builtin/live/voice';
 import {fetchRooms} from 'vrroomruntime_builtin/live/signalling';
 import {createPanel} from 'vrroomruntime_builtin/live/panel';
 import {attemptEnded, roomRemoved, listCapacity, mutePeerOf} from 'vrroomruntime_builtin/live/roomstatus';
+import {cameraErrorReason, peerActionOf} from 'vrroomruntime_builtin/live/videostate';
 import {region, announce, plainText, startScene} from 'vrroomruntime_builtin/util';
 
 /** Strings of the live room (all in vrroomruntime_builtin). */
@@ -49,7 +51,21 @@ const STRINGS = [
     'livereplaced', 'liveroomslistfailed', 'liveunmute', 'liveunmutepeer', 'livewhere3d', 'livewherear',
     'livewherelist', 'livewheremr', 'livewhereroom', 'livewherevr', 'liveyou',
     'liveoff', 'liveattemptended', 'liveroomremoved',
+    'livecambusy', 'livecamdenied', 'livecamerror', 'livecaminsecure', 'livecamnone', 'livecamoff', 'livecamon',
+    'livecamstate_on', 'livehidevideopeer', 'liveshowvideopeer',
 ];
+
+/** Camera failure reasons (live/videostate cameraErrorReason) → strings. */
+const CAMERA_FAILURES = {
+    insecure: 'livecaminsecure',
+    denied: 'livecamdenied',
+    nocamera: 'livecamnone',
+    busy: 'livecambusy',
+    error: 'livecamerror',
+};
+
+/** Per-person buttons whose focus is kept when the list of people is drawn again. */
+const PEER_ACTIONS = ['vrroom-live-mutepeer', 'vrroom-live-hidevideo'];
 
 /** Transports by config.live.transport. */
 const TRANSPORTS = {
@@ -170,7 +186,11 @@ class LiveController extends Emitter {
         this.liveconfig = config.live;
         this.transport = null;
         this.unbind = [];
-        this.voice = createVoice(null);
+        // Webcams: allowed by the site and the activity (live config 'video', contract 4).
+        this.videoallowed = this.liveconfig.video === true;
+        this.voice = createVoice(null, {video: this.videoallowed});
+        // Who shows the videos (the avatar layer): {setVideo(peerid, stream|null), setLocalVideo(stream|null)}.
+        this.videosinks = new Set();
         this.panel = null;
         this.strings = {};
         this.joined = false;
@@ -213,8 +233,25 @@ class LiveController extends Emitter {
             this.updateVoiceControls();
             this.scheduleRefresh();
         });
+        this.voice.on('camstate', (detail) => {
+            const stream = detail && detail.stream ? detail.stream : null;
+            this.sendState();
+            this.updateVoiceControls();
+            this.scheduleRefresh();
+            this.videosinks.forEach((sink) => this.callSink(sink, 'setLocalVideo', [stream]));
+            if (this.panel) {
+                this.panel.setSelfVideo(stream);
+            }
+        });
+        this.voice.on('video', (detail) => {
+            const stream = detail.stream || null;
+            this.videosinks.forEach((sink) => this.callSink(sink, 'setVideo', [detail.peerid, stream]));
+            this.emit('video', {peerid: detail.peerid, stream: stream});
+        });
 
         this.onPageHide = () => {
+            // The camera light goes out with the page.
+            this.voice.disableCam();
             if (this.transport && (this.joined || this.joining)) {
                 try {
                     this.transport.leaveOnUnload();
@@ -307,6 +344,8 @@ class LiveController extends Emitter {
             ptt: (on) => this.setPushToTalk(on),
             talk: (on) => this.talk(on),
             mutepeer: (peerid) => this.toggleMutePeer(peerid),
+            cam: () => this.toggleCam(),
+            hidevideo: (peerid) => this.toggleHideVideo(peerid),
         };
         return getStrings(STRINGS.map((key) => ({key: key, component: 'vrroomruntime_builtin'}))).then((values) => {
             STRINGS.forEach((key, i) => {
@@ -316,6 +355,7 @@ class LiveController extends Emitter {
                 cmid: Number(this.liveconfig.cmid) || 0,
                 live: this.liveconfig,
                 secure: this.voice.canSend(),
+                video: this.videoallowed,
                 str: (key, a) => this.str(key, a),
                 handlers: handlers,
             });
@@ -673,6 +713,56 @@ class LiveController extends Emitter {
     }
 
     /**
+     * Register who shows the videos: the avatar layer, with setVideo(peerid, stream|null) for the
+     * face screens of the others' avatars and setLocalVideo(stream|null) for an optional self view.
+     * The videos shown now are handed over at once.
+     *
+     * @param {Object} sink {setVideo, setLocalVideo} (either may be missing).
+     * @returns {Function} Call it to unregister.
+     */
+    attachVideoSink(sink) {
+        if (!sink || this.destroyed) {
+            return () => undefined;
+        }
+        this.videosinks.add(sink);
+        this.voice.getShownVideos().forEach((video) => this.callSink(sink, 'setVideo', [video.peerid, video.stream]));
+        const local = this.voice.getLocalVideo();
+        if (local) {
+            this.callSink(sink, 'setLocalVideo', [local]);
+        }
+        return () => {
+            this.videosinks.delete(sink);
+        };
+    }
+
+    /**
+     * Call a method of a video sink, reporting (not throwing) its errors.
+     *
+     * @param {Object} sink The sink.
+     * @param {string} name Method name.
+     * @param {Array} args Arguments.
+     */
+    callSink(sink, name, args) {
+        if (!sink || typeof sink[name] !== 'function') {
+            return;
+        }
+        try {
+            sink[name](...args);
+        } catch (e) {
+            window.console.error(e);
+        }
+    }
+
+    /**
+     * Whether webcams can be used in the room joined (or to be joined).
+     *
+     * @returns {boolean}
+     */
+    isVideoAllowed() {
+        return this.videoallowed && this.voice.isVideoAllowed();
+    }
+
+    /**
      * Leave and release everything (finish, page unload).
      *
      * @returns {Promise}
@@ -693,6 +783,7 @@ class LiveController extends Emitter {
         return leaving.catch(() => undefined).then(() => {
             this.teardown('');
             this.voice.dispose();
+            this.videosinks.clear();
             if (this.panel) {
                 this.panel.destroy();
                 this.panel = null;
@@ -795,6 +886,7 @@ class LiveController extends Emitter {
             if (this.transport && this.transport.capabilities && this.transport.capabilities.voice === false) {
                 this.panel.setVoiceAvailable(false);
             }
+            this.panel.setVideoAvailable(this.isVideoAllowed());
             if (this.roomlist) {
                 this.panel.setCurrentRoom(this.roomname ? this.str('livecurrentroom', this.roomname) : '');
             }
@@ -969,7 +1061,9 @@ class LiveController extends Emitter {
         this.transport = null;
         this.unbindTransport();
         this.voice.disableMic();
+        this.voice.disableCam();
         this.voice.setTransport(null);
+        this.voice.clearVideos();
         this.joined = false;
         this.joining = false;
         delete this.root.dataset.vrroomLive;
@@ -1088,26 +1182,32 @@ class LiveController extends Emitter {
         } else if (detail.channel === 'state') {
             const previous = this.peerstates.get(peerid);
             this.peerstates.set(peerid, message);
+            this.voice.setPeerCam(peerid, message.cam === true);
             this.emit('peerstate', {peerid: peerid, state: message});
-            if (!previous || previous.m !== message.m || previous.sc !== message.sc || previous.mic !== message.mic) {
+            if (!previous || previous.m !== message.m || previous.sc !== message.sc || previous.mic !== message.mic
+                    || !!previous.cam !== !!message.cam) {
                 this.scheduleRefresh();
             }
         }
     }
 
     /**
-     * Send the own state (mode, room, microphone) to everyone.
+     * Send the own state (mode, room, microphone, camera) to everyone.
      */
     sendState() {
         if (!this.joined || !this.transport) {
             return;
         }
-        this.transport.broadcast('state', {
+        const state = {
             t: 's',
             m: this.mode,
             sc: this.mode === 'list' ? '' : this.sceneid,
             mic: this.voice.getMicState(),
-        });
+        };
+        if (this.voice.getCamState() === 'on') {
+            state.cam = true;
+        }
+        this.transport.broadcast('state', state);
     }
 
     /**
@@ -1172,6 +1272,55 @@ class LiveController extends Emitter {
             this.updateVoiceControls();
             pending.resolve();
         });
+    }
+
+    /**
+     * Turn the own camera on or off (the Camera button). The video fades in and out on the own
+     * avatar for the others; nothing reconnects.
+     */
+    toggleCam() {
+        if (!this.joined || !this.isVideoAllowed()) {
+            return;
+        }
+        if (this.voice.getCamState() !== 'off') {
+            this.voice.disableCam();
+            return;
+        }
+        const pending = new Pending('vrroomruntime_builtin/live/controller:cam');
+        if (this.panel) {
+            this.panel.setCamBusy(true);
+        }
+        this.voice.enableCam().then(() => {
+            if (!this.joined) {
+                // Left while the browser asked for permission.
+                this.voice.disableCam();
+            }
+            return undefined;
+        }).catch((error) => {
+            this.statuskey = '';
+            if (this.panel) {
+                this.panel.setStatus(this.str(CAMERA_FAILURES[cameraErrorReason(error)] || 'livecamerror'));
+            }
+        }).finally(() => {
+            if (this.panel) {
+                this.panel.setCamBusy(false);
+            }
+            this.updateVoiceControls();
+            pending.resolve();
+        });
+    }
+
+    /**
+     * Hide or show one person's video for me (their avatar shows the designed face instead).
+     *
+     * @param {string} peerid Peer id.
+     */
+    toggleHideVideo(peerid) {
+        if (!peerid || !this.names.has(peerid) || !this.videoallowed) {
+            return;
+        }
+        this.voice.setPeerVideoHidden(peerid, !this.voice.isPeerVideoHidden(peerid));
+        this.scheduleRefresh();
     }
 
     /**
@@ -1250,6 +1399,7 @@ class LiveController extends Emitter {
             micstate: this.voice.getMicState(),
             muted: this.voice.isMuted(),
             ptt: this.voice.isPushToTalk(),
+            camstate: this.voice.getCamState(),
         });
     }
 
@@ -1308,8 +1458,12 @@ class LiveController extends Emitter {
                 kindpreview: self.kind === 'preview',
                 where: this.whereText(this.mode, this.sceneid),
                 micstate: this.micText(this.voice.getMicState()),
+                camstate: this.voice.getCamState() === 'on' ? this.str('livecamstate_on') : '',
                 mutedforme: false,
                 mutelabel: '',
+                video: false,
+                videohiddenforme: false,
+                videolabel: '',
             });
         }
         this.transport.getPeers().forEach((peer) => {
@@ -1328,6 +1482,8 @@ class LiveController extends Emitter {
                 where = this.str('liveconnecting');
             }
             const muted = this.voice.isPeerMuted(peer.peerid);
+            const camon = this.videoallowed && !!(state && peer.connected && state.cam === true);
+            const hidden = this.voice.isPeerVideoHidden(peer.peerid);
             list.push({
                 peerid: peer.peerid,
                 name: name,
@@ -1335,8 +1491,13 @@ class LiveController extends Emitter {
                 kindpreview: peer.kind === 'preview',
                 where: where,
                 micstate: state && peer.connected ? this.micText(state.mic) : '',
+                camstate: camon ? this.str('livecamstate_on') : '',
                 mutedforme: muted,
                 mutelabel: this.str(muted ? 'liveunmutepeer' : 'livemutepeer', name),
+                // "Hide video for me" while their camera is on, and while hidden (so it can be undone).
+                video: this.videoallowed && (camon || hidden),
+                videohiddenforme: hidden,
+                videolabel: this.str(hidden ? 'liveshowvideopeer' : 'livehidevideopeer', name),
             });
         });
         return list;
@@ -1363,9 +1524,9 @@ class LiveController extends Emitter {
                 release();
                 return;
             }
-            const focused = this.focusedMutePeer();
+            const focused = this.focusedPeerAction();
             this.panel.setParticipants(this.participants()).then(() => {
-                this.refocusMutePeer(focused);
+                this.refocusPeerAction(focused);
                 return undefined;
             }).catch(Notification.exception).finally(release);
         }, 100);
@@ -1400,6 +1561,48 @@ class LiveController extends Emitter {
         // The peer id is 32 hex characters (checked by mutePeerOf), safe in a selector.
         const button = container
             ? container.querySelector(`[data-peerid="${peerid}"] [data-action="vrroom-live-mutepeer"]`) : null;
+        if (button) {
+            button.focus();
+        }
+    }
+
+    /**
+     * The per-person button (mute or hide video for me) that has the keyboard focus, or null.
+     *
+     * @returns {{peerid: string, action: string}|null}
+     */
+    focusedPeerAction() {
+        const container = region(this.root, 'vrroom-liveroom');
+        const active = document.activeElement;
+        if (!container || !active || !container.contains(active)) {
+            return null;
+        }
+        const peerid = mutePeerOf(active);
+        return peerid ? {peerid: peerid, action: 'vrroom-live-mutepeer'} : peerActionOf(active, PEER_ACTIONS);
+    }
+
+    /**
+     * Give the focus back to a per-person button after the list was drawn again, when the focus
+     * was lost with the old button (and nothing else took it meanwhile).
+     *
+     * @param {{peerid: string, action: string}|null} focused From focusedPeerAction().
+     */
+    refocusPeerAction(focused) {
+        if (!focused) {
+            return;
+        }
+        if (focused.action === 'vrroom-live-mutepeer') {
+            this.refocusMutePeer(focused.peerid);
+            return;
+        }
+        const active = document.activeElement;
+        if (active && active !== document.body) {
+            return;
+        }
+        const container = region(this.root, 'vrroom-liveroom');
+        // The peer id is 32 hex characters and the action one of PEER_ACTIONS (peerActionOf), safe in a selector.
+        const button = container && PEER_ACTIONS.indexOf(focused.action) >= 0
+            ? container.querySelector(`[data-peerid="${focused.peerid}"] [data-action="${focused.action}"]`) : null;
         if (button) {
             button.focus();
         }

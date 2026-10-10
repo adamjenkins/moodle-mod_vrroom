@@ -46,8 +46,8 @@ use mod_vrroom\local\attempt\event_store;
  * Empty room: blank_environment (default gallery-hall).
  *
  * Live mode: livemode (default 0; 1 fixed rooms, 2 students open rooms), liverooms (default 1;
- * the number of rooms, or in mode 2 the most open at once, 0 = no limit) and livemaxusers
- * (default 6, per room).
+ * the number of rooms, or in mode 2 the most open at once, 0 = no limit), livemaxusers
+ * (default 6, per room) and livevideo (default 1, webcams in live rooms).
  *
  * Everything is turned into the template's own form fields (gallery_*, escape_*, blank_*),
  * exactly as the activity form would submit them.
@@ -73,6 +73,7 @@ class mod_vrroom_generator extends testing_module_generator {
             'livemode' => 0,
             'livemaxusers' => 6,
             'liverooms' => 1,
+            'livevideo' => 1,
         ];
         foreach ($defaults as $name => $value) {
             if (!isset($record->$name)) {

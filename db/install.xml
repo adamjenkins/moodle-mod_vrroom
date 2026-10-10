@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/vrroom/db" VERSION="2026100803" COMMENT="XMLDB file for Moodle mod/vrroom"
+<XMLDB PATH="mod/vrroom/db" VERSION="2026101000" COMMENT="XMLDB file for Moodle mod/vrroom"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -26,6 +26,7 @@
         <FIELD NAME="livemode" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="0 off, 1 on with a fixed number of rooms, 2 on with rooms students open; every person keeps their own attempt."/>
         <FIELD NAME="livemaxusers" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="6" SEQUENCE="false" COMMENT="Maximum people in one live room, 2 upwards; the run mode caps it at what it supports."/>
         <FIELD NAME="liverooms" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="Live rooms: in fixed mode the number of rooms (1-20); in dynamic mode the most rooms open at once (0 = no limit). In group mode per group."/>
+        <FIELD NAME="livevideo" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1" SEQUENCE="false" COMMENT="1 when people may turn on their webcam in live rooms (built-in run mode, also needs the site setting), 0 when not."/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

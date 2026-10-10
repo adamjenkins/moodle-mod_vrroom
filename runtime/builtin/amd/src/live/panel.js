@@ -16,7 +16,9 @@
 /**
  * The live room panel: notice, group room choice, join and leave (or, with several rooms per
  * activity, the list of rooms with their occupancy), voice controls and the list of the people in
- * the room. It only shows state and reports clicks; live/controller decides.
+ * the room, with the Camera button and a small self view when webcams are allowed. It only shows
+ * state and reports clicks; live/controller decides. The panel is moved into the viewport in
+ * fullscreen (stagebar), so the Camera button is there too.
  *
  * @module     vrroomruntime_builtin/live/panel
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -63,8 +65,8 @@ class Panel {
      * Constructor.
      *
      * @param {HTMLElement} container The vrroom-liveroom section.
-     * @param {Object} options {cmid, live, secure, str(key, a), handlers: {join(room), leave, mic, mute,
-     *     ptt, talk, mutepeer, groupchange}}
+     * @param {Object} options {cmid, live, secure, video, str(key, a), handlers: {join(room), leave, mic,
+     *     mute, ptt, talk, mutepeer, groupchange, cam, hidevideo}}
      */
     constructor(container, options) {
         this.container = container;
@@ -74,6 +76,8 @@ class Panel {
         this.rendered = false;
         this.joined = false;
         this.novoice = false;
+        this.video = !!options.video;
+        this.cambusy = false;
         this.busy = false;
         this.talking = false;
         this.listseq = 0;
@@ -97,6 +101,7 @@ class Panel {
             canjoin: !!live.canjoin,
             nogroup: live.reason === 'nogroup',
             secure: !!this.options.secure,
+            video: this.video,
             hasgroups: !!live.canjoin && groups.length > 0,
             groups: groups.map((g) => ({
                 id: Number(g.id) || 0,
@@ -155,6 +160,15 @@ class Panel {
             } else if (name === 'vrroom-live-mute') {
                 e.preventDefault();
                 this.call('mute');
+            } else if (name === 'vrroom-live-cam') {
+                e.preventDefault();
+                this.call('cam');
+            } else if (name === 'vrroom-live-hidevideo') {
+                e.preventDefault();
+                const item = button.closest('[data-peerid]');
+                if (item) {
+                    this.call('hidevideo', item.dataset.peerid);
+                }
             } else if (name === 'vrroom-live-mutepeer') {
                 e.preventDefault();
                 const item = button.closest('[data-peerid]');
@@ -253,6 +267,7 @@ class Panel {
         }
         if (!this.joined) {
             this.setTalking(false);
+            this.setSelfVideo(null);
             this.listseq++;
             part(this.container, 'vrroom-live-participants').textContent = '';
             this.setCurrentRoom('');
@@ -370,6 +385,69 @@ class Panel {
     }
 
     /**
+     * Show or hide the camera controls (hidden entirely when webcams are not allowed).
+     *
+     * @param {boolean} available Webcams can be used in this room.
+     */
+    setVideoAvailable(available) {
+        this.video = !!available;
+        if (!this.rendered) {
+            return;
+        }
+        const cam = part(this.container, 'vrroom-live-camcontrol');
+        if (cam) {
+            cam.classList.toggle('d-none', !this.video);
+        }
+        if (!this.video) {
+            this.setSelfVideo(null);
+        }
+    }
+
+    /**
+     * Disable the Camera button while the browser asks for the camera.
+     *
+     * @param {boolean} busy Busy.
+     */
+    setCamBusy(busy) {
+        this.cambusy = !!busy;
+        if (!this.rendered) {
+            return;
+        }
+        const cam = action(this.container, 'vrroom-live-cam');
+        if (cam) {
+            cam.disabled = this.cambusy;
+            cam.setAttribute('aria-busy', this.cambusy ? 'true' : 'false');
+        }
+    }
+
+    /**
+     * Show the own camera in the small self view, or hide it (null).
+     *
+     * @param {MediaStream|null} stream The own camera stream.
+     */
+    setSelfVideo(stream) {
+        if (!this.rendered) {
+            return;
+        }
+        const video = part(this.container, 'vrroom-live-selfview');
+        if (!video) {
+            return;
+        }
+        const show = !!stream && this.video;
+        try {
+            if (video.srcObject !== (show ? stream : null)) {
+                video.srcObject = show ? stream : null;
+            }
+        } catch (e) {
+            // No srcObject: no self view.
+        }
+        video.classList.toggle('d-none', !show);
+        if (show && typeof video.play === 'function') {
+            Promise.resolve(video.play()).catch(() => undefined);
+        }
+    }
+
+    /**
      * Disable the join and leave buttons while a join or leave runs.
      *
      * @param {boolean} busy Busy.
@@ -413,7 +491,7 @@ class Panel {
     /**
      * Show the own voice state on the controls.
      *
-     * @param {Object} state {micstate: 'off'|'on'|'muted', muted: bool, ptt: bool}
+     * @param {Object} state {micstate: 'off'|'on'|'muted', muted: bool, ptt: bool, camstate: 'off'|'on'}
      */
     setVoiceState(state) {
         if (!this.rendered) {
@@ -440,6 +518,15 @@ class Panel {
         if (talk) {
             talk.classList.toggle('d-none', !state.ptt);
             talk.disabled = !on || !!state.muted;
+        }
+        const cam = action(this.container, 'vrroom-live-cam');
+        if (cam) {
+            const camon = state.camstate === 'on';
+            cam.textContent = this.str(camon ? 'livecamon' : 'livecamoff');
+            cam.setAttribute('aria-pressed', camon ? 'true' : 'false');
+            cam.classList.toggle('btn-outline-primary', !camon);
+            cam.classList.toggle('btn-primary', camon);
+            cam.disabled = this.cambusy;
         }
     }
 
@@ -517,6 +604,7 @@ class Panel {
      * Stop listening and empty the panel.
      */
     destroy() {
+        this.setSelfVideo(null);
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
         this.listseq++;
@@ -533,7 +621,7 @@ class Panel {
  * Create the live room panel.
  *
  * @param {HTMLElement} container The vrroom-liveroom section.
- * @param {Object} options {cmid, live, secure, str(key, a), handlers}
+ * @param {Object} options {cmid, live, secure, video, str(key, a), handlers}
  * @returns {Panel}
  */
 export const createPanel = (container, options) => new Panel(container, options);

@@ -278,6 +278,9 @@ final class access {
     /**
      * The live block of the launch config (PHASE3-CONTRACT §3.1, LIVE-ROOMS-CONTRACT §6.1).
      *
+     * 'video' is true when people may turn on their webcam (AVATAR-DESIGN.md, owner decisions 2026-10-10):
+     * the site setting livevideo and the activity's livevideo are both on.
+     *
      * @param \cm_info $cm Course module.
      * @param \context_module $context Module context.
      * @param \stdClass $vrroom vrroom row.
@@ -307,10 +310,13 @@ final class access {
             'roomlist' => false,
             'roommode' => self::ROOMMODE_FIXED,
             'maxrooms' => self::max_rooms($vrroom),
+            'video' => false,
         ];
         if (!self::is_available($vrroom)) {
             return $block;
         }
+        // Webcams on the avatars: the site allows them and the activity's "Webcams in live rooms" is on.
+        $block['video'] = config::video_enabled($vrroom);
         $userid = (int)$user->id;
         $block['available'] = true;
         $block['maxpeers'] = self::max_peers($vrroom);

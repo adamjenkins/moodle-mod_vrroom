@@ -316,7 +316,8 @@ final class access_test extends \advanced_testcase {
 
         $block = access::launch_block($cm, $context, $vrroom, $attempt, $student);
         $this->assertSame(['available', 'canjoin', 'reason', 'transport', 'transportmodule', 'cmid', 'attemptid',
-            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms'], array_keys($block));
+            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms',
+            'video'], array_keys($block));
         $this->assertFalse($block['available']);
         $this->assertFalse($block['roomlist']);
         $this->assertSame('fixed', $block['roommode']);
@@ -327,6 +328,35 @@ final class access_test extends \advanced_testcase {
         $this->assertSame(0, $block['defaultgroupid']);
         $this->assertSame('', $block['selfname']);
         $this->assertNull($block['transportmodule']);
+    }
+
+    /**
+     * The launch block's video: on only when the site setting and the activity setting are both on.
+     */
+    public function test_launch_block_video(): void {
+        $this->resetAfterTest();
+        [$cm, $context, $vrroom, $course] = $this->create_activity();
+        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $attempt = $this->vrroom_generator()->create_attempt((int)$vrroom->id, (int)$student->id);
+        $this->setUser($student);
+
+        // Both on by default: the activity column defaults to 1, the site setting was never saved.
+        $this->assertEquals(1, $vrroom->livevideo);
+        $this->assertTrue(access::launch_block($cm, $context, $vrroom, $attempt, $student)['video']);
+
+        $novideo = clone $vrroom;
+        $novideo->livevideo = 0;
+        $this->assertFalse(access::launch_block($cm, $context, $novideo, $attempt, $student)['video']);
+
+        set_config('livevideo', 0, 'vrroomruntime_builtin');
+        $this->assertFalse(access::launch_block($cm, $context, $vrroom, $attempt, $student)['video']);
+        set_config('livevideo', 1, 'vrroomruntime_builtin');
+        $this->assertTrue(access::launch_block($cm, $context, $vrroom, $attempt, $student)['video']);
+
+        // Without live mode there is no video either.
+        $off = clone $vrroom;
+        $off->livemode = 0;
+        $this->assertFalse(access::launch_block($cm, $context, $off, $attempt, $student)['video']);
     }
 
     /**

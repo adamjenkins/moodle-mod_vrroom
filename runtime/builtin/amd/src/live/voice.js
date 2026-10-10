@@ -14,17 +14,22 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Voice in a live room: the own microphone (with mute and push-to-talk) and the voices of the
- * others, placed in the room with Web Audio so a voice comes from the speaker's avatar.
+ * Voice and webcams in a live room: the own microphone (with mute and push-to-talk) and the voices
+ * of the others, placed in the room with Web Audio so a voice comes from the speaker's avatar; and
+ * next to it the own camera (on or off, sent with replaceTrack so switching needs no reconnect)
+ * and the videos of the others, reported for their avatars' face screens.
  *
  * Uses only the transport interface (live/transport), so it works with any transport. All Web
- * Audio and WebRTC behaviour here is unverified in this repository's tests (manual check).
+ * Audio and WebRTC behaviour here is unverified in this repository's tests (manual check); the
+ * video bookkeeping (live/videostate) has node tests.
  *
  * @module     vrroomruntime_builtin/live/voice
  * @copyright  2026 Boban Blagojevic
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
+import {CAMERA_CONSTRAINTS, createVideoBook} from 'vrroomruntime_builtin/live/videostate';
 
 /** Level above which a voice counts as speaking. */
 const SPEAKING_LEVEL = 0.04;
@@ -105,8 +110,9 @@ class Voice {
      * Constructor.
      *
      * @param {Object} transport A live/transport Transport.
+     * @param {Object} [options] {video: boolean} webcams are allowed in this room (live config 'video').
      */
-    constructor(transport) {
+    constructor(transport, options) {
         this.ctx = null;
         this.voices = new Map();
         this.mutedpeers = new Set();
@@ -124,6 +130,14 @@ class Voice {
         this.disposed = false;
         this.transport = null;
         this.unsubscribe = [];
+        // The camera: allowed by the live config, the own track, and the others' videos.
+        this.videoallowed = !!(options && options.video === true);
+        this.camtrack = null;
+        this.camstream = null;
+        this.camrequesting = null;
+        this.camstate = 'off';
+        this.videos = createVideoBook((peerid, stream) => this.emit('video', {peerid: peerid, stream: stream}),
+            this.videoallowed);
         this.setTransport(transport);
     }
 
@@ -136,6 +150,8 @@ class Voice {
         this.unsubscribe.forEach((fn) => fn());
         this.unsubscribe = [];
         Array.from(this.voices.keys()).forEach((peerid) => this.removeVoice(peerid));
+        // Peer ids are new for every join: the videos of the old room go (reported as gone).
+        this.videos.clear();
         this.transport = transport || null;
         if (!this.transport) {
             return;
@@ -144,9 +160,18 @@ class Voice {
         this.unsubscribe.push(this.transport.on('trackended', (detail) => this.removeVoice(detail.peerid)));
         this.unsubscribe.push(this.transport.on('peerleft', (detail) => {
             this.removeVoice(detail.peerid);
+            this.videos.remove(detail.peerid);
+        }));
+        this.unsubscribe.push(this.transport.on('video', (detail) => {
+            if (detail && typeof detail.peerid === 'string') {
+                this.videos.setTrack(detail.peerid, detail.stream || null, !!detail.flowing);
+            }
         }));
         if (this.track) {
             this.applyTrack();
+        }
+        if (this.camtrack) {
+            this.applyCamTrack();
         }
     }
 
@@ -260,6 +285,184 @@ class Voice {
             Promise.resolve(this.transport.setLocalAudio(null)).catch(() => undefined);
         }
         this.updateMicState();
+    }
+
+    /**
+     * Whether webcams can be used in this room at all: allowed by the live config, and the
+     * transport sends video.
+     *
+     * @returns {boolean}
+     */
+    isVideoAllowed() {
+        if (!this.videoallowed) {
+            return false;
+        }
+        const caps = this.transport ? this.transport.capabilities : null;
+        return !this.transport || !!(caps && caps.video);
+    }
+
+    /**
+     * Whether this page can send the camera (a secure context with getUserMedia).
+     *
+     * @returns {boolean}
+     */
+    canSendVideo() {
+        return this.videoallowed && this.canSend();
+    }
+
+    /**
+     * Turn the camera on (about 320×240 at 15 fps). The video is sent by replacing the track of
+     * the video transceiver each link already has, so others see it fade in on the same avatar.
+     *
+     * @returns {Promise} Rejects with Error('insecure'), Error('notallowed'), Error('notrack') or
+     *     the getUserMedia error (NotAllowedError, NotFoundError, NotReadableError ...).
+     */
+    enableCam() {
+        if (this.disposed) {
+            return Promise.reject(new Error('disposed'));
+        }
+        if (!this.isVideoAllowed()) {
+            return Promise.reject(new Error('notallowed'));
+        }
+        if (!this.canSend()) {
+            return Promise.reject(new Error('insecure'));
+        }
+        if (this.camtrack) {
+            return Promise.resolve();
+        }
+        if (this.camrequesting) {
+            return this.camrequesting;
+        }
+        this.camrequesting = Promise.resolve(navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                width: Object.assign({}, CAMERA_CONSTRAINTS.width),
+                height: Object.assign({}, CAMERA_CONSTRAINTS.height),
+                frameRate: Object.assign({}, CAMERA_CONSTRAINTS.frameRate),
+                facingMode: CAMERA_CONSTRAINTS.facingMode,
+            },
+        })).then((stream) => {
+            this.camrequesting = null;
+            const track = stream.getVideoTracks()[0] || null;
+            if (!track || this.disposed) {
+                stream.getTracks().forEach((t) => t.stop());
+                throw new Error('notrack');
+            }
+            if ('contentHint' in track) {
+                try {
+                    // A face: keep it sharp rather than smooth when the bitrate is low.
+                    track.contentHint = 'detail';
+                } catch (e) {
+                    // Not supported.
+                }
+            }
+            this.camstream = stream;
+            this.camtrack = track;
+            track.addEventListener('ended', () => {
+                // Unplugged, or the permission was taken back.
+                if (this.camtrack === track) {
+                    this.disableCam();
+                }
+            });
+            this.updateCamState();
+            return this.applyCamTrack();
+        }).catch((error) => {
+            this.camrequesting = null;
+            throw error;
+        });
+        return this.camrequesting;
+    }
+
+    /**
+     * Turn the camera off: stop the track (the camera light goes out) and send nothing.
+     */
+    disableCam() {
+        const track = this.camtrack;
+        this.camtrack = null;
+        if (this.camstream) {
+            this.camstream.getTracks().forEach((t) => t.stop());
+            this.camstream = null;
+        } else if (track) {
+            track.stop();
+        }
+        if (this.transport && typeof this.transport.setLocalVideo === 'function') {
+            Promise.resolve(this.transport.setLocalVideo(null)).catch(() => undefined);
+        }
+        this.updateCamState();
+    }
+
+    /**
+     * The own camera state: 'off' or 'on'.
+     *
+     * @returns {string}
+     */
+    getCamState() {
+        return this.camtrack ? 'on' : 'off';
+    }
+
+    /**
+     * The own camera stream (for a self view), or null.
+     *
+     * @returns {MediaStream|null}
+     */
+    getLocalVideo() {
+        return this.camtrack ? this.camstream : null;
+    }
+
+    /**
+     * Another person's camera state, from their state message.
+     *
+     * @param {string} peerid Peer id.
+     * @param {boolean} on Their camera is on.
+     */
+    setPeerCam(peerid, on) {
+        this.videos.setCam(peerid, on);
+    }
+
+    /**
+     * Hide or show one other person's video, for this user only.
+     *
+     * @param {string} peerid Peer id.
+     * @param {boolean} hidden Hidden.
+     */
+    setPeerVideoHidden(peerid, hidden) {
+        this.videos.setHidden(peerid, hidden);
+    }
+
+    /**
+     * Whether one other person's video is hidden for this user.
+     *
+     * @param {string} peerid Peer id.
+     * @returns {boolean}
+     */
+    isPeerVideoHidden(peerid) {
+        return this.videos.isHidden(peerid);
+    }
+
+    /**
+     * Whether one other person's camera is on (their last state message).
+     *
+     * @param {string} peerid Peer id.
+     * @returns {boolean}
+     */
+    isPeerCamOn(peerid) {
+        return this.videos.isCamOn(peerid);
+    }
+
+    /**
+     * The videos shown now.
+     *
+     * @returns {Array<{peerid: string, stream: MediaStream}>}
+     */
+    getShownVideos() {
+        return this.videos.shown();
+    }
+
+    /**
+     * Forget the others' videos and "hidden for me" (left the room). Shown videos are reported gone.
+     */
+    clearVideos() {
+        this.videos.clear();
     }
 
     /**
@@ -482,7 +685,9 @@ class Voice {
     }
 
     /**
-     * Listen for voice events: 'micstate' {state}.
+     * Listen for voice events: 'micstate' {state}, 'camstate' {state, stream} (stream: the own
+     * camera or null) and 'video' {peerid, stream} (someone's video to show, or null to show
+     * their designed face again).
      *
      * @param {string} type Event type.
      * @param {Function} fn Listener.
@@ -509,7 +714,9 @@ class Voice {
             return;
         }
         this.disableMic();
+        this.disableCam();
         this.setTransport(null);
+        this.videos.clear();
         this.disposed = true;
         this.listeners.clear();
         if (this.ctx && typeof this.ctx.close === 'function') {
@@ -547,6 +754,31 @@ class Voice {
             this.micstate = state;
             this.emit('micstate', {state: state});
         }
+    }
+
+    /**
+     * Recompute the camera state and announce a change.
+     */
+    updateCamState() {
+        const state = this.getCamState();
+        if (state !== this.camstate) {
+            this.camstate = state;
+            this.emit('camstate', {state: state, stream: this.getLocalVideo()});
+        }
+    }
+
+    /**
+     * Hand the current camera track to the transport.
+     *
+     * @returns {Promise}
+     */
+    applyCamTrack() {
+        if (!this.transport || typeof this.transport.setLocalVideo !== 'function') {
+            return Promise.resolve();
+        }
+        return Promise.resolve(this.transport.setLocalVideo(this.camtrack)).catch((e) => {
+            window.console.error(e);
+        });
     }
 
     /**
@@ -811,9 +1043,10 @@ class Voice {
 }
 
 /**
- * Create the voice chat of a live room.
+ * Create the voice chat (and webcams) of a live room.
  *
  * @param {Object} transport A live/transport Transport.
+ * @param {Object} [options] {video: boolean} webcams are allowed in this room.
  * @returns {Voice}
  */
-export const createVoice = (transport) => new Voice(transport);
+export const createVoice = (transport, options) => new Voice(transport, options);

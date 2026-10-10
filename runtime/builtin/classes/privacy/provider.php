@@ -91,6 +91,8 @@ class provider implements
             'ipaddress' => 'privacy:metadata:livepeers:ipaddress',
             'pose' => 'privacy:metadata:livepeers:pose',
             'voice' => 'privacy:metadata:livepeers:voice',
+            'video' => 'privacy:metadata:livepeers:video',
+            'appearance' => 'privacy:metadata:livepeers:appearance',
         ], 'privacy:metadata:livepeers');
 
         $collection->add_external_location_link('iceservers', [

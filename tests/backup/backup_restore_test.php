@@ -372,8 +372,8 @@ final class backup_restore_test extends \advanced_testcase {
     }
 
     /**
-     * "Students open rooms" and the number of rooms survive a backup and restore; a restore into a
-     * site whose run mode runs one room only turns mode 2 into 1.
+     * "Students open rooms", the number of rooms and "Webcams in live rooms" survive a backup and restore;
+     * a restore into a site whose run mode runs one room only turns mode 2 into 1.
      */
     public function test_backup_restore_live_rooms(): void {
         global $DB;
@@ -381,12 +381,14 @@ final class backup_restore_test extends \advanced_testcase {
         $this->setAdminUser();
         [$course, $vrroom, $cm] = $this->create_setup();
 
-        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'livemode' => 2, 'liverooms' => 3, 'livemaxusers' => 2]);
+        $DB->update_record('vrroom', (object)['id' => $vrroom->id, 'livemode' => 2, 'liverooms' => 3, 'livemaxusers' => 2,
+            'livevideo' => 0]);
         $newcourseid = $this->backup_and_restore($course, $cm, false);
         [$new] = $this->get_restored($newcourseid);
         $this->assertEquals(2, $new->livemode);
         $this->assertEquals(3, $new->liverooms);
         $this->assertEquals(2, $new->livemaxusers);
+        $this->assertEquals(0, $new->livevideo);
 
         // No live rooms on the site: the built-in viewer runs no rooms, so mode 2 is restored as 1.
         set_config('liveenabled', 0, 'vrroomruntime_builtin');

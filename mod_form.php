@@ -314,6 +314,12 @@ class mod_vrroom_mod_form extends moodleform_mod {
         $mform->setDefault('livemaxusers', min(6, $livemax));
         $mform->addHelpButton('livemaxusers', 'livemaxusers', 'vrroom');
         $mform->hideIf('livemaxusers', 'livemode', 'eq', live_settings::MODE_OFF);
+        // Webcams on the avatars: only the built-in run mode sends video (browser to browser, like the voice).
+        $mform->addElement('advcheckbox', 'livevideo', get_string('livevideo', 'vrroom'));
+        $mform->setDefault('livevideo', live_settings::DEFAULT_VIDEO);
+        $mform->addHelpButton('livevideo', 'livevideo', 'vrroom');
+        $mform->hideIf('livevideo', 'livemode', 'eq', live_settings::MODE_OFF);
+        $mform->hideIf('livevideo', 'runtime', 'neq', live_settings::VIDEO_RUNTIME);
         foreach (array_diff(array_keys(runtime_registry::get_all()), $livecapable) as $other) {
             $mform->hideIf('livemode', 'runtime', 'eq', $other);
             $mform->hideIf('liverooms', 'runtime', 'eq', $other);

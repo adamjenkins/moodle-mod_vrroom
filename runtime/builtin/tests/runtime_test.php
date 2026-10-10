@@ -119,7 +119,8 @@ final class runtime_test extends \advanced_testcase {
 
         // The live block (live mode is off in a new activity).
         $this->assertSame(['available', 'canjoin', 'reason', 'transport', 'transportmodule', 'cmid', 'attemptid',
-            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms'], array_keys($config['live']));
+            'maxpeers', 'groups', 'defaultgroupid', 'selfname', 'roomlist', 'roommode', 'maxrooms',
+            'video'], array_keys($config['live']));
         $this->assertFalse($config['live']['available']);
         $this->assertFalse($config['live']['roomlist']);
         $this->assertSame((int)$attempt->id, $config['live']['attemptid']);

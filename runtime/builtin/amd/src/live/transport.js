@@ -31,6 +31,9 @@
  * - message     {peerid, channel, message}   message already decoded by the codec, never null
  * - track       {peerid, stream}
  * - trackended  {peerid}
+ * - video       {peerid, stream, flowing}   the peer's video: stream a MediaStream holding only the
+ *                                      video track (null when it ended), flowing whether frames
+ *                                      arrive (live and not muted). Sent again on every change.
  *
  * A Peer is {peerid: string, name: string, kind: 'attempt'|'preview', connected: boolean}.
  *
@@ -42,7 +45,8 @@
  */
 
 /** Event types a transport emits. */
-export const EVENTS = Object.freeze(['state', 'peerjoined', 'peerupdated', 'peerleft', 'message', 'track', 'trackended']);
+export const EVENTS = Object.freeze(['state', 'peerjoined', 'peerupdated', 'peerleft', 'message', 'track', 'trackended',
+    'video']);
 
 /** Transport states. */
 export const STATES = Object.freeze(['idle', 'joining', 'joined', 'reconnecting', 'left', 'failed']);
@@ -153,9 +157,9 @@ export class Transport extends Emitter {
     }
 
     /**
-     * What this transport can do.
+     * What this transport can do. video (optional, false when left out): webcams can be sent.
      *
-     * @returns {{voice: boolean, maxpeers: number}}
+     * @returns {{voice: boolean, video: (boolean|undefined), maxpeers: number}}
      */
     get capabilities() {
         return notImplemented();
@@ -240,6 +244,17 @@ export class Transport extends Emitter {
      */
     setLocalAudio(track) { // eslint-disable-line no-unused-vars
         return notImplemented();
+    }
+
+    /**
+     * Set (or clear) the local camera track sent to everybody. A transport without video keeps
+     * this default, which sends nothing.
+     *
+     * @param {MediaStreamTrack|null} track The camera track or null.
+     * @returns {Promise<void>}
+     */
+    setLocalVideo(track) { // eslint-disable-line no-unused-vars
+        return Promise.resolve();
     }
 
     /**

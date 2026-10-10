@@ -78,6 +78,7 @@ final class instance_manager {
             $vrroom->livemode
         );
         $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? 6);
+        $vrroom->livevideo = live_settings::clean_video($data->livevideo ?? live_settings::DEFAULT_VIDEO);
         $vrroom->customised = 0;
         $vrroom->timecreated = $now;
         $vrroom->timemodified = $now;
@@ -214,6 +215,9 @@ final class instance_manager {
                 $vrroom->livemode
             );
             $vrroom->livemaxusers = self::clean_livemaxusers($data->livemaxusers ?? ($vrroom->livemaxusers ?? 6));
+            $vrroom->livevideo = live_settings::clean_video(
+                $data->livevideo ?? ($vrroom->livevideo ?? live_settings::DEFAULT_VIDEO)
+            );
         } else {
             // The stored values may meet another run mode: one that runs a single room never gets mode 2.
             $vrroom->livemode = live_settings::clean_mode($vrroom->livemode ?? live_settings::MODE_OFF, $multi);
@@ -221,6 +225,7 @@ final class instance_manager {
                 $vrroom->liverooms ?? live_settings::DEFAULT_ROOMS,
                 $vrroom->livemode
             );
+            $vrroom->livevideo = live_settings::clean_video($vrroom->livevideo ?? live_settings::DEFAULT_VIDEO);
         }
         $vrroom->timemodified = time();
 
@@ -247,6 +252,7 @@ final class instance_manager {
                     'livemode' => $vrroom->livemode,
                     'livemaxusers' => $vrroom->livemaxusers,
                     'liverooms' => $vrroom->liverooms,
+                    'livevideo' => $vrroom->livevideo,
                     'timemodified' => $vrroom->timemodified,
                 ]);
             } else {

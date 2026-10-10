@@ -133,6 +133,10 @@ class restore_vrroom_activity_structure_step extends restore_questions_activity_
             $data->liverooms ?? \mod_vrroom\local\live_settings::DEFAULT_ROOMS,
             $data->livemode
         );
+        // Webcams in live rooms: 0 or 1; backups made before the setting existed allow them (the default).
+        $data->livevideo = \mod_vrroom\local\live_settings::clean_video(
+            $data->livevideo ?? \mod_vrroom\local\live_settings::DEFAULT_VIDEO
+        );
 
         $newitemid = $DB->insert_record('vrroom', $data);
         $this->apply_activity_instance($newitemid);

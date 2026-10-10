@@ -17,9 +17,10 @@
  * Mesh transport: one direct WebRTC connection between every pair of browsers in a live room.
  *
  * Signalling (offers, answers, ICE candidates) goes through Moodle (live/signalling). Each link
- * has two negotiated data channels (pose: unordered, no retransmits; state: reliable) and one audio
- * transceiver from the start, so the microphone is switched with replaceTrack and never needs a
- * renegotiation. Links use perfect negotiation (the polite peer has the greater peer id) and carry
+ * has two negotiated data channels (pose: unordered, no retransmits; state: reliable), one audio
+ * transceiver and, when the live config allows video, one video transceiver from the start, so the
+ * microphone and the camera are switched with replaceTrack and never need a renegotiation (no
+ * reconnect, no flicker of the avatar). Links use perfect negotiation (the polite peer has the greater peer id) and carry
  * a generation number: a higher generation replaces a link, a lower one is ignored.
  *
  * Peers see each other's IP addresses (ICE candidates); the activity UI and the privacy metadata
@@ -38,6 +39,7 @@ import Log from 'core/log';
 import {Transport} from 'vrroomruntime_builtin/live/transport';
 import {encode, decode} from 'vrroomruntime_builtin/live/codec';
 import {createSignalling, RECONNECTING_AFTER} from 'vrroomruntime_builtin/live/signalling';
+import {VIDEO_MAX_BITRATE, VIDEO_MAX_FRAMERATE} from 'vrroomruntime_builtin/live/videostate';
 
 /** Skip a peer's pose channel while this many bytes wait to be sent. */
 const POSE_BUFFER_LIMIT = 16384;
@@ -158,7 +160,25 @@ const isGen = (gen) => Number.isInteger(gen) && gen >= 0 && gen <= MAX_GEN;
  * @param {Object} peer
  * @returns {Object}
  */
-const copyPeer = (peer) => ({peerid: peer.peerid, name: peer.name, kind: peer.kind, connected: peer.connected});
+const copyPeer = (peer) => ({
+    peerid: peer.peerid,
+    name: peer.name,
+    kind: peer.kind,
+    connected: peer.connected,
+    // How their avatar looks (a vrroom-avatar/1 JSON string, '' for today's look) and their picture.
+    appearance: peer.appearance || '',
+    picture: peer.picture || '',
+});
+
+/**
+ * Whether a transceiver carries the given kind of media and is usable.
+ *
+ * @param {RTCRtpTransceiver} transceiver
+ * @param {string} kind 'audio' or 'video'.
+ * @returns {boolean}
+ */
+const isTransceiverOf = (transceiver, kind) => !transceiver.stopped && transceiver.currentDirection !== 'stopped'
+    && !!transceiver.receiver && !!transceiver.receiver.track && transceiver.receiver.track.kind === kind;
 
 /**
  * Whether a transceiver carries audio and is usable.
@@ -166,8 +186,55 @@ const copyPeer = (peer) => ({peerid: peer.peerid, name: peer.name, kind: peer.ki
  * @param {RTCRtpTransceiver} transceiver
  * @returns {boolean}
  */
-const isAudioTransceiver = (transceiver) => !transceiver.stopped && transceiver.currentDirection !== 'stopped'
-    && transceiver.receiver && transceiver.receiver.track && transceiver.receiver.track.kind === 'audio';
+const isAudioTransceiver = (transceiver) => isTransceiverOf(transceiver, 'audio');
+
+/**
+ * Whether a transceiver carries video and is usable.
+ *
+ * @param {RTCRtpTransceiver} transceiver
+ * @returns {boolean}
+ */
+const isVideoTransceiver = (transceiver) => isTransceiverOf(transceiver, 'video');
+
+/** Send encodings of the video transceiver: small and cheap for a mesh of up to 6. */
+const VIDEO_ENCODING = Object.freeze({maxBitrate: VIDEO_MAX_BITRATE, maxFramerate: VIDEO_MAX_FRAMERATE});
+
+/**
+ * Cap the bitrate and frame rate of a video sender (setParameters; ignored where it fails, for
+ * example before the first negotiation in some browsers).
+ *
+ * @param {RTCRtpSender} sender
+ * @returns {Promise}
+ */
+const limitVideo = (sender) => {
+    if (!sender || typeof sender.getParameters !== 'function' || typeof sender.setParameters !== 'function') {
+        return Promise.resolve();
+    }
+    let params;
+    try {
+        params = sender.getParameters();
+    } catch (error) {
+        return Promise.resolve();
+    }
+    if (!params || !Array.isArray(params.encodings) || !params.encodings.length) {
+        return Promise.resolve();
+    }
+    const first = params.encodings[0];
+    if (first.maxBitrate === VIDEO_ENCODING.maxBitrate && first.maxFramerate === VIDEO_ENCODING.maxFramerate) {
+        return Promise.resolve();
+    }
+    first.maxBitrate = VIDEO_ENCODING.maxBitrate;
+    first.maxFramerate = VIDEO_ENCODING.maxFramerate;
+    return Promise.resolve().then(() => sender.setParameters(params)).catch((error) => Log.debug(error));
+};
+
+/**
+ * Whether a remote video track brings frames now.
+ *
+ * @param {MediaStreamTrack} track
+ * @returns {boolean}
+ */
+const isFlowing = (track) => !!track && track.readyState === 'live' && !track.muted;
 
 /**
  * One RTCPeerConnection to one remote peer.
@@ -194,6 +261,8 @@ class Link {
         this.closed = false;
         this.connected = false;
         this.stream = null;
+        this.videotrack = null;
+        this.videostream = null;
         this.queue = Promise.resolve();
         this.candidates = [];
         this.candidatetimer = null;
@@ -224,8 +293,33 @@ class Link {
             if (mesh.localtrack) {
                 Promise.resolve(transceiver.sender.replaceTrack(mesh.localtrack)).catch((error) => Log.debug(error));
             }
+            if (mesh.videoallowed) {
+                this.addVideoTransceiver();
+            }
         }
         this.arm(CONNECT_TIMEOUT, 'connect');
+    }
+
+    /**
+     * Add the video transceiver of an initiating link (sendrecv from the start, with or without
+     * a camera track), so turning the camera on later is a replaceTrack and no renegotiation.
+     */
+    addVideoTransceiver() {
+        let transceiver = null;
+        try {
+            transceiver = this.pc.addTransceiver('video', {direction: 'sendrecv', sendEncodings: [VIDEO_ENCODING]});
+        } catch (error) {
+            // Browsers without sendEncodings in addTransceiver: capped after the negotiation.
+            try {
+                transceiver = this.pc.addTransceiver('video', {direction: 'sendrecv'});
+            } catch (inner) {
+                Log.debug(inner);
+                return;
+            }
+        }
+        if (this.mesh.localvideo) {
+            Promise.resolve(transceiver.sender.replaceTrack(this.mesh.localvideo)).catch((error) => Log.debug(error));
+        }
     }
 
     /**
@@ -275,6 +369,7 @@ class Link {
         const state = this.connectionState();
         if (state === 'connected') {
             this.disarm();
+            this.limitVideo();
         } else if (state === 'failed') {
             if (typeof this.pc.restartIce === 'function') {
                 try {
@@ -389,7 +484,9 @@ class Link {
     }
 
     /**
-     * Before answering: every audio transceiver sends and receives, with the current local track.
+     * Before answering: every audio transceiver sends and receives, with the current local track;
+     * every video transceiver too when video is allowed here (with the current camera track, or
+     * none), and it is inactive otherwise.
      *
      * @returns {Promise}
      */
@@ -404,7 +501,30 @@ class Link {
             promises.push(Promise.resolve(transceiver.sender.replaceTrack(this.mesh.localtrack))
                 .catch((error) => Log.debug(error)));
         });
+        this.pc.getTransceivers().filter(isVideoTransceiver).forEach((transceiver) => {
+            const allowed = this.mesh.videoallowed;
+            try {
+                transceiver.direction = allowed ? 'sendrecv' : 'inactive';
+            } catch (error) {
+                Log.debug(error);
+            }
+            promises.push(Promise.resolve(transceiver.sender.replaceTrack(allowed ? this.mesh.localvideo : null))
+                .catch((error) => Log.debug(error)));
+        });
         return Promise.all(promises);
+    }
+
+    /**
+     * Cap the video senders of this link (after a negotiation, when the encodings exist).
+     *
+     * @returns {Promise}
+     */
+    limitVideo() {
+        if (this.closed || !this.mesh.videoallowed) {
+            return Promise.resolve();
+        }
+        return Promise.all(this.pc.getTransceivers().filter(isVideoTransceiver)
+            .map((transceiver) => limitVideo(transceiver.sender)));
     }
 
     /**
@@ -497,7 +617,14 @@ class Link {
      * @param {RTCTrackEvent} e
      */
     onTrack(e) {
-        if (this.closed || !e.track || e.track.kind !== 'audio') {
+        if (this.closed || !e.track) {
+            return;
+        }
+        if (e.track.kind === 'video') {
+            this.onVideoTrack(e.track);
+            return;
+        }
+        if (e.track.kind !== 'audio') {
             return;
         }
         const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
@@ -515,6 +642,41 @@ class Link {
             }
         });
         this.mesh.onLinkTrack(this, stream);
+    }
+
+    /**
+     * Remote video arrived: report it now and whenever it mutes, unmutes or ends (the sender's
+     * replaceTrack(null) makes it mute after a moment; the state message says so sooner).
+     *
+     * @param {MediaStreamTrack} track
+     */
+    onVideoTrack(track) {
+        if (this.videotrack === track) {
+            return;
+        }
+        if (!this.mesh.videoallowed) {
+            return;
+        }
+        this.videotrack = track;
+        this.videostream = new MediaStream([track]);
+        const stream = this.videostream;
+        const report = () => {
+            if (this.closed || this.videotrack !== track) {
+                return;
+            }
+            this.mesh.onLinkVideo(this, stream, isFlowing(track));
+        };
+        track.addEventListener('mute', report);
+        track.addEventListener('unmute', report);
+        track.addEventListener('ended', () => {
+            if (this.closed || this.videotrack !== track) {
+                return;
+            }
+            this.videotrack = null;
+            this.videostream = null;
+            this.mesh.onLinkVideo(this, null, false);
+        });
+        report();
     }
 
     /**
@@ -573,6 +735,21 @@ class Link {
     }
 
     /**
+     * Switch the local camera track (no renegotiation; null sends nothing).
+     *
+     * @param {MediaStreamTrack|null} track
+     * @returns {Promise}
+     */
+    setVideoTrack(track) {
+        if (this.closed) {
+            return Promise.resolve();
+        }
+        return Promise.all(this.pc.getTransceivers().filter(isVideoTransceiver).map((transceiver) =>
+            Promise.resolve(transceiver.sender.replaceTrack(track)).then(() => limitVideo(transceiver.sender))
+                .catch((error) => Log.debug(error))));
+    }
+
+    /**
      * Apply new ICE servers.
      *
      * @param {Array} iceservers
@@ -627,6 +804,11 @@ class Link {
             this.stream = null;
             this.mesh.onLinkTrackEnded(this, true);
         }
+        if (this.videostream) {
+            this.videotrack = null;
+            this.videostream = null;
+            this.mesh.onLinkVideo(this, null, false, true);
+        }
         this.connected = false;
     }
 }
@@ -663,6 +845,9 @@ class MeshTransport extends Transport {
         this.iceexpires = 0;
         this.icerequested = 0;
         this.localtrack = null;
+        /** Webcams in this room (live config 'video': site and activity setting). */
+        this.videoallowed = this.config.video === true;
+        this.localvideo = null;
         this.lastok = 0;
         this.joining = null;
         this.rejoining = false;
@@ -682,11 +867,11 @@ class MeshTransport extends Transport {
     /**
      * What this transport can do.
      *
-     * @returns {{voice: boolean, maxpeers: number}}
+     * @returns {{voice: boolean, video: boolean, maxpeers: number}}
      */
     get capabilities() {
         const maxpeers = this.room ? this.room.maxpeers : this.config.maxpeers;
-        return {voice: true, maxpeers: Number(maxpeers) || 0};
+        return {voice: true, video: this.videoallowed, maxpeers: Number(maxpeers) || 0};
     }
 
     /**
@@ -833,14 +1018,18 @@ class MeshTransport extends Transport {
             seen.add(entry.peerid);
             const name = String(entry.name || '');
             const kind = entry.kind === 'preview' ? 'preview' : 'attempt';
+            const appearance = typeof entry.appearance === 'string' ? entry.appearance : '';
+            const picture = typeof entry.picture === 'string' ? entry.picture : '';
             const peer = this.peers.get(entry.peerid);
             if (!peer) {
-                const added = {peerid: entry.peerid, name: name, kind: kind, connected: false};
+                const added = {peerid: entry.peerid, name, kind, connected: false, appearance, picture};
                 this.peers.set(entry.peerid, added);
                 this.emit('peerjoined', {peer: copyPeer(added)});
-            } else if (peer.name !== name || peer.kind !== kind) {
+            } else if (peer.name !== name || peer.kind !== kind || peer.appearance !== appearance || peer.picture !== picture) {
                 peer.name = name;
                 peer.kind = kind;
+                peer.appearance = appearance;
+                peer.picture = picture;
                 this.emit('peerupdated', {peer: copyPeer(peer)});
             }
         });
@@ -1117,6 +1306,20 @@ class MeshTransport extends Transport {
     }
 
     /**
+     * A remote video track arrived, muted, unmuted or ended.
+     *
+     * @param {Link} link
+     * @param {MediaStream|null} stream Stream with only the video track, or null when it ended.
+     * @param {boolean} flowing Frames arrive.
+     * @param {boolean} [closing] Whether the link is being closed (already removed from the map).
+     */
+    onLinkVideo(link, stream, flowing, closing) {
+        if (closing || this.links.get(link.peerid) === link) {
+            this.emit('video', {peerid: link.peerid, stream: stream, flowing: !!(stream && flowing)});
+        }
+    }
+
+    /**
      * Data from a link's channel.
      *
      * @param {Link} link
@@ -1259,6 +1462,30 @@ class MeshTransport extends Transport {
     }
 
     /**
+     * Set the local camera track on every link (replaceTrack, no renegotiation). New links pick it
+     * up when they are created or answer. Ignored when video is not allowed.
+     *
+     * @param {MediaStreamTrack|null} track
+     * @returns {Promise<void>}
+     */
+    setLocalVideo(track) {
+        this.localvideo = this.videoallowed && track ? track : null;
+        return Promise.all(Array.from(this.links.values()).map((link) => link.setVideoTrack(this.localvideo)))
+            .then(() => undefined);
+    }
+
+    /**
+     * A peer's remote video stream (only the video track), or null.
+     *
+     * @param {string} peerid
+     * @returns {MediaStream|null}
+     */
+    getRemoteVideo(peerid) {
+        const link = this.links.get(peerid);
+        return link && link.videostream ? link.videostream : null;
+    }
+
+    /**
      * A peer's remote audio stream.
      *
      * @param {string} peerid
@@ -1279,6 +1506,7 @@ class MeshTransport extends Transport {
         Promise.resolve(this.leave()).catch((error) => Log.debug(error));
         this.disposed = true;
         this.localtrack = null;
+        this.localvideo = null;
         if (this.unsubscribe) {
             this.unsubscribe();
             this.unsubscribe = null;

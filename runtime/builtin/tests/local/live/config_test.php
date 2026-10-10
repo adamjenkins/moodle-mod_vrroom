@@ -218,4 +218,24 @@ final class config_test extends \advanced_testcase {
         $this->assertTrue($setting->validate('stun:stun.example.org'));
         $this->assertSame(get_string('errorinvalidstunurl', 'vrroomruntime_builtin', 1), $setting->validate('nonsense'));
     }
+
+    /**
+     * Webcams: allowed on the site unless the setting is off; an activity needs its own setting on too.
+     */
+    public function test_video(): void {
+        $this->resetAfterTest();
+        unset_config('livevideo', 'vrroomruntime_builtin');
+        $this->assertTrue(config::video_allowed());
+        $this->assertTrue(config::video_enabled((object)['livevideo' => 1]));
+        $this->assertTrue(config::video_enabled((object)[]));
+        $this->assertFalse(config::video_enabled((object)['livevideo' => 0]));
+
+        set_config('livevideo', 0, 'vrroomruntime_builtin');
+        $this->assertFalse(config::video_allowed());
+        $this->assertFalse(config::video_enabled((object)['livevideo' => 1]));
+
+        set_config('livevideo', 1, 'vrroomruntime_builtin');
+        $this->assertTrue(config::video_allowed());
+        $this->assertTrue(config::video_enabled((object)['livevideo' => 1]));
+    }
 }

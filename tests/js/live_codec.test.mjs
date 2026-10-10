@@ -294,7 +294,8 @@ test('Transport base methods throw', () => {
 });
 
 test('event and state lists', () => {
-    assert.deepEqual(Array.from(EVENTS), ['state', 'peerjoined', 'peerupdated', 'peerleft', 'message', 'track', 'trackended']);
+    assert.deepEqual(Array.from(EVENTS), ['state', 'peerjoined', 'peerupdated', 'peerleft', 'message', 'track', 'trackended',
+        'video']);
     assert.deepEqual(Array.from(STATES), ['idle', 'joining', 'joined', 'reconnecting', 'left', 'failed']);
     assert.ok(Object.isFrozen(EVENTS));
     assert.ok(Object.isFrozen(STATES));

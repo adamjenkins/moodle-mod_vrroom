@@ -147,7 +147,7 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
             array_keys($items['vrroomruntime_builtin_signals']->get_privacy_fields())
         );
         $this->assertEqualsCanonicalizing(
-            ['fullname', 'ipaddress', 'pose', 'voice'],
+            ['fullname', 'ipaddress', 'pose', 'voice', 'video', 'appearance'],
             array_keys($items['livepeers']->get_privacy_fields())
         );
         $this->assertSame(['ipaddress'], array_keys($items['iceservers']->get_privacy_fields()));

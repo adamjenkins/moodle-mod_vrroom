@@ -66,5 +66,15 @@ function xmldb_vrroom_upgrade(int $oldversion): bool {
         upgrade_mod_savepoint(true, 2026100803, 'vrroom');
     }
 
+    if ($oldversion < 2026101000) {
+        // Webcams in live rooms (built-in run mode): on by default, so existing activities allow them too.
+        $table = new xmldb_table('vrroom');
+        $field = new xmldb_field('livevideo', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'liverooms');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        upgrade_mod_savepoint(true, 2026101000, 'vrroom');
+    }
+
     return true;
 }

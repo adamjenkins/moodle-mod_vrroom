@@ -19,7 +19,7 @@ namespace mod_vrroom\local;
 use mod_vrroom\local\runtime\registry as runtime_registry;
 
 /**
- * Live mode settings of an activity: the mode, the number of rooms and their cleaning.
+ * Live mode settings of an activity: the mode, the number of rooms, webcams and their cleaning.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -36,6 +36,10 @@ final class live_settings {
     public const MAX_ROOMS = 20;
     /** @var int Default number of rooms. */
     public const DEFAULT_ROOMS = 1;
+    /** @var int Webcams in live rooms by default (vrroom.livevideo). */
+    public const DEFAULT_VIDEO = 1;
+    /** @var string The run mode that sends webcam video in live rooms. */
+    public const VIDEO_RUNTIME = 'builtin';
 
     /**
      * Clean a live mode value.
@@ -68,6 +72,16 @@ final class live_settings {
             return self::DEFAULT_ROOMS;
         }
         return $rooms;
+    }
+
+    /**
+     * Clean the "Webcams in live rooms" value.
+     *
+     * @param mixed $value Submitted or restored value.
+     * @return int 0 or 1.
+     */
+    public static function clean_video($value): int {
+        return empty($value) ? 0 : 1;
     }
 
     /**

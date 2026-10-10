@@ -20,8 +20,9 @@
  *       m '3d'|'vr'|'mr'|'ar', h head and l/r hands (or null) as [x, y, z, qx, qy, qz, qw] in
  *       room coordinates; positions |v| <= 1000 with 3 decimals, quaternion components in
  *       [-1.01, 1.01] with 4 decimals, normalised on decode. At most 1024 bytes.
- * state {t: 's', m: '3d'|'vr'|'mr'|'ar'|'list', sc: scene id or '', mic: 'off'|'on'|'muted'}.
- *       At most 512 bytes.
+ * state {t: 's', m: '3d'|'vr'|'mr'|'ar'|'list', sc: scene id or '', mic: 'off'|'on'|'muted'[, cam: true]}.
+ *       cam is there only while the sender's camera is on (older browsers leave it out, which
+ *       reads as off). At most 512 bytes.
  *
  * Anything else encodes and decodes to null. Messages come from other people's browsers: decode
  * rebuilds every message from known keys only.
@@ -233,7 +234,14 @@ const buildState = (message) => {
     if (message.sc !== '' && !isSceneId(message.sc)) {
         return null;
     }
-    return {t: 's', m: message.m, sc: message.sc, mic: message.mic};
+    if (message.cam !== undefined && typeof message.cam !== 'boolean') {
+        return null;
+    }
+    const built = {t: 's', m: message.m, sc: message.sc, mic: message.mic};
+    if (message.cam === true) {
+        built.cam = true;
+    }
+    return built;
 };
 
 /**

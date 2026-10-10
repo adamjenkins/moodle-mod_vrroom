@@ -19,7 +19,7 @@
  * Fullscreen covers the whole viewport (the room and this bar), so the HUD buttons, panels and
  * the bar stay usable. The live room panel sits above the viewport on the page; while the viewport
  * is fullscreen it is moved in under the bar (a strip of at most a third of the screen that
- * scrolls), so leaving, the microphone and the people in the room stay in reach, and put back
+ * scrolls), so leaving, the microphone, the camera and the people in the room stay in reach, and put back
  * when fullscreen ends. The drag settings are the user preferences mod_vrroom_invertx,
  * mod_vrroom_inverty and mod_vrroom_locky, so they apply in every VR room activity.
  *

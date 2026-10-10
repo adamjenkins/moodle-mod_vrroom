@@ -7,6 +7,22 @@ All notable changes to this plugin are documented here. The format follows
 
 ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
+### Added
+
+- Webcams in built-in live rooms: a Camera button next to the microphone; a person's video shows on
+  the face screen of their avatar and fades in and out without reconnecting (one video transceiver per
+  connection, `replaceTrack`, about 320×240 at 15 fps). Per-person "Hide video for me". Site setting
+  `vrroomruntime_builtin/livevideo` and activity setting `vrroom.livevideo` (both default on;
+  `$plugin->version` 2026101000, schema change with upgrade step; built-in run mode 2026101000).
+- Hook `\mod_vrroom\hook\avatar_appearance`, dispatched when the built-in run mode lists the people in
+  a live room: an optional plugin (such as local_avatar) can describe how each avatar looks
+  (`vrroom-avatar/1`) and give a profile picture. Without a listener every avatar looks as before.
+- The avatar builder (`vrroomruntime_builtin/live/avatarmodel`) draws designed avatars (body, head,
+  colours, hair, glasses, hats, a face screen with face, profile picture or webcam).
+- A "beam in" effect where an avatar appears in a live room: a soft column of light in the person's
+  accent colour and a spreading ring, 1.5 s, no flicker; none with reduced motion
+  (`vrroomruntime_builtin/live/spawnflash`).
+
 ### Changed
 
 - Template choice moved from per-template activity-chooser entries into the settings form

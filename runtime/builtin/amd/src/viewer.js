@@ -304,6 +304,8 @@ const run = (p) => {
         avatars.setRoom(current.handle.root, current.doc.id);
         avatars.setMode('3d');
     }
+    // Webcams: the avatar layer registers itself with the live controller (avatars.js), which hands
+    // each person's video to their avatar's face screen.
 
     const panels = createPanels(stage, session, {
         onClose: () => canvas.focus({preventScroll: true}),

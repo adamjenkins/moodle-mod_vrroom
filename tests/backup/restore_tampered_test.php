@@ -213,6 +213,7 @@ final class restore_tampered_test extends \advanced_testcase {
             $this->set_child($vrroom, 'livemode', '7');
             $this->set_child($vrroom, 'liverooms', '999');
             $this->set_child($vrroom, 'livemaxusers', '1000');
+            $this->set_child($vrroom, 'livevideo', '9');
             $this->set_child($vrroom, 'questionmode', '<b>evil</b>');
             $this->set_child($vrroom, 'retrypenalty', '5');
             $this->set_child($vrroom, 'grade', '-3');
@@ -274,6 +275,7 @@ final class restore_tampered_test extends \advanced_testcase {
         $this->assertSame(live_settings::MODE_OFF, (int)$new->livemode);
         $this->assertSame(live_settings::MAX_ROOMS, (int)$new->liverooms);
         $this->assertSame(50, (int)$new->livemaxusers);
+        $this->assertSame(1, (int)$new->livevideo);
         $this->assertSame(mode::ONCE, $new->questionmode);
         $this->assertContainsEquals((float)$new->retrypenalty, mode::PENALTIES);
         $this->assertSame(0, (int)$new->grade);
@@ -309,6 +311,29 @@ final class restore_tampered_test extends \advanced_testcase {
         foreach ($events as $event) {
             $this->assertMatchesRegularExpression(self::UUID_PATTERN, $event->statementid);
         }
+    }
+
+    /**
+     * A backup made before "Webcams in live rooms" existed (no livevideo) restores with webcams allowed,
+     * the default; an activity with webcams off keeps them off.
+     */
+    public function test_restore_live_video_missing_or_off(): void {
+        global $DB;
+        $this->resetAfterTest();
+        $this->setAdminUser();
+        [$course, $vrroom, $cm] = $this->create_setup();
+        $DB->set_field('vrroom', 'livevideo', 0, ['id' => $vrroom->id]);
+
+        $newcourseid = $this->backup_tamper_restore($course, $cm, function (\DOMDocument $xml): void {
+            $field = $this->element($this->element($xml, 'vrroom'), 'livevideo');
+            $field->parentNode->removeChild($field);
+        });
+        $this->assertSame(1, (int)$this->get_restored($newcourseid)->livevideo);
+
+        $newcourseid = $this->backup_tamper_restore($course, $cm, function (\DOMDocument $xml): void {
+            $this->assertSame('0', $this->element($this->element($xml, 'vrroom'), 'livevideo')->textContent);
+        });
+        $this->assertSame(0, (int)$this->get_restored($newcourseid)->livevideo);
     }
 
     /**

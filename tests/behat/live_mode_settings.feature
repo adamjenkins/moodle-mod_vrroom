@@ -43,6 +43,20 @@ Feature: A teacher turns on live mode for a VR room activity
     And "Number of rooms" "field" should be visible
     And "Maximum participants" "field" should be visible
 
+  Scenario: Webcams in live rooms are on by default, shown only with live mode on, and can be turned off
+    Given I am on the "Museum walk" "vrroom activity editing" page logged in as "teacher1"
+    And I expand all fieldsets
+    When I set the field "Live mode" to "Off"
+    Then "Webcams in live rooms" "field" should not be visible
+    And I set the field "Live mode" to "On, fixed rooms"
+    And "Webcams in live rooms" "field" should be visible
+    And the field "Webcams in live rooms" matches value "1"
+    And I set the field "Webcams in live rooms" to "0"
+    And I press "Save and display"
+    And I am on the "Museum walk" "vrroom activity editing" page
+    And I expand all fieldsets
+    And the field "Webcams in live rooms" matches value "0"
+
   Scenario: Students open rooms without a limit on the number of rooms
     Given I am on the "Museum walk" "vrroom activity editing" page logged in as "teacher1"
     And I expand all fieldsets

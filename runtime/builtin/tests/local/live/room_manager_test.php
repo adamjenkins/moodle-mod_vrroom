@@ -766,6 +766,61 @@ final class room_manager_test extends \advanced_testcase {
     }
 
     /**
+     * The peer list asks the avatar_appearance listeners once per list, for all listed people, and
+     * carries what they set; people they leave out, and lists without listeners, get '' (today's look).
+     */
+    public function test_roster_appearances(): void {
+        $this->resetAfterTest();
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::install();
+        $activity = $this->create_activity();
+        $other = $this->presence($activity, 1);
+        $plain = $this->presence($activity, 1);
+        [$user, $attempt] = $this->learner($activity);
+        $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'broad', 'color' => 'red', 'picture' => true];
+        $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
+        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($other, $doc, $picture): void {
+            $this->assertInstanceOf(\context_module::class, $hook->get_context());
+            $hook->set_appearance((string)$other->peerid, $doc, $picture);
+        };
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::$callback = $callback;
+
+        $joined = $this->join($activity, $user, $attempt);
+        $this->assertSame(1, \mod_vrroom\tests\hook\avatar_appearance_callbacks::$calls);
+        $this->assertEqualsCanonicalizing(
+            [
+                ['peerid' => (string)$other->peerid, 'userid' => (int)$other->userid],
+                ['peerid' => (string)$plain->peerid, 'userid' => (int)$plain->userid],
+            ],
+            \mod_vrroom\tests\hook\avatar_appearance_callbacks::$peerlists[0]
+        );
+        $bypeer = array_column($joined['peers'], null, 'peerid');
+        $this->assertSame($doc, json_decode($bypeer[$other->peerid]['appearance'], true));
+        $this->assertSame($picture, $bypeer[$other->peerid]['picture']);
+        $this->assertSame('', $bypeer[$plain->peerid]['appearance']);
+        $this->assertSame('', $bypeer[$plain->peerid]['picture']);
+
+        // A poll asks again (looks can change while people are in the room).
+        $poll = $this->poll($activity, $joined['peer']);
+        $this->assertSame(2, \mod_vrroom\tests\hook\avatar_appearance_callbacks::$calls);
+        $this->assertSame($picture, array_column($poll['peers'], null, 'peerid')[$other->peerid]['picture']);
+
+        // Alone in a room: nobody to ask about, no dispatch.
+        $activity2 = $this->create_activity(NOGROUPS, 6, $activity['course']);
+        [$user2, $attempt2] = $this->learner($activity2);
+        $this->assertSame([], $this->join($activity2, $user2, $attempt2)['peers']);
+        $this->assertSame(2, \mod_vrroom\tests\hook\avatar_appearance_callbacks::$calls);
+
+        // Without listeners every look is today's.
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::install(false);
+        $poll = $this->poll($activity, $joined['peer']);
+        foreach ($poll['peers'] as $entry) {
+            $this->assertSame('', $entry['appearance']);
+            $this->assertSame('', $entry['picture']);
+        }
+        \mod_vrroom\tests\hook\avatar_appearance_callbacks::reset();
+    }
+
+    /**
      * Join and expect a refusal.
      *
      * @param array $activity Activity from create_activity().

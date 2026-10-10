@@ -76,3 +76,8 @@ First release.
   does, and a room whose tasks no longer fit it is rebuilt from its template.
 - Live mode explains when people cannot connect because no STUN or TURN server is set up, and the
   built-in viewer's settings page warns about it.
+- Webcams in live rooms: turn your camera on and others see you on the face of your avatar; turn it
+  off and your avatar's face comes back, without leaving the room. Teachers and administrators can
+  turn webcams off.
+- Avatars can be designed by each user with the optional VR avatar plugin (local_avatar).
+- People appearing in a live room "beam in" with a short, soft flash of light.
