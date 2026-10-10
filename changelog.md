@@ -61,6 +61,15 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 - A "beam in" effect where an avatar appears in a live room: a soft column of light in the person's
   accent colour and a spreading ring, 1.5 s, no flicker; none with reduced motion
   (`vrroomruntime_builtin/live/spawnflash`).
+- Fullscreen: a "Hide controls" button among the room's buttons hides the bar under the room (and
+  the live room panel moved in under it) so the room fills the screen; "Show controls" or leaving
+  fullscreen brings them back.
+
+### Fixed
+
+- Fullscreen on a phone: an open panel (a sheet at the bottom of the screen) lay over the bar under
+  the room, so the reverse and lock checkboxes and the fullscreen button took no clicks. The sheet
+  now sits at the bottom of the room, above the bar.
 
 ### Changed
 

@@ -23,6 +23,8 @@
     also holds the bar under the room (fullscreen, reversed or locked dragging), list view, progress
     panel and the live region for screen readers. While the viewport is fullscreen, stagebar.js moves
     the live room panel into it under the bar, so the live controls stay in reach, and puts it back after.
+    In fullscreen the "Hide controls" button among the room's buttons hides the bar and that panel
+    (and "Show controls" brings them back); leaving fullscreen shows them again.
     The bar's "look around by moving your phone" toggle stays hidden until a 360° photo room is shown
     on a device with orientation events. Shown by another plugin (standalone.js), the shell has no
     launch buttons, no progress panel and no live room panel.
@@ -79,6 +81,7 @@
                 {{^standalone}}
                 <button type="button" class="btn btn-light btn-sm" data-action="vrroom-toggle-progress" aria-expanded="false" aria-controls="vrroom-progress-{{cmid}}">{{#str}}progress, vrroomruntime_builtin{{/str}}</button>
                 {{/standalone}}
+                <button type="button" class="btn btn-light btn-sm d-none" data-action="vrroom-togglebar" aria-expanded="true" aria-controls="vrroom-stagebar-{{cmid}}">{{#str}}hidecontrols, vrroomruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-light btn-sm" data-action="vrroom-switch-list">{{#str}}switchtolist, vrroomruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-vr">{{#str}}entervr, vrroomruntime_builtin{{/str}}</button>
                 <button type="button" class="btn btn-primary btn-sm d-none" data-action="vrroom-enter-ar">{{#str}}enterar, vrroomruntime_builtin{{/str}}</button>
@@ -89,7 +92,7 @@
         </div>
         <div class="vrroom-overlay" data-region="vrroom-overlay"></div>
     </div>
-    <div class="vrroom-stagebar" data-region="vrroom-stagebar">
+    <div class="vrroom-stagebar" id="vrroom-stagebar-{{cmid}}" data-region="vrroom-stagebar">
         <button type="button" class="btn btn-secondary btn-sm d-none" data-action="vrroom-fullscreen" aria-pressed="false">{{#str}}fullscreen, vrroomruntime_builtin{{/str}}</button>
         <div class="form-check mb-0">
             <input class="form-check-input" type="checkbox" id="vrroom-invertx-{{cmid}}" data-action="vrroom-invertx">

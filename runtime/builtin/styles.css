@@ -47,6 +47,12 @@
     color: #fff;
 }
 
+/* Fullscreen with the controls hidden ("Hide controls"): the room fills the whole screen. */
+.vrroom-viewport.vrroom-controls-hidden > .vrroom-stagebar,
+.vrroom-viewport.vrroom-controls-hidden > .vrroom-liveroom {
+    display: none;
+}
+
 .vrroom-canvas {
     display: block;
     width: 100%;
@@ -302,10 +308,12 @@
         max-height: calc(100vh - 80px - 4.5rem);
     }
 
-    /* Fullscreen: no navigation bar and no footer. */
+    /* Fullscreen: a sheet at the bottom of the room, above the bar under it (fixed to the bottom
+       of the screen it would lie over the bar and take its clicks), below the room's buttons. */
     .vrroom-viewport:fullscreen .vrroom-overlay {
+        position: absolute;
         bottom: 0;
-        max-height: calc(100vh - 1rem);
+        max-height: calc(100% - 3.5rem);
     }
 
     /* The board texts and panels of the room never make the page wider than the screen. */

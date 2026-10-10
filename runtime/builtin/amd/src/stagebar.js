@@ -20,7 +20,9 @@
  * the bar stay usable. The live room panel sits above the viewport on the page; while the viewport
  * is fullscreen it is moved in under the bar (a strip of at most a third of the screen that
  * scrolls), so leaving, the microphone, the camera and the people in the room stay in reach, and put back
- * when fullscreen ends. The drag settings are the user preferences mod_vrroom_invertx,
+ * when fullscreen ends. In fullscreen, "Hide controls" (among the room's buttons, so it stays in
+ * reach) hides the bar and that panel until "Show controls" or the end of fullscreen. The drag
+ * settings are the user preferences mod_vrroom_invertx,
  * mod_vrroom_inverty and mod_vrroom_locky, so they apply in every VR room activity.
  *
  * In a 360° photo room on a device with orientation events the bar also offers "Look around by
@@ -103,7 +105,11 @@ export const createStagebar = (root, controls, look) => {
     const boxx = bar.querySelector('[data-action="vrroom-invertx"]');
     const boxy = bar.querySelector('[data-action="vrroom-inverty"]');
     const boxlock = bar.querySelector('[data-action="vrroom-locky"]');
-    const labels = {enter: button ? button.textContent : '', exit: ''};
+    const labels = {enter: button ? button.textContent : '', exit: '', hide: '', show: ''};
+    const togglebar = root.querySelector('[data-action="vrroom-togglebar"]');
+    if (togglebar) {
+        labels.hide = togglebar.textContent;
+    }
     const liveroom = region(root, 'vrroom-liveroom');
     // Where the live room panel goes back to after fullscreen.
     let liveplace = null;
@@ -191,10 +197,31 @@ export const createStagebar = (root, controls, look) => {
         }
     };
 
+    // Hiding the controls in fullscreen: the bar and the live room panel moved in under it.
+    let hidden = false;
+    const showControls = (show) => {
+        hidden = !show;
+        viewport.classList.toggle('vrroom-controls-hidden', hidden);
+        if (togglebar) {
+            togglebar.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+            togglebar.textContent = hidden && labels.show ? labels.show : labels.hide;
+        }
+    };
+    const onToggle = (e) => {
+        e.preventDefault();
+        showControls(hidden);
+    };
+
     // Fullscreen.
     const showLabel = () => {
         const on = fullscreenElement() === viewport;
         placeLive(on);
+        if (togglebar) {
+            togglebar.classList.toggle('d-none', !on);
+        }
+        if (!on || !togglebar) {
+            showControls(true);
+        }
         if (!button) {
             return;
         }
@@ -212,14 +239,21 @@ export const createStagebar = (root, controls, look) => {
     if (button && canFullscreen(viewport)) {
         button.classList.remove('d-none');
         bar.addEventListener('click', onClick);
+        if (togglebar) {
+            togglebar.addEventListener('click', onToggle);
+        }
         document.addEventListener('fullscreenchange', showLabel);
         document.addEventListener('webkitfullscreenchange', showLabel);
         getStrings([
             {key: 'fullscreen', component: 'vrroomruntime_builtin'},
             {key: 'exitfullscreen', component: 'vrroomruntime_builtin'},
-        ]).then(([enter, exit]) => {
+            {key: 'hidecontrols', component: 'vrroomruntime_builtin'},
+            {key: 'showcontrols', component: 'vrroomruntime_builtin'},
+        ]).then(([enter, exit, hide, show]) => {
             labels.enter = enter;
             labels.exit = exit;
+            labels.hide = hide;
+            labels.show = show;
             showLabel();
             return undefined;
         }).catch((error) => Log.debug(error));
@@ -249,6 +283,11 @@ export const createStagebar = (root, controls, look) => {
         dispose() {
             bar.removeEventListener('change', onChange);
             bar.removeEventListener('click', onClick);
+            if (togglebar) {
+                togglebar.removeEventListener('click', onToggle);
+                togglebar.classList.add('d-none');
+            }
+            showControls(true);
             document.removeEventListener('fullscreenchange', showLabel);
             document.removeEventListener('webkitfullscreenchange', showLabel);
             if (fullscreenElement() === viewport) {
