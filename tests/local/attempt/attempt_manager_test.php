@@ -167,6 +167,8 @@ final class attempt_manager_test extends \advanced_testcase {
      */
     public function test_start_releases_lock_and_transaction(): void {
         global $DB;
+        // On PostgreSQL the test harness runs each test inside a transaction of its own.
+        $this->preventResetByRollback();
         $fx = $this->setup_activity(['maxattempts' => 1]);
         $userid = (int)$fx->student->id;
         $factory = \core\lock\lock_config::get_lock_factory('mod_vrroom');

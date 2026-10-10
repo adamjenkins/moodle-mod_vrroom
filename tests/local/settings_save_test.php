@@ -160,6 +160,8 @@ final class settings_save_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $this->setAdminUser();
+        // On PostgreSQL the test harness runs each test inside a transaction of its own.
+        $this->preventResetByRollback();
         $course = $this->getDataGenerator()->create_course();
         $vrroom = $this->getDataGenerator()->create_module('vrroom', [
             'course' => $course->id,

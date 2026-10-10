@@ -71,6 +71,10 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Fixed
 
+- A failed activity save drops the course's cached module info without writing to the database
+  (`instance_manager::drop_course_cache()`), so on PostgreSQL, where a failed query aborts the
+  transaction, the rollback still runs.
+
 - Room editor: a room's name is escaped in the Delete room confirmation (it was placed in the dialogue
   as HTML).
 - Restore: a question link to a question bank entry that is not in the backup is kept only for a

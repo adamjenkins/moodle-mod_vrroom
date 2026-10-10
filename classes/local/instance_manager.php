@@ -111,11 +111,34 @@ final class instance_manager {
             // rollback lowers again. The cache is not part of the transaction and would outlive the
             // course module that core deletes after a failed add, breaking the course page
             // (invalidcoursemodule). Drop it, so the next page builds it from the database.
-            rebuild_course_cache((int)$data->course, true);
+            self::drop_course_cache((int)$data->course);
             $transaction->rollback($e);
         }
 
         return (int)$vrroom->id;
+    }
+
+    /**
+     * Drop a course's cached module info, in this request and in the cache store.
+     *
+     * Called while a transaction is being given up: it writes nothing to the database, since on
+     * PostgreSQL every query after a failed one in the same transaction fails too, which would stop
+     * the rollback (rebuild_course_cache() also raises the course's cache revision in the database).
+     *
+     * @param int $courseid Course id.
+     * @return void
+     */
+    private static function drop_course_cache(int $courseid): void {
+        \core_course\modinfo::clear_instance_cache($courseid);
+        // The store requires its own lock (file-based by default, not the database) for any write.
+        $cache = \cache::make('core', 'coursemodinfo');
+        if ($cache->acquire_lock($courseid)) {
+            try {
+                $cache->delete($courseid);
+            } finally {
+                $cache->release_lock($courseid);
+            }
+        }
     }
 
     /**
@@ -253,7 +276,7 @@ final class instance_manager {
         } catch (\Throwable $e) {
             // As in add_instance(): module info cached above with the changes would outlive the
             // rollback. Drop it, so the next page builds it from the database.
-            rebuild_course_cache((int)$vrroom->course, true);
+            self::drop_course_cache((int)$vrroom->course);
             $transaction->rollback($e);
         }
 
