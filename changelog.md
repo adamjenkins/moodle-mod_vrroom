@@ -20,7 +20,9 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   a live room: an optional plugin (such as local_avatar) can describe how each avatar looks
   (`vrroom-avatar/1`) and give a profile picture. Without a listener every avatar looks as before.
 - The avatar builder (`vrroomruntime_builtin/live/avatarmodel`) draws designed avatars (body, head,
-  colours, hair, glasses, hats, a face screen with face, profile picture or webcam).
+  colours, hair, glasses, hats, a face screen with face, profile picture or webcam): 14 hairstyles and
+  10 hair colours, round/square/oval/heart heads, skin tones, eyes, eyebrows, nose, ears and beards
+  (all optional keys of `vrroom-avatar/1` whose defaults keep the earlier look); hats adapt to tall hair.
 - A "beam in" effect where an avatar appears in a live room: a soft column of light in the person's
   accent colour and a spreading ring, 1.5 s, no flicker; none with reduced motion
   (`vrroomruntime_builtin/live/spawnflash`).
@@ -88,6 +90,9 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   `mod_vrroom` and 2026100801 for `vrroomruntime_builtin` (schema changes, with upgrade steps).
 
 ### Fixed
+
+- The progress panel's redraw is pending work (`core/pending`), so tests no longer click a button that
+  is about to be replaced.
 
 - Live mode: when a person cannot be connected to and the site has no STUN or TURN server, the
   participant list says why and to ask the administrator (`liveconnectfailednoservers`); the built-in

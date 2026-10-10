@@ -329,6 +329,8 @@ const buildProgress = (host, session, options, strings) => {
         const mine = sequence;
         const state = session.getState();
         let scoretext = '';
+        // Behat (and anything else waiting for the page to settle) waits until the new list is in.
+        const pending = new Pending('vrroomruntime_builtin/panels:progress');
         return getString('scoreprogress', 'vrroomruntime_builtin', {
             earned: formatPoints(state.earnedpoints),
             max: formatPoints(state.maxpoints),
@@ -348,7 +350,7 @@ const buildProgress = (host, session, options, strings) => {
                 tick();
             }
             return undefined;
-        }).catch(Notification.exception);
+        }).catch(Notification.exception).then(() => pending.resolve());
     };
 
     /**
