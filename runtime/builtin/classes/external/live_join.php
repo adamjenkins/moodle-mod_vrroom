@@ -146,6 +146,12 @@ class live_join extends external_api {
                 VALUE_DEFAULT,
                 ''
             ),
+            'assets' => new external_value(
+                PARAM_RAW,
+                'JSON object of the costume model URLs by name (outfit, hat), \'\' for none',
+                VALUE_DEFAULT,
+                ''
+            ),
         ]);
     }
 

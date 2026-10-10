@@ -23,6 +23,14 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   colours, hair, glasses, hats, a face screen with face, profile picture or webcam): 14 hairstyles and
   10 hair colours, round/square/oval/heart heads, skin tones, eyes, eyebrows, nose, ears and beards
   (all optional keys of `vrroom-avatar/1` whose defaults keep the earlier look); hats adapt to tall hair.
+- Costumes: the avatar_appearance hook's `set_appearance()` takes an optional map of asset URLs
+  (`outfit`, `hat`; http(s) only), sent to the browser as the peers' `assets`; the avatar builder wears
+  body costumes (the head on the costume's neck, accent-tinted materials, lights) and device costumes
+  (a PC or TV whose screen shows the face, profile picture or webcam), and model hats. Costume files
+  come from an optional plugin such as local_avatar. `$plugin->version` 2026101001 (API addition).
+- Live rooms pass every look field (appearance, picture, assets) through the roster, so costumes
+  reach the other people in the room; black and white added to the avatar colours; costume lamps
+  are larger with a soft glow.
 - A "beam in" effect where an avatar appears in a live room: a soft column of light in the person's
   accent colour and a spreading ring, 1.5 s, no flicker; none with reduced motion
   (`vrroomruntime_builtin/live/spawnflash`).

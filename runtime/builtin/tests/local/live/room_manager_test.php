@@ -778,9 +778,11 @@ final class room_manager_test extends \advanced_testcase {
         [$user, $attempt] = $this->learner($activity);
         $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'broad', 'color' => 'red', 'picture' => true];
         $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
-        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($other, $doc, $picture): void {
+        $outfit = 'https://example.org/local/avatar/costumes/robot-screen.glb';
+        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($other, $plain, $doc, $picture, $outfit): void {
             $this->assertInstanceOf(\context_module::class, $hook->get_context());
-            $hook->set_appearance((string)$other->peerid, $doc, $picture);
+            $hook->set_appearance((string)$other->peerid, $doc, $picture, ['outfit' => $outfit, 'hat' => 'data:x', 'x' => $outfit]);
+            $hook->set_appearance((string)$plain->peerid, $doc, '', ['outfit' => 'javascript:alert(1)']);
         };
         \mod_vrroom\tests\hook\avatar_appearance_callbacks::$callback = $callback;
 
@@ -796,8 +798,11 @@ final class room_manager_test extends \advanced_testcase {
         $bypeer = array_column($joined['peers'], null, 'peerid');
         $this->assertSame($doc, json_decode($bypeer[$other->peerid]['appearance'], true));
         $this->assertSame($picture, $bypeer[$other->peerid]['picture']);
-        $this->assertSame('', $bypeer[$plain->peerid]['appearance']);
+        $this->assertSame(['outfit' => $outfit], json_decode($bypeer[$other->peerid]['assets'], true));
+        // A look whose only asset was invalid keeps the look, with no assets.
+        $this->assertSame($doc, json_decode($bypeer[$plain->peerid]['appearance'], true));
         $this->assertSame('', $bypeer[$plain->peerid]['picture']);
+        $this->assertSame('', $bypeer[$plain->peerid]['assets']);
 
         // A poll asks again (looks can change while people are in the room).
         $poll = $this->poll($activity, $joined['peer']);
@@ -816,6 +821,7 @@ final class room_manager_test extends \advanced_testcase {
         foreach ($poll['peers'] as $entry) {
             $this->assertSame('', $entry['appearance']);
             $this->assertSame('', $entry['picture']);
+            $this->assertSame('', $entry['assets']);
         }
         \mod_vrroom\tests\hook\avatar_appearance_callbacks::reset();
     }

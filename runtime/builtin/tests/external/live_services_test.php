@@ -71,7 +71,14 @@ final class live_services_test extends \advanced_testcase {
         $this->setUser($b);
         $joinb = $this->join($cmid, (int)$attemptb->id);
         $this->assertSame(
-            [['peerid' => $joina['peerid'], 'name' => fullname($a), 'kind' => 'attempt', 'appearance' => '', 'picture' => '']],
+            [[
+                'peerid' => $joina['peerid'],
+                'name' => fullname($a),
+                'kind' => 'attempt',
+                'appearance' => '',
+                'picture' => '',
+                'assets' => '',
+            ]],
             $joinb['peers']
         );
 
@@ -209,7 +216,7 @@ final class live_services_test extends \advanced_testcase {
     }
 
     /**
-     * Join and poll return each person's appearance and picture from the avatar_appearance listeners.
+     * Join and poll return each person's appearance, picture and assets from the avatar_appearance listeners.
      */
     public function test_appearance_fields(): void {
         $this->resetAfterTest();
@@ -219,10 +226,14 @@ final class live_services_test extends \advanced_testcase {
         [$b, $attemptb] = $this->learner($course, $vrroom);
         $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'slim', 'head' => 'square', 'color' => 'green', 'picture' => true];
         $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
-        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($a, $doc, $picture): void {
+        $assets = [
+            'outfit' => 'https://example.org/local/avatar/costumes/pirate-captain.glb',
+            'hat' => 'https://example.org/local/avatar/costumes/hat-pirate.glb',
+        ];
+        $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($a, $doc, $picture, $assets): void {
             foreach ($hook->get_peers() as $peer) {
                 if ($peer['userid'] === (int)$a->id) {
-                    $hook->set_appearance($peer['peerid'], $doc, $picture);
+                    $hook->set_appearance($peer['peerid'], $doc, $picture, $assets + ['skin' => 'https://example.org/x']);
                 }
             }
         };
@@ -235,12 +246,14 @@ final class live_services_test extends \advanced_testcase {
         $this->assertCount(1, $joinb['peers']);
         $this->assertSame($doc, json_decode($joinb['peers'][0]['appearance'], true));
         $this->assertSame($picture, $joinb['peers'][0]['picture']);
+        $this->assertSame($assets, json_decode($joinb['peers'][0]['assets'], true));
 
         $this->setUser($a);
         $poll = external_api::clean_returnvalue(live_poll::execute_returns(), live_poll::execute($joina['peerid'], false));
         $this->assertSame([$joinb['peerid']], array_column($poll['peers'], 'peerid'));
         $this->assertSame('', $poll['peers'][0]['appearance']);
         $this->assertSame('', $poll['peers'][0]['picture']);
+        $this->assertSame('', $poll['peers'][0]['assets']);
         \mod_vrroom\tests\hook\avatar_appearance_callbacks::reset();
     }
 
@@ -263,8 +276,14 @@ final class live_services_test extends \advanced_testcase {
         $this->setUser($a);
         $joina = $this->join($cmid, (int)$attempta->id);
         $this->assertSame(
-            [['peerid' => $jointeacher['peerid'], 'name' => fullname($teacher), 'kind' => 'preview', 'appearance' => '',
-                'picture' => '']],
+            [[
+                'peerid' => $jointeacher['peerid'],
+                'name' => fullname($teacher),
+                'kind' => 'preview',
+                'appearance' => '',
+                'picture' => '',
+                'assets' => '',
+            ]],
             $joina['peers']
         );
 

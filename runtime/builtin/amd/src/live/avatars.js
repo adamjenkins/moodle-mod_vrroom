@@ -21,7 +21,8 @@
  * controller, never to the transport, so another transport does not change it.
  *
  * Each avatar wears the person's appearance (from the live-room peer list: a "vrroom-avatar/1"
- * JSON text and a picture URL, '' for none) and can show their webcam on its face screen:
+ * JSON text, a picture URL and a JSON object of costume model URLs {outfit, hat}, each '' for none)
+ * and can show their webcam on its face screen:
  * setVideo(peerid, stream) gives a person's media stream (or null), and the video fades in while the
  * stream has a live, unmuted video track, and fades back to the face when the track ends or is muted.
  * The layer registers itself with the live controller's attachVideoSink() to get these calls.
@@ -42,7 +43,7 @@
 import Log from 'core/log';
 import {createInterpolator} from 'vrroomruntime_builtin/live/interpolation';
 import {createPoseSource} from 'vrroomruntime_builtin/live/posesource';
-import {createAvatar, parseAppearance, cleanPictureUrl, hasLiveVideo, FADE_MS, COLOURS, hueOf}
+import {createAvatar, parseAppearance, parseAssets, cleanPictureUrl, hasLiveVideo, FADE_MS, COLOURS, hueOf}
     from 'vrroomruntime_builtin/live/avatarmodel';
 import {createSpawnFlash, prefersReducedMotion, timeline as flashTimeline} from 'vrroomruntime_builtin/live/spawnflash';
 
@@ -135,7 +136,7 @@ export const createAvatarLayer = (THREE, options) => {
     });
 
     // Peer id → {avatar|null, interpolator, scene, mode, mic, lastpos ([x, z] last drawn, or null),
-    // look {appearance, picture} (texts from the peer list), video (see attachVideo) or null}.
+    // look {appearance, picture, assets} (texts from the peer list), video (see attachVideo) or null}.
     const peers = new Map();
     const unsubscribers = [];
     let lookclock = 0;
@@ -159,7 +160,7 @@ export const createAvatarLayer = (THREE, options) => {
                 mode: '',
                 mic: 'off',
                 lastpos: null,
-                look: {appearance: '', picture: ''},
+                look: {appearance: '', picture: '', assets: ''},
                 video: null,
             };
             peers.set(peerid, entry);
@@ -177,7 +178,7 @@ export const createAvatarLayer = (THREE, options) => {
      *
      * @param {string} peerid Peer id.
      * @param {Object|null} peer Peer object if at hand.
-     * @returns {Object|null} {appearance, picture}, or null when the peer is not listed.
+     * @returns {Object|null} {appearance, picture, assets}, or null when the peer is not listed.
      */
     const lookOf = (peerid, peer) => {
         let found = peer && peer.peerid === peerid ? peer : null;
@@ -194,6 +195,7 @@ export const createAvatarLayer = (THREE, options) => {
         return {
             appearance: typeof found.appearance === 'string' ? found.appearance : '',
             picture: typeof found.picture === 'string' ? found.picture : '',
+            assets: typeof found.assets === 'string' ? found.assets : '',
         };
     };
 
@@ -201,17 +203,26 @@ export const createAvatarLayer = (THREE, options) => {
      * Give an avatar a (new) look when it changed.
      *
      * @param {Object} entry Peer entry.
-     * @param {Object|null} look {appearance, picture}, or null to keep the last one.
+     * @param {Object|null} look {appearance, picture, assets}, or null to keep the last one.
      */
     const applyLook = (entry, look) => {
-        if (!look || (look.appearance === entry.look.appearance && look.picture === entry.look.picture)) {
+        if (!look || (look.appearance === entry.look.appearance && look.picture === entry.look.picture &&
+                look.assets === entry.look.assets)) {
             return;
         }
         entry.look = look;
         if (entry.avatar) {
-            entry.avatar.setAppearance(parseAppearance(look.appearance), cleanPictureUrl(look.picture));
+            entry.avatar.setAppearance(parseAppearance(look.appearance), cleanPictureUrl(look.picture),
+                parseAssets(look.assets));
         }
     };
+
+    /**
+     * A costume that cannot be loaded or worn only leaves the avatar without it.
+     *
+     * @param {Error} error What went wrong.
+     */
+    const costumeFailed = (error) => Log.debug(error);
 
     /**
      * Show or hide a peer's video on their avatar, from the state of the stream.
@@ -458,6 +469,8 @@ export const createAvatarLayer = (THREE, options) => {
                 seed: detail.peerid,
                 name: nameOf(detail.peerid),
                 pictureurl: cleanPictureUrl(entry.look.picture),
+                assets: parseAssets(entry.look.assets),
+                onError: costumeFailed,
             });
             entry.avatar.object.visible = false;
             if (roomroot) {

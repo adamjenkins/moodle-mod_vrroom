@@ -66,17 +66,52 @@ final class avatar_appearance_test extends \advanced_testcase {
         $hook->set_appearance(self::PEERA, ['schema' => 'vrroom-avatar/1']);
         $hook->set_appearance(self::PEERA, $doc, 'https://example.org/pluginfile.php/5/user/icon/boost/f1');
         $this->assertSame(
-            [self::PEERA => ['appearance' => $doc, 'picture' => 'https://example.org/pluginfile.php/5/user/icon/boost/f1']],
+            [self::PEERA => [
+                'appearance' => $doc,
+                'picture' => 'https://example.org/pluginfile.php/5/user/icon/boost/f1',
+                'assets' => [],
+            ]],
             $hook->get_appearances()
         );
 
         // A picture that is not an http(s) URL is dropped; the look stays.
         $hook->set_appearance(self::PEERB, $doc, 'javascript:alert(1)');
-        $this->assertSame(['appearance' => $doc, 'picture' => ''], $hook->get_appearances()[self::PEERB]);
+        $this->assertSame(['appearance' => $doc, 'picture' => '', 'assets' => []], $hook->get_appearances()[self::PEERB]);
 
         // More than MAX_BYTES of JSON is ignored: the earlier look of the peer stays.
         $big = $doc + ['padding' => str_repeat('x', avatar_appearance::MAX_BYTES)];
         $hook->set_appearance(self::PEERB, $big);
         $this->assertSame($doc, $hook->get_appearances()[self::PEERB]['appearance']);
+    }
+
+    /**
+     * Assets: only 'outfit' and 'hat' are kept, each only when it is a clean http(s) URL.
+     */
+    public function test_set_appearance_assets(): void {
+        $hook = new avatar_appearance([['peerid' => self::PEERA, 'userid' => 5]], \context_system::instance());
+        $doc = ['schema' => 'vrroom-avatar/1', 'outfit' => 'pirate-captain', 'hat' => 'pirate'];
+        $outfit = 'https://example.org/local/avatar/costumes/pirate-captain.glb';
+        $hat = 'http://example.org/local/avatar/costumes/hat-pirate.glb';
+
+        $hook->set_appearance(self::PEERA, $doc, '', [
+            'outfit' => $outfit,
+            'hat' => $hat,
+            'shoes' => 'https://example.org/local/avatar/costumes/shoes.glb',
+        ]);
+        $this->assertSame(['outfit' => $outfit, 'hat' => $hat], $hook->get_appearances()[self::PEERA]['assets']);
+
+        // Invalid URLs are dropped one by one; the look and the valid assets stay.
+        $hook->set_appearance(self::PEERA, $doc, '', ['outfit' => 'javascript:alert(1)', 'hat' => $hat]);
+        $this->assertSame(['hat' => $hat], $hook->get_appearances()[self::PEERA]['assets']);
+        $this->assertSame($doc, $hook->get_appearances()[self::PEERA]['appearance']);
+
+        $hook->set_appearance(self::PEERA, $doc, '', [
+            'outfit' => 'ftp://example.org/a.glb',
+            'hat' => 'https://example.org/a b.glb',
+        ]);
+        $this->assertSame([], $hook->get_appearances()[self::PEERA]['assets']);
+
+        $hook->set_appearance(self::PEERA, $doc, '', ['outfit' => ['https://example.org/a.glb'], 'hat' => '']);
+        $this->assertSame([], $hook->get_appearances()[self::PEERA]['assets']);
     }
 }

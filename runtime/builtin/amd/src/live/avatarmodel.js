@@ -34,11 +34,12 @@
  *      "eyes": "dots*|round|almond|sleepy", "brows": "none*|thin|thick|arched",
  *      "nose": "none*|small|round|pointed", "ears": bool (false*),
  *      "beard": "none*|stubble|moustache|goatee|full",
- *      "glasses": bool (false*), "hat": "none*|cap|beanie|sunhat", "picture": bool (true*),
- *      "outfit": "none*"}
+ *      "glasses": bool (false*), "hat": "none*|cap|beanie|sunhat|pirate", "picture": bool (true*),
+ *      "outfit": "none*|<costume id>"}
  *
  * Colours: red #d32f2f, orange #f57c00, yellow #fbc02d, green #388e3c, teal #00897b, cyan #00acc1,
- * blue #1e88e5, indigo #3949ab, purple #8e24aa, pink #d81b60, brown #6d4c41, grey #757575.
+ * blue #1e88e5, indigo #3949ab, purple #8e24aa, pink #d81b60, brown #6d4c41, grey #757575,
+ * black #1b1b1d, white #f4f4f2.
  * Hair colours: black #1c1c1c, brown #5d3a1a, blonde #e0c068, auburn #8d3b1f, grey #9e9e9e,
  * white #eeeeee, red #b8452a, pink #e78fb3, blue #3f6fd8, purple #7b4bb5.
  * Skin tones: porcelain #f9e4d8, fair #f1cfb6, light #e3b48f, medium #c99266, tan #b07646,
@@ -47,7 +48,27 @@
  * accent colour for the collar, the belt, the hat and hair ties. Beards use the hair colour (the
  * moustache has a pale rim of it so it shows on the dark screen; stubble is a soft shadow in a light
  * tint of it on the face screen).
- * "outfit" is reserved for costumes: only "none" is allowed for now.
+ * "outfit" names a costume: "none", or a costume id (lower-case letters, digits and hyphens; which
+ * ids exist is up to the plugin that offers costumes, local_avatar). The hat "pirate" is a model too.
+ *
+ * Costumes (models, "vrroom-costume/1"): the builder never knows where costumes come from. The caller
+ * gives the model URLs as assets {outfit: url, hat: url} (createAvatar() option assets, the third
+ * argument of setAppearance()); an outfit other than "none" is worn when assets.outfit is given, the
+ * pirate hat when assets.hat is given. The glTF binary files are loaded once per URL with three.js's
+ * GLTFLoader (shared by every avatar, cloned per avatar), and their scene extras
+ * {"vrroom": {schema, kind, neck, headscale, screen, tint, ownhands, lights, hat}} say how to wear them
+ * (feet at y = 0, facing -Z, metres; "neck" is where our head centre goes):
+ * - kind "body": the costume replaces the built-in body and follows its position and yaw; our head
+ *   sits at its neck point, scaled by headscale (and doubled while the webcam shows). The materials
+ *   named in tint take the accent colour; lights are small glowing lamps (a bright bead with a soft
+ *   halo), gently pulsing (steady with prefers-reduced-motion).
+ * - kind "device" (a laptop, a monitor, a TV, a computer): replaces the head and the body; the device
+ *   turns with the head's yaw (and a little with its pitch) and its screen (extras.screen) shows the
+ *   face screen: the designed face, the profile picture or the webcam, cropped to fill it. A device
+ *   that stands on the floor (a robot with a screen for a head) is worn like a body, with the face on
+ *   its screen. The head does not grow for the webcam on a device.
+ * - kind "accessory" with a hat offset: the pirate hat, worn on the head like the other hats.
+ * A costume that cannot be loaded, or no asset, leaves the avatar as it would be without it.
  *
  * Head shapes: round (a sphere), square (a rounded cube), oval (taller and narrower) and heart
  * (wider at the brow, narrow chin). The hair, hats, glasses, ears, beard and the face screen follow
@@ -97,6 +118,8 @@ export const COLOURS = Object.freeze({
     pink: '#d81b60',
     brown: '#6d4c41',
     grey: '#757575',
+    black: '#1b1b1d',
+    white: '#f4f4f2',
 });
 
 /** Hair colours (also beards): name → hex. */
@@ -137,15 +160,30 @@ export const CHOICES = Object.freeze({
     hair: Object.freeze(['none', 'short', 'long', 'bun', 'curly', 'afro', 'ponytail', 'braids', 'buzz', 'bob', 'mohawk',
         'sidepart', 'pigtails', 'topknot']),
     haircolor: Object.freeze(Object.keys(HAIR_COLOURS)),
-    hat: Object.freeze(['none', 'cap', 'beanie', 'sunhat']),
+    hat: Object.freeze(['none', 'cap', 'beanie', 'sunhat', 'pirate']),
     skin: Object.freeze(['match', ...Object.keys(SKIN_TONES)]),
     eyes: Object.freeze(['dots', 'round', 'almond', 'sleepy']),
     brows: Object.freeze(['none', 'thin', 'thick', 'arched']),
     nose: Object.freeze(['none', 'small', 'round', 'pointed']),
     beard: Object.freeze(['none', 'stubble', 'moustache', 'goatee', 'full']),
-    // Reserved for costumes; nothing but "none" yet.
+    // The fixed values; a costume id (COSTUME_ID) is allowed as well (cleanAppearance()).
     outfit: Object.freeze(['none']),
 });
+
+/** A costume id: lower-case letters and digits in words joined by hyphens, at most 40 characters. */
+export const COSTUME_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Longest costume id. */
+const COSTUME_ID_MAX = 40;
+
+/** Hats that are models (the value of "hat" → the asset that holds the model). */
+export const MODEL_HATS = Object.freeze(['pirate']);
+
+/** Names of the assets a caller may give (model URLs). */
+export const ASSET_NAMES = Object.freeze(['outfit', 'hat']);
+
+/** Schema name of the costume extras in a model. */
+export const COSTUME_SCHEMA = 'vrroom-costume/1';
 
 /** The on/off choices of the appearance document. */
 export const FLAGS = Object.freeze(['glasses', 'picture', 'ears']);
@@ -240,6 +278,21 @@ const CANVAS_HEIGHT = 64;
 /** Longest name shown on the label (characters, then an ellipsis). */
 const NAME_MAX = 24;
 
+/** Room left between the top of a model hat or an outfit and the middle of the name label (m). */
+const LABEL_CLEAR = 0.1;
+
+/** Colours of a costume's lamps after the first (which is in the accent colour): green, amber. */
+const LIGHT_COLOURS = Object.freeze(['#43e070', '#ffc233']);
+
+/** Radius of a costume lamp's bead (m). */
+export const LIGHT_RADIUS = 0.027;
+
+/** Diameter of a costume lamp's halo (m). */
+export const LIGHT_HALO = 0.11;
+
+/** Side of the halo's soft round texture (pixels). */
+const HALO_SIZE = 32;
+
 /** Height of the speaking ring above the head centre (m). */
 const RING_HEIGHT = 0.42;
 
@@ -294,14 +347,49 @@ const MOUTH_Y = -0.022;
  */
 const EAR_CUT = Math.PI * 0.435;
 
-/** Sphere phi of the ears (the left one at 0, the right one at pi) and half the width of the cut round them. */
-const EAR_GAP = Math.PI * 0.09;
+/**
+ * The rounded cut of the hair round an ear (sphere phi from the ear's centre): flat at EAR_CUT up to
+ * EAR_ARCH_FLAT, then rounding down to the hair's full length at EAR_ARCH_OUT.
+ */
+const EAR_ARCH_FLAT = Math.PI * 0.065;
+const EAR_ARCH_OUT = Math.PI * 0.125;
+
+/**
+ * Sphere phi of the ears' centres: the left one at 2 pi, the right one at 3 pi (as the sides piece
+ * runs from 1.8 pi to 3.2 pi), each moved a little towards the back, where the ears sit.
+ */
+const EAR_PHIS = Object.freeze([Math.PI * 2.02, Math.PI * 2.98]);
+
+/** Columns of the sides cut round the ears: a few round the back, many round each ear. */
+const EAR_COLUMNS = Object.freeze((() => {
+    const start = Math.PI * 1.8;
+    const end = Math.PI * 3.2;
+    const list = [];
+    for (let i = 0; i <= 10; i++) {
+        const phi = start + (end - start) * i / 10;
+        if (EAR_PHIS.every((ear) => Math.abs(phi - ear) > EAR_ARCH_OUT + 0.02)) {
+            list.push(phi);
+        }
+    }
+    EAR_PHIS.forEach((ear) => {
+        for (let i = 0; i <= 12; i++) {
+            list.push(ear - EAR_ARCH_OUT + EAR_ARCH_OUT * 2 * i / 12);
+        }
+    });
+    return list.sort((a, b) => a - b);
+})());
 
 /**
  * How much bigger a hat is drawn over a hair style that stands out further than the hat (1 = its
  * own size), so the hat sits on the hair and shows from every side.
  */
 const HAT_FIT = Object.freeze({afro: 1.25, bob: 1.04, sidepart: 1.04});
+
+/**
+ * The taper of the buzz cut's sides and back (shellScale()): from just below the crown it sinks
+ * smoothly into the head (below the skull's flat faces too), so its lower edge is soft.
+ */
+const BUZZ_TAPER = Object.freeze({from: Math.PI * 0.42, to: Math.PI * 0.6, floor: 0.98});
 
 /** Warm colour the skin glows a little in, so light skin tones do not look grey in cool light. */
 const SKIN_GLOW = '#ff9466';
@@ -313,6 +401,15 @@ const SKIN_GLOW = '#ff9466';
  * @returns {boolean}
  */
 const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * The outfit of an appearance: "none" or a costume id; anything else is "none".
+ *
+ * @param {*} value Outfit value.
+ * @returns {string}
+ */
+export const cleanCostumeId = (value) => (typeof value === 'string' && value.length <= COSTUME_ID_MAX &&
+    COSTUME_ID.test(value) ? value : 'none');
 
 /**
  * A clean appearance document, or null for "today's look".
@@ -346,6 +443,8 @@ export const cleanAppearance = (input) => {
         if (FLAGS.indexOf(key) >= 0) {
             // A real true or false is kept; anything else is the default, as on the server.
             clean[key] = typeof value[key] === 'boolean' ? value[key] : DEFAULT_APPEARANCE[key];
+        } else if (key === 'outfit') {
+            clean[key] = cleanCostumeId(value[key]);
         } else {
             const allowed = CHOICES[key];
             clean[key] = typeof value[key] === 'string' && allowed.indexOf(value[key]) >= 0 ? value[key] : DEFAULT_APPEARANCE[key];
@@ -392,6 +491,339 @@ export const coverCrop = (source, target) => {
     }
     const r = s / t;
     return {repeatx: 1, repeaty: r, offsetx: 0, offsety: (1 - r) / 2};
+};
+
+/**
+ * The costume model URLs of an avatar: only the names of ASSET_NAMES, each a clean http(s) URL.
+ *
+ * Accepts the object or its JSON text (as the peer list sends it, '' for none); anything else gives {}.
+ *
+ * @param {Object|string|null} input {outfit: url, hat: url}
+ * @returns {Object} A new object with the clean URLs only.
+ */
+export const parseAssets = (input) => {
+    let value = input;
+    if (typeof value === 'string') {
+        if (value === '' || value.length > 8192) {
+            return {};
+        }
+        try {
+            value = JSON.parse(value);
+        } catch (error) {
+            return {};
+        }
+    }
+    const clean = {};
+    if (!isObject(value)) {
+        return clean;
+    }
+    ASSET_NAMES.forEach((name) => {
+        const url = cleanPictureUrl(value[name]);
+        if (url) {
+            clean[name] = url;
+        }
+    });
+    return clean;
+};
+
+/**
+ * A point [x, y, z] of finite numbers, or a fallback.
+ *
+ * @param {*} value Anything.
+ * @param {number[]|null} fallback Fallback.
+ * @returns {number[]|null}
+ */
+const point3 = (value, fallback) => (Array.isArray(value) && value.length === 3 &&
+    value.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 100) ? value.slice() : fallback);
+
+/** Most lights a costume may carry. */
+const LIGHTS_MAX = 16;
+
+/** Most tinted material names a costume may carry. */
+const TINT_MAX = 16;
+
+/**
+ * Clean costume extras ("vrroom-costume/1"), or null when they are not usable.
+ *
+ * Accepts {vrroom: {...}} (the scene extras as GLTFLoader puts them in userData) or the inner object.
+ * A device without a usable screen, an accessory without a hat offset and an unknown kind give null.
+ *
+ * @param {*} input Scene userData or the extras object.
+ * @returns {Object|null} {kind, neck, headscale, screen|null, tint: string[], ownhands, lights: number[][],
+ *     hat: {offset}|null, credit, licence}
+ */
+// One check per field of the costume's extras, in the order of the schema.
+// eslint-disable-next-line complexity
+export const parseCostumeExtras = (input) => {
+    const value = isObject(input) && isObject(input.vrroom) ? input.vrroom : input;
+    if (!isObject(value) || value.schema !== COSTUME_SCHEMA) {
+        return null;
+    }
+    const kind = value.kind;
+    if (kind !== 'body' && kind !== 'device' && kind !== 'accessory') {
+        return null;
+    }
+    const headscale = Number(value.headscale);
+    const extras = {
+        kind: kind,
+        neck: point3(value.neck, [0, STANDING_HEAD_HEIGHT, 0]),
+        headscale: Number.isFinite(headscale) && headscale > 0 ? Math.min(3, Math.max(0.5, headscale)) : 1,
+        screen: null,
+        tint: Array.isArray(value.tint) ? value.tint.filter((name) => typeof name === 'string' && name !== '')
+            .slice(0, TINT_MAX) : [],
+        ownhands: value.ownhands === true,
+        lights: Array.isArray(value.lights) ? value.lights.map((p) => point3(p, null)).filter((p) => p)
+            .slice(0, LIGHTS_MAX) : [],
+        hat: null,
+        credit: typeof value.credit === 'string' ? value.credit : '',
+        licence: typeof value.licence === 'string' ? value.licence : '',
+    };
+    const screen = isObject(value.screen) ? value.screen : null;
+    if (screen) {
+        const centre = point3(screen.center, null);
+        const size = Array.isArray(screen.size) && screen.size.length === 2 &&
+            screen.size.every((n) => typeof n === 'number' && n > 0 && n < 10) ? screen.size.slice() : null;
+        let normal = point3(screen.normal, [0, 0, -1]);
+        const length = Math.hypot(normal[0], normal[1], normal[2]);
+        normal = length > 1e-6 ? normal.map((n) => n / length) : [0, 0, -1];
+        if (centre && size) {
+            extras.screen = {center: centre, size: size, normal: normal};
+        }
+    }
+    if (kind === 'device' && !extras.screen) {
+        return null;
+    }
+    if (kind === 'accessory') {
+        const offset = isObject(value.hat) ? point3(value.hat.offset, null) : null;
+        if (!offset) {
+            return null;
+        }
+        extras.hat = {offset: offset};
+    }
+    return extras;
+};
+
+/**
+ * The costume extras of a loaded model: those of the scene, else the first node that has them.
+ *
+ * @param {Object|null} scene THREE.Object3D (gltf.scene).
+ * @returns {Object|null} Clean extras (parseCostumeExtras()).
+ */
+export const findCostumeExtras = (scene) => {
+    if (!scene) {
+        return null;
+    }
+    let found = parseCostumeExtras(scene.userData);
+    if (!found && typeof scene.traverse === 'function') {
+        scene.traverse((child) => {
+            if (!found && child !== scene) {
+                found = parseCostumeExtras(child.userData);
+            }
+        });
+    }
+    return found;
+};
+
+/** Lowest point (m) of a device that stands on the floor (a robot with a screen head), not floating. */
+const STANDING_BELOW = 0.3;
+
+/**
+ * How a costume is worn.
+ *
+ * @param {Object|null} extras Clean extras.
+ * @param {number} lowest The model's lowest point (m, feet at 0).
+ * @returns {string} 'body' (replaces the body), 'device' (replaces the head and the body and turns
+ *     with the head), 'standing' (a device on legs: worn like a body, the face on its screen), 'hat'
+ *     (an accessory hat) or '' (not wearable).
+ */
+export const costumeLayout = (extras, lowest) => {
+    if (!extras) {
+        return '';
+    }
+    if (extras.kind === 'body') {
+        return 'body';
+    }
+    if (extras.kind === 'device') {
+        return Number(lowest) < STANDING_BELOW ? 'standing' : 'device';
+    }
+    return extras.hat ? 'hat' : '';
+};
+
+/**
+ * The materials of a costume that take the accent colour: those named in extras.tint.
+ *
+ * @param {Object[]} list Materials (each with a name), duplicates allowed.
+ * @param {string[]} names Material names from the extras.
+ * @returns {Object[]} The materials to tint, each once, in the order found.
+ */
+export const selectTintMaterials = (list, names) => {
+    const wanted = Array.isArray(names) ? names : [];
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach((material) => {
+        if (material && typeof material.name === 'string' && wanted.indexOf(material.name) >= 0 &&
+                out.indexOf(material) < 0) {
+            out.push(material);
+        }
+    });
+    return out;
+};
+
+/** Gap between a device's screen and the face drawn on it (m), so they do not flicker. */
+const DEVICE_SCREEN_GAP = 0.003;
+
+/**
+ * Where the face goes on a device's screen, relative to the costume's neck point.
+ *
+ * @param {Object} screen {center, size, normal} (clean extras).
+ * @param {number[]} neck Neck point [x, y, z].
+ * @param {number} aspect Aspect ratio (width / height) of the picture shown on it.
+ * @returns {Object} {position [x, y, z] (a little in front of the screen), normal, width, height, crop}
+ *     where crop is the coverCrop() of the picture onto the screen.
+ */
+export const fitScreen = (screen, neck, aspect) => {
+    const n = screen.normal;
+    return {
+        position: [0, 1, 2].map((i) => screen.center[i] - neck[i] + n[i] * DEVICE_SCREEN_GAP),
+        normal: n.slice(),
+        width: screen.size[0],
+        height: screen.size[1],
+        crop: coverCrop(aspect, screen.size[0] / screen.size[1]),
+    };
+};
+
+/** How much a device tilts with the head's pitch (1 = as much), and the most it tilts (radians). */
+const DEVICE_PITCH_SHARE = 0.5;
+const DEVICE_PITCH_MAX = 0.3;
+
+/**
+ * The tilt of a device for a look direction: a share of the head's pitch, clamped.
+ *
+ * @param {number[]} direction Look direction [x, y, z].
+ * @returns {number} Radians about X, positive when looking up.
+ */
+export const devicePitch = (direction) => {
+    const [x, y, z] = direction.map((n) => Number(n) || 0);
+    const pitch = Math.atan2(y, Math.hypot(x, z));
+    return Math.max(-DEVICE_PITCH_MAX, Math.min(DEVICE_PITCH_MAX, pitch * DEVICE_PITCH_SHARE));
+};
+
+/** Period (ms) of the costume lights' pulse. */
+const LIGHT_PERIOD = 1800;
+
+/**
+ * Brightness (0..1) of a costume light at a time: a gentle pulse, steady (1) with reduced motion.
+ *
+ * @param {number} index Light number (lights pulse out of step).
+ * @param {number} at Time (ms).
+ * @param {boolean} still Reduced motion.
+ * @returns {number}
+ */
+export const lightPulse = (index, at, still) => {
+    if (still) {
+        return 1;
+    }
+    return 0.65 + 0.35 * Math.sin((Number(at) || 0) / LIGHT_PERIOD * Math.PI * 2 + index * 1.3);
+};
+
+/**
+ * Whether the person asks for reduced motion.
+ *
+ * @returns {boolean}
+ */
+const reducedMotion = () => {
+    try {
+        return typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (error) {
+        return false;
+    }
+};
+
+/** Loaded costumes by URL: {promise, value: {scene, extras, lowest, top}|null, failed}. */
+const costumes = new Map();
+
+/**
+ * Load a costume model (once per URL; every avatar gets the same entry and clones its scene).
+ *
+ * @param {Object} THREE three.js namespace (its GLTFLoader is used unless a loader is given).
+ * @param {string} url Model URL (http(s)).
+ * @param {Object|null} loader Something with loadAsync(url) → Promise of {scene} (a GLTFLoader).
+ * @returns {Object} The cache entry {promise, value, failed}; the promise never rejects (null on failure).
+ */
+export const loadCostume = (THREE, url, loader = null) => {
+    const key = cleanPictureUrl(url);
+    let entry = costumes.get(key);
+    if (entry) {
+        return entry;
+    }
+    entry = {promise: null, value: null, failed: false};
+    costumes.set(key, entry);
+    const source = loader || (key && THREE.GLTFLoader ? new THREE.GLTFLoader() : null);
+    entry.promise = Promise.resolve()
+        .then(() => {
+            if (!source || typeof source.loadAsync !== 'function') {
+                throw new Error('No glTF loader for ' + key);
+            }
+            return source.loadAsync(key);
+        })
+        .then((gltf) => {
+            const scene = gltf && (gltf.scene || (Array.isArray(gltf.scenes) ? gltf.scenes[0] : null));
+            const extras = findCostumeExtras(scene);
+            if (!extras) {
+                throw new Error('Not a vrroom-costume/1 model: ' + key);
+            }
+            scene.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(scene);
+            entry.value = {scene: scene, extras: extras, lowest: box.min.y, top: box.max.y};
+            return entry.value;
+        })
+        .catch((error) => {
+            entry.failed = true;
+            entry.error = error;
+            return null;
+        });
+    return entry;
+};
+
+/** Forget every loaded costume (for tests). */
+export const clearCostumes = () => costumes.clear();
+
+/**
+ * The size of a hair shell at a height: shells with a taper sink into the head towards their lower
+ * edge, so the edge has no rim (a smooth step from scale to floor between two sphere thetas).
+ *
+ * @param {number} scale Shell size relative to the head.
+ * @param {number} theta Sphere theta of the point (0 is the crown).
+ * @param {Object|null} taper {from, to, floor} or null.
+ * @returns {number}
+ */
+export const shellScale = (scale, theta, taper) => {
+    if (!taper || !(taper.to > taper.from)) {
+        return scale;
+    }
+    const t = Math.min(1, Math.max(0, (theta - taper.from) / (taper.to - taper.from)));
+    const smooth = t * t * (3 - 2 * t);
+    return scale + (taper.floor - scale) * smooth;
+};
+
+/**
+ * Sphere theta (0 is the crown) of the lower edge of the hair at the sides cut round an ear: up at
+ * EAR_CUT above the ear, rounding down to the full length (to) on either side of it.
+ *
+ * @param {number} offset Sphere phi from the ear's centre (radians, signed).
+ * @param {number} to Theta of the lower edge away from the ears.
+ * @returns {number}
+ */
+export const earCutBottom = (offset, to) => {
+    const d = Math.abs(offset);
+    if (to <= EAR_CUT || d >= EAR_ARCH_OUT) {
+        return to;
+    }
+    if (d <= EAR_ARCH_FLAT) {
+        return EAR_CUT;
+    }
+    const k = (d - EAR_ARCH_FLAT) / (EAR_ARCH_OUT - EAR_ARCH_FLAT);
+    return EAR_CUT + (to - EAR_CUT) * (1 - Math.sqrt(1 - k * k));
 };
 
 /**
@@ -573,6 +1005,34 @@ const ellipseArc = (a, c, s) => {
     return [sign * px, -pz];
 };
 
+/**
+ * The stubble shadow's gradient: [where (0 the middle, 1 the edge of the band's ellipse), opacity].
+ * Clear over the inner half, where the mouth is; a soft band along the jaw; clear at the edge.
+ */
+export const STUBBLE_STOPS = Object.freeze([[0, 0], [0.5, 0], [0.74, 0.4], [0.9, 0.26], [1, 0]]);
+
+/**
+ * The ellipse of the stubble shadow on the face canvas, round the mouth.
+ *
+ * @param {number} mx Mouth x (px).
+ * @param {number} my Mouth y (px).
+ * @returns {{cx: number, cy: number, rx: number, ry: number}} Centre and radii (px).
+ */
+export const stubbleBand = (mx, my) => ({cx: mx, cy: my - 6, rx: 86, ry: 56});
+
+/**
+ * A CSS rgba() colour from a hex colour and an opacity.
+ *
+ * @param {string} hex Colour '#rrggbb'.
+ * @param {number} alpha Opacity 0..1.
+ * @returns {string}
+ */
+const rgba = (hex, alpha) => {
+    const text = String(hex);
+    const channel = (at) => parseInt(text.slice(at, at + 2), 16) || 0;
+    return `rgba(${channel(1)}, ${channel(3)}, ${channel(5)}, ${alpha})`;
+};
+
 /** Line width of each eyebrow style on the face canvas (px). */
 const BROW_WIDTHS = {thick: 7, thin: 3, arched: 4.5};
 
@@ -653,18 +1113,20 @@ const CURL_DIRECTIONS = Object.freeze((() => {
  * Shape a unit sphere (or a part of one) to the head, or to a shell around it.
  *
  * Options: flare (the shell grows by up to this much towards the bottom, for hair that stands out
- * at the chin) and tilt (the piece is turned by this angle round the Z axis before it is shaped,
- * which moves its edges and seams to one side).
+ * at the chin), tilt (the piece is turned by this angle round the Z axis before it is shaped,
+ * which moves its edges and seams to one side) and taper (shellScale(): the shell sinks into the
+ * head towards its lower edge).
  *
  * @param {Object} geometry THREE.SphereGeometry of radius 1.
  * @param {number} scale Size relative to the head (1 = the head itself).
  * @param {string} shape Head shape.
- * @param {Object} options {flare, tilt}
+ * @param {Object} options {flare, tilt, taper}
  * @returns {Object} The same geometry.
  */
 const shapeToHead = (geometry, scale, shape, options = {}) => {
     const flare = options.flare || 0;
     const tilt = options.tilt || 0;
+    const taper = options.taper || null;
     const cos = Math.cos(tilt);
     const sin = Math.sin(tilt);
     const position = geometry.attributes.position;
@@ -675,13 +1137,14 @@ const shapeToHead = (geometry, scale, shape, options = {}) => {
         const length = Math.hypot(x, y, z) || 1;
         x /= length;
         y /= length;
+        const size = taper ? shellScale(scale, Math.acos(Math.max(-1, Math.min(1, y))), taper) : scale;
         if (tilt) {
             const tx = x * cos - y * sin;
             y = x * sin + y * cos;
             x = tx;
         }
         const grow = flare ? flare * Math.max(0, 0.3 - y) / 1.3 : 0;
-        const point = headPoint(shape, x, y, z / length, scale + grow);
+        const point = headPoint(shape, x, y, z / length, size + grow);
         position.setXYZ(i, point[0], point[1], point[2]);
     }
     position.needsUpdate = true;
@@ -733,14 +1196,17 @@ const makeCanvas = (width, height) => {
  *
  * Options: name (plain text for the label), pictureurl (profile picture, used when the appearance
  * has picture: true), seed (the anonymous peer id: the colour of an avatar without appearance and
- * the peer id kept in userData; peerid is accepted as an alias).
+ * the peer id kept in userData; peerid is accepted as an alias), assets (costume model URLs
+ * {outfit, hat}, see parseAssets()), loader (a glTF loader with loadAsync(url), instead of
+ * THREE.GLTFLoader) and onError(error) (told when a costume cannot be loaded or worn; the avatar
+ * then looks as it would without it).
  *
  * @param {Object} THREE three.js namespace.
  * @param {Object|string|null} appearance Appearance document (object or JSON), or null for today's look.
- * @param {Object} options {name, pictureurl, seed}
+ * @param {Object} options {name, pictureurl, seed, assets, loader, onError}
  * @returns {Object} Avatar {group, object (the same group), setPose(pose, mode), setName(name),
- *     setSpeaking(level), setMicState(state), setAppearance(appearance, pictureurl), setVideo(video|null),
- *     update(nowms), dispose()}
+ *     setSpeaking(level), setMicState(state), setAppearance(appearance, pictureurl, assets),
+ *     setVideo(video|null), update(nowms), whenDressed() → Promise, dispose()}
  */
 export const createAvatar = (THREE, appearance, options) => {
     const opts = options || {};
@@ -759,6 +1225,8 @@ export const createAvatar = (THREE, appearance, options) => {
     const textures = [];
     // Resources of the current appearance, replaced by setAppearance().
     let built = {geometries: [], materials: [], textures: []};
+    // The halo texture of costume lamps, made when a costume first has lamps.
+    let halotexture = null;
     const keep = (list, item) => {
         list.push(item);
         return item;
@@ -875,6 +1343,30 @@ export const createAvatar = (THREE, appearance, options) => {
     let videotexture = null;
     let fade = {from: 0, to: 0, start: 0};
     const videolisteners = [];
+
+    // Costumes. The worn outfit: {url, layout, value (cache value), holder (THREE.Group at the neck
+    // point), screen ({width, height}) or null, lights [{mesh, index}], resources} or null.
+    let assets = parseAssets(opts.assets);
+    let outfit = null;
+    // The worn model hat: {url, top (m above the head centre, before fit), fit} or null.
+    let modelhat = null;
+    // Costume URLs that are being loaded by this avatar (so a finished load re-dresses it once).
+    const waiting = new Set();
+    const pending = [];
+    const loader = opts.loader || null;
+    const report = (error) => {
+        if (typeof opts.onError === 'function') {
+            try {
+                opts.onError(error);
+            } catch (ignored) {
+                // The caller's logger failed; nothing else to do.
+            }
+        }
+    };
+    const outfitholder = new THREE.Group();
+    outfitholder.name = 'outfit';
+    outfitholder.rotation.order = 'YXZ';
+    group.add(outfitholder);
 
     const drawLabel = () => {
         const ctx = canvas.getContext('2d');
@@ -1054,36 +1546,39 @@ export const createAvatar = (THREE, appearance, options) => {
     }
 
     /**
-     * Draw stubble on the lower face: a soft shadow over the jaw and cheeks, thickest at the chin
-     * and fading out towards the cheeks, in a tint of the hair colour that shows on the dark screen.
+     * Draw stubble on the lower face: a soft shadow along the jaw and the lower cheeks, in a tint of
+     * the hair colour that shows on the dark screen.
      *
-     * The shadow is a stack of see-through ellipses (each adds a little colour), so it needs no
-     * canvas gradient. It stays inside the screen and below the nose.
+     * The shadow is one smooth elliptical radial gradient (STUBBLE_STOPS: clear in the middle, where
+     * the mouth is, then a soft band round it), so it has no rings and never covers the mouth. It
+     * stays inside the screen and below the nose; without canvas gradients no stubble is drawn.
      *
      * @param {CanvasRenderingContext2D} ctx Face canvas context.
-     * @param {string} colour CSS colour of the shadow.
+     * @param {string} colour Colour '#rrggbb' of the shadow.
      */
     function drawStubble(ctx, colour) {
+        if (typeof ctx.createRadialGradient !== 'function') {
+            return;
+        }
         const [mx, my] = facePixel(0, MOUTH_Y);
         const top = facePixel(0, NOSE_Y)[1] + 4;
-        const steps = 7;
+        const band = stubbleBand(mx, my);
         ctx.save();
         roundRect(ctx, 0, 0, FACE_WIDTH, FACE_HEIGHT, 26);
         ctx.clip();
         ctx.beginPath();
         ctx.rect(0, top, FACE_WIDTH, FACE_HEIGHT - top);
         ctx.clip();
-        ctx.fillStyle = colour;
-        ctx.globalAlpha = 0.085;
-        for (let i = 0; i < steps; i++) {
-            // From the widest (the cheeks) to the smallest (the chin).
-            const k = 1 - i / steps;
-            ctx.beginPath();
-            ctx.ellipse(mx, my + 14 + 10 * (1 - k), 18 + 68 * k, 16 + 44 * k, 0, 0, Math.PI * 2);
-            ctx.fill();
+        // A circle gradient squashed into the ellipse of the band.
+        ctx.translate(band.cx, band.cy);
+        ctx.scale(1, band.ry / band.rx);
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, band.rx);
+        if (gradient && typeof gradient.addColorStop === 'function') {
+            STUBBLE_STOPS.forEach(([at, alpha]) => gradient.addColorStop(at, rgba(colour, alpha)));
+            ctx.fillStyle = gradient;
+            ctx.fillRect(-band.rx, -band.rx, band.rx * 2, band.rx * 2);
         }
         ctx.restore();
-        ctx.globalAlpha = 1;
     }
 
     /**
@@ -1323,21 +1818,27 @@ export const createAvatar = (THREE, appearance, options) => {
         };
         const piece = (scale, phistart, philength, thetastart, thetalength, opts) =>
             add(headPiece(scale, shape, phistart, philength, thetastart, thetalength, opts));
-        // The sides and back from the hairline down to sidesend, open at the front; round the ears
-        // when they show (a band above them all round, and below it the back and the sideburns).
+        // The sides and back from the hairline down to sidesend, open at the front; when the ears
+        // show, one shell whose lower edge rises in a rounded arch over each ear (earCutBottom()),
+        // with the back and the sideburns below it.
         const sides = (scale, from, to, opts = {}) => {
             if (!ears || to <= EAR_CUT) {
-                piece(scale, PI * 1.8, PI * 1.4, from, to - from, opts);
-                return;
+                return piece(scale, PI * 1.8, PI * 1.4, from, to - from, opts);
             }
-            const w = opts.w || 16;
-            piece(scale, PI * 1.8, PI * 1.4, from, EAR_CUT - from, {...opts, w: w, h: 2});
-            const left = PI * 2 - EAR_GAP;
-            const right = PI * 3 - EAR_GAP;
-            [[PI * 1.8, left - PI * 1.8, 2], [left + EAR_GAP * 2, right - left - EAR_GAP * 2, Math.max(6, w - 6)],
-                [right + EAR_GAP * 2, PI * 3.2 - right - EAR_GAP * 2, 2]].forEach(([start, length, segments]) => {
-                piece(scale, start, length, EAR_CUT, to - EAR_CUT, {...opts, w: segments, h: 3});
-            });
+            const rows = Math.max(3, Math.min(opts.h || 5, 5));
+            const grid = [];
+            for (let r = 0; r <= rows; r++) {
+                grid.push(EAR_COLUMNS.map((phi) => {
+                    const offset = Math.min(...EAR_PHIS.map((ear) => Math.abs(phi - ear)));
+                    const theta = from + (earCutBottom(offset, to) - from) * r / rows;
+                    const st = Math.sin(theta);
+                    return headPoint(shape, -Math.cos(phi) * st, Math.cos(theta), Math.sin(phi) * st,
+                        shellScale(scale, theta, opts.taper || null));
+                }));
+            }
+            const mesh = add(gridGeometry(grid));
+            mesh.name = 'earcut';
+            return mesh;
         };
         // Crown down to the hairline, and the sides and back down to sidesend.
         const capAndSides = (scale, sidesend, opts, hairline = PI * 0.28) => {
@@ -1374,14 +1875,16 @@ export const createAvatar = (THREE, appearance, options) => {
             }
         } else if (style === 'buzz') {
             // Cropped: a very thin cap tight to the head with a high hairline, in a darker, duller
-            // tint of the hair colour (the skin shows through cropped hair).
+            // tint of the hair colour (the skin shows through cropped hair). Lower than any other
+            // style, and at the back and the sides it fades into the head (taper), so its edge has
+            // no rim and the outline is the head's own.
             const cropped = bm(material.clone());
             const hsl = cropped.color.getHSL({});
             cropped.color.setHSL(hsl.h, hsl.s * 0.6, hsl.l * 0.82);
             cropped.roughness = 1;
-            piece(1.012, 0, PI * 2, 0, PI * 0.22, {w: 14, h: 4}).material = cropped;
+            piece(1.008, 0, PI * 2, 0, PI * 0.22, {w: 14, h: 4}).material = cropped;
             const before = hair.children.length;
-            sides(1.012, PI * 0.22, PI * 0.52, {w: 14, h: 4});
+            sides(1.008, PI * 0.22, PI * 0.6, {w: 14, h: 6, taper: BUZZ_TAPER});
             hair.children.slice(before).forEach((mesh) => {
                 mesh.material = cropped;
             });
@@ -1486,6 +1989,14 @@ export const createAvatar = (THREE, appearance, options) => {
             // Two halves of the crown with a step between them (the parting, moved to one side by the
             // tilt), the fuller half swept over with a fringe, and the sides as short hair.
             const tilt = 0.28;
+            // Under the step, a whole crown in a darker tint, so the parting reads as a line in the
+            // hair and no skin shows through the step.
+            const under = bm(material.clone());
+            const hsl = under.color.getHSL({});
+            under.color.setHSL(hsl.h, hsl.s, hsl.l * 0.7);
+            const parting = piece(1.045, 0, PI * 2, 0, PI * 0.3, {w: 12, h: 4, tilt: tilt});
+            parting.material = under;
+            parting.name = 'parting';
             piece(1.06, PI * 1.5, PI, 0, PI * 0.3, {w: 8, h: 5, tilt: tilt});
             piece(1.1, PI * 0.5, PI, 0, PI * 0.33, {w: 8, h: 5, tilt: tilt});
             sides(1.07, PI * 0.2, PI * 0.6);
@@ -1687,9 +2198,258 @@ export const createAvatar = (THREE, appearance, options) => {
         nose = null;
         beardface = null;
         beardlower = null;
+        modelhat = null;
     };
 
+    // Costumes.
+
+    /** @returns {string} The outfit model URL the look asks for, or ''. */
+    const outfitUrl = () => (look && look.outfit !== 'none' && assets.outfit ? assets.outfit : '');
+
+    /** @returns {string} The hat model URL the look asks for, or ''. */
+    const hatUrl = () => (look && MODEL_HATS.indexOf(look.hat) >= 0 && assets.hat ? assets.hat : '');
+
+    // URLs whose failure was told already.
+    const reported = new Set();
+
+    /**
+     * Where a costume model is: '' (none asked for), 'loading', 'ready' or 'failed' (it did not load,
+     * or it is not of a wanted layout). While it loads, the avatar is dressed again when it is there.
+     *
+     * @param {string} url Model URL, or ''.
+     * @param {string[]} layouts The wanted layouts (costumeLayout()).
+     * @returns {string}
+     */
+    const costumeState = (url, layouts) => {
+        if (!url) {
+            return '';
+        }
+        const entry = loadCostume(THREE, url, loader);
+        if (!entry.value && !entry.failed) {
+            if (!waiting.has(url)) {
+                waiting.add(url);
+                pending.push(entry.promise.then(() => {
+                    waiting.delete(url);
+                    if (!disposed && (url === outfitUrl() || url === hatUrl())) {
+                        try {
+                            build();
+                        } catch (error) {
+                            report(error);
+                        }
+                    }
+                    return undefined;
+                }));
+            }
+            return 'loading';
+        }
+        const wearable = entry.value && layouts.indexOf(costumeLayout(entry.value.extras, entry.value.lowest)) >= 0;
+        if (!wearable) {
+            if (!reported.has(url)) {
+                reported.add(url);
+                report(entry.error || new Error('The costume cannot be worn here: ' + url));
+            }
+            return 'failed';
+        }
+        return 'ready';
+    };
+
+    /**
+     * Give the materials of a costume named in its extras the accent colour (as copies, so the shared
+     * model keeps its colours).
+     *
+     * @param {Object} model THREE.Object3D, a clone of a costume scene.
+     * @param {string[]} names Material names (extras.tint).
+     * @param {Function} keepmaterial Keeps a new material for disposal; returns it.
+     */
+    const tintModel = (model, names, keepmaterial) => {
+        if (!names.length) {
+            return;
+        }
+        const found = [];
+        model.traverse((child) => {
+            if (child.isMesh) {
+                (Array.isArray(child.material) ? child.material : [child.material]).forEach((m) => found.push(m));
+            }
+        });
+        const copies = new Map();
+        selectTintMaterials(found, names).forEach((material) => {
+            const copy = keepmaterial(material.clone());
+            if (copy.color) {
+                copy.color.set(accentcss);
+            }
+            copies.set(material, copy);
+        });
+        model.traverse((child) => {
+            if (child.isMesh) {
+                child.material = Array.isArray(child.material) ? child.material.map((m) => copies.get(m) || m) :
+                    copies.get(child.material) || child.material;
+            }
+        });
+    };
+
+    /**
+     * Put a model hat on the head, like the built hats: at its offset above the head centre (raised
+     * for a taller head), drawn bigger over hair that stands out (fit).
+     *
+     * @param {Object} value Costume cache value.
+     * @param {string} shape Head shape.
+     * @param {number} fit HAT_FIT of the hair.
+     */
+    const wearHat = (value, shape, fit) => {
+        const offset = value.extras.hat.offset;
+        const model = value.scene.clone(true);
+        tintModel(model, value.extras.tint, bm);
+        model.position.set(offset[0], offset[1] + Math.max(0, headExtent(shape).top - HEAD_RADIUS), offset[2]);
+        const hat = new THREE.Group();
+        hat.name = 'hat';
+        hat.userData.vrroomCostume = true;
+        hat.scale.setScalar(fit);
+        hat.add(model);
+        headparts.add(hat);
+        modelhat = {top: (value.top + model.position.y) * fit};
+    };
+
+    /**
+     * Take the outfit off: the built body and head come back and the face screen goes back on the head.
+     */
+    const undress = () => {
+        if (!outfit) {
+            return;
+        }
+        while (outfitholder.children.length) {
+            outfitholder.remove(outfitholder.children[0]);
+        }
+        outfit.resources.geometries.forEach((g) => g.dispose());
+        outfit.resources.materials.forEach((m) => m.dispose());
+        outfit = null;
+        [facescreen, videoscreen].forEach((mesh) => {
+            head.add(mesh);
+            mesh.position.set(0, 0, 0);
+            mesh.quaternion.identity();
+        });
+        facetexture.repeat.set(1, 1);
+        facetexture.offset.set(0, 0);
+        body.visible = true;
+        head.visible = true;
+    };
+
+    /**
+     * Put on the outfit the look asks for, if its model is there: a body costume in place of the
+     * body, a device in place of the head and the body with the face screen on its screen.
+     */
+    const dress = () => {
+        if (costumeState(outfitUrl(), ['body', 'device', 'standing']) !== 'ready') {
+            return;
+        }
+        const url = outfitUrl();
+        const value = loadCostume(THREE, url, loader).value;
+        const extras = value.extras;
+        const layout = costumeLayout(extras, value.lowest);
+        const resources = {geometries: [], materials: []};
+        const keepmaterial = (material) => keep(resources.materials, material);
+        const model = value.scene.clone(true);
+        model.name = 'costume';
+        model.userData.vrroomCostume = true;
+        // The neck point at the holder's origin, which follows the head.
+        model.position.set(-extras.neck[0], -extras.neck[1], -extras.neck[2]);
+        tintModel(model, extras.tint, keepmaterial);
+        outfitholder.add(model);
+        // Lamps: glowing beads with a soft halo, in the accent colour and two fixed colours.
+        const lights = [];
+        if (extras.lights.length) {
+            const geometry = keep(resources.geometries, new THREE.SphereGeometry(LIGHT_RADIUS, 12, 8));
+            const colours = [accentcss, ...LIGHT_COLOURS];
+            const glow = haloTexture();
+            extras.lights.forEach((position, index) => {
+                const base = new THREE.Color(colours[index % colours.length]);
+                const material = keepmaterial(new THREE.MeshBasicMaterial({color: base.clone(), toneMapped: false}));
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = 'costumelight';
+                mesh.position.set(position[0], position[1], position[2]);
+                // The halo: an additive sprite (always facing the viewer), drawn after the bead.
+                const halo = new THREE.Sprite(keepmaterial(new THREE.SpriteMaterial({map: glow, color: base.clone(),
+                    transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false,
+                    toneMapped: false})));
+                halo.name = 'costumelighthalo';
+                halo.scale.set(LIGHT_HALO, LIGHT_HALO, 1);
+                halo.renderOrder = 1;
+                // Never picked (a sprite needs the raycaster's camera, which rays from controllers lack).
+                halo.raycast = () => undefined;
+                mesh.add(halo);
+                model.add(mesh);
+                lights.push({mesh: mesh, halo: halo, base: base, index: index});
+            });
+            // The pulse moves on whenever the lamps are drawn, also where nobody calls update().
+            lights[0].mesh.onBeforeRender = () => pulseLights(now());
+        }
+        let screen = null;
+        if (layout === 'device' || layout === 'standing') {
+            const fit = fitScreen(extras.screen, extras.neck, FACE_WIDTH / FACE_HEIGHT);
+            const turn = turnTo([0, 0, 1], fit.normal);
+            facescreen.geometry = keep(resources.geometries, new THREE.PlaneGeometry(fit.width, fit.height));
+            videoscreen.geometry = keep(resources.geometries, new THREE.PlaneGeometry(fit.width, fit.height));
+            [facescreen, videoscreen].forEach((mesh, i) => {
+                outfitholder.add(mesh);
+                mesh.position.set(fit.position[0] + fit.normal[0] * 0.002 * i, fit.position[1] + fit.normal[1] * 0.002 * i,
+                    fit.position[2] + fit.normal[2] * 0.002 * i);
+                mesh.quaternion.copy(turn);
+            });
+            facescreen.visible = true;
+            facetexture.repeat.set(fit.crop.repeatx, fit.crop.repeaty);
+            facetexture.offset.set(fit.crop.offsetx, fit.crop.offsety);
+            screen = {width: fit.width, height: fit.height};
+            head.visible = false;
+        }
+        body.visible = false;
+        outfit = {url: url, layout: layout, value: value, screen: screen, lights: lights, still: reducedMotion(),
+            top: value.top - extras.neck[1], resources: resources};
+        pulseLights(now());
+    };
+
+    /**
+     * The soft round texture of the lamps' halos, made once per avatar (white, alpha falling off
+     * from the middle; the sprite's colour tints it).
+     *
+     * @returns {Object} THREE.DataTexture
+     */
+    function haloTexture() {
+        if (!halotexture) {
+            const data = new Uint8Array(HALO_SIZE * HALO_SIZE * 4);
+            const middle = (HALO_SIZE - 1) / 2;
+            for (let y = 0; y < HALO_SIZE; y++) {
+                for (let x = 0; x < HALO_SIZE; x++) {
+                    const r = Math.min(1, Math.hypot(x - middle, y - middle) / middle);
+                    const i = (y * HALO_SIZE + x) * 4;
+                    data[i] = data[i + 1] = data[i + 2] = 255;
+                    data[i + 3] = Math.round(255 * Math.pow(1 - r, 2));
+                }
+            }
+            halotexture = keep(textures, new THREE.DataTexture(data, HALO_SIZE, HALO_SIZE, THREE.RGBAFormat));
+            halotexture.magFilter = THREE.LinearFilter;
+            halotexture.minFilter = THREE.LinearFilter;
+            halotexture.needsUpdate = true;
+        }
+        return halotexture;
+    }
+
+    /**
+     * Move the pulse of the costume's lamps on.
+     *
+     * @param {number} at Now (ms).
+     */
+    function pulseLights(at) {
+        if (!outfit) {
+            return;
+        }
+        outfit.lights.forEach((light) => {
+            const level = lightPulse(light.index, at, outfit.still);
+            light.mesh.material.color.copy(light.base).multiplyScalar(level);
+            light.halo.material.opacity = 0.6 * level;
+        });
+    }
+
     const build = () => {
+        undress();
         clearParts();
         const shape = look ? look.head : 'round';
         const colour = look ? new THREE.Color(COLOURS[look.color]) :
@@ -1719,8 +2479,16 @@ export const createAvatar = (THREE, appearance, options) => {
                 metalness: 0, side: doubleside}));
             const hair = bm(new THREE.MeshStandardMaterial({color: new THREE.Color(HAIR_COLOURS[look.haircolor]),
                 roughness: 0.9, metalness: 0, side: doubleside}));
-            buildHair(look.hair, shape, hair, accent, {ears: look.ears && !hairCoversEars(look.hair), hat: look.hat});
+            // A model hat counts as a hat for the hair while it loads and once it is there; without
+            // its model (none given, or it failed) the hair is as without a hat.
+            const hatstate = costumeState(hatUrl(), ['hat']);
+            const modelhatworn = hatstate === 'ready' || hatstate === 'loading';
+            const hatworn = MODEL_HATS.indexOf(look.hat) >= 0 && !modelhatworn ? 'none' : look.hat;
+            buildHair(look.hair, shape, hair, accent, {ears: look.ears && !hairCoversEars(look.hair), hat: hatworn});
             buildHat(look.hat, shape, accent, HAT_FIT[look.hair] || 1);
+            if (hatstate === 'ready') {
+                wearHat(loadCostume(THREE, hatUrl(), loader).value, shape, HAT_FIT[look.hair] || 1);
+            }
             if (look.glasses) {
                 glasses = buildGlasses(shape);
             }
@@ -1740,8 +2508,10 @@ export const createAvatar = (THREE, appearance, options) => {
         }
         facescreen.geometry = bg(screenGeometry(shape, 0));
         videoscreen.geometry = bg(screenGeometry(shape, 0.002));
+        dress();
         inert(group);
         drawFace();
+        fitVideo();
         applyPose();
         applyVideoState(now());
     };
@@ -1784,9 +2554,12 @@ export const createAvatar = (THREE, appearance, options) => {
      */
     function applyPose() {
         const h = lastpose.h;
-        const grown = videoHeadScale(headgrow);
-        head.position.set(h[0], h[1] + grown.lift, h[2]);
-        head.scale.setScalar(grown.scale);
+        // A device has no head to grow (its screen is big already); a body costume scales the head.
+        const device = !!outfit && outfit.layout !== 'body';
+        const grown = device ? {scale: 1, lift: 0} : videoHeadScale(headgrow);
+        const headscale = outfit && outfit.layout === 'body' ? outfit.value.extras.headscale : 1;
+        head.position.set(h[0], h[1] + grown.lift * headscale, h[2]);
+        head.scale.setScalar(grown.scale * headscale);
         quaternion.set(h[3], h[4], h[5], h[6]).normalize();
         head.quaternion.copy(quaternion);
         forward.set(0, 0, -1).applyQuaternion(quaternion);
@@ -1795,10 +2568,21 @@ export const createAvatar = (THREE, appearance, options) => {
         }
         body.position.set(h[0], h[1] - bodydrop, h[2]);
         body.rotation.set(0, yaw, 0);
-        // The name tag and the speaking ring stay just above the head, however big it is.
-        const above = grown.lift + (grown.scale - 1) * HEAD_RADIUS;
-        label.position.set(h[0], h[1] + LABEL_HEIGHT + above, h[2]);
-        ring.position.set(h[0], h[1] + RING_HEIGHT + above, h[2]);
+        // The outfit hangs from the head like the body; a floating device also tilts a little.
+        outfitholder.position.set(h[0], h[1], h[2]);
+        outfitholder.rotation.set(outfit && outfit.layout === 'device' ? devicePitch([forward.x, forward.y, forward.z]) : 0,
+            yaw, 0);
+        // The name tag and the speaking ring stay just above the head (however big it is), a model
+        // hat and the outfit.
+        let tag = LABEL_HEIGHT + grown.lift * headscale + (grown.scale * headscale - 1) * HEAD_RADIUS;
+        if (modelhat && !device) {
+            tag = Math.max(tag, grown.lift * headscale + modelhat.top * grown.scale * headscale + LABEL_CLEAR);
+        }
+        if (outfit) {
+            tag = Math.max(tag, outfit.top + LABEL_CLEAR);
+        }
+        label.position.set(h[0], h[1] + tag, h[2]);
+        ring.position.set(h[0], h[1] + tag + RING_HEIGHT - LABEL_HEIGHT, h[2]);
         const immersive = lastmode === 'vr' || lastmode === 'mr' || lastmode === 'ar';
         placeHand(hands[0], immersive ? lastpose.l : null);
         placeHand(hands[1], immersive ? lastpose.r : null);
@@ -1810,7 +2594,8 @@ export const createAvatar = (THREE, appearance, options) => {
         if (!videotexture || !video) {
             return;
         }
-        const crop = coverCrop((video.videoWidth || 4) / (video.videoHeight || 3), SCREEN_WIDTH / SCREEN_HEIGHT);
+        const target = outfit && outfit.screen ? outfit.screen.width / outfit.screen.height : SCREEN_WIDTH / SCREEN_HEIGHT;
+        const crop = coverCrop((video.videoWidth || 4) / (video.videoHeight || 3), target);
         videotexture.repeat.set(crop.repeatx, crop.repeaty);
         videotexture.offset.set(crop.offsetx, crop.offsety);
     };
@@ -1979,17 +2764,22 @@ export const createAvatar = (THREE, appearance, options) => {
          *
          * @param {Object|string|null} value Appearance document (object or JSON), or null for today's look.
          * @param {string} url Profile picture URL, or ''.
+         * @param {Object|string|undefined} models Costume model URLs {outfit, hat} (parseAssets()); left
+         *     out, the ones given before are kept.
          */
-        setAppearance(value, url = '') {
+        setAppearance(value, url = '', models = undefined) {
             if (disposed) {
                 return;
             }
             const next = cleanAppearance(value);
             const nexturl = cleanPictureUrl(url);
-            const changed = JSON.stringify(next) !== JSON.stringify(look);
+            const nextassets = models === undefined ? assets : parseAssets(models);
+            const changed = JSON.stringify(next) !== JSON.stringify(look) ||
+                JSON.stringify(nextassets) !== JSON.stringify(assets);
             const picturechanged = nexturl !== pictureurl;
             look = next;
             pictureurl = nexturl;
+            assets = nextassets;
             if (changed) {
                 build();
             }
@@ -2041,8 +2831,19 @@ export const createAvatar = (THREE, appearance, options) => {
          */
         update(nowms) {
             if (!disposed) {
-                applyVideoState(Number.isFinite(Number(nowms)) ? Number(nowms) : now());
+                const at = Number.isFinite(Number(nowms)) ? Number(nowms) : now();
+                applyVideoState(at);
+                pulseLights(at);
             }
+        },
+
+        /**
+         * Wait until the costume models asked for so far have loaded (or failed) and are worn.
+         *
+         * @returns {Promise} Resolves with undefined; never rejects.
+         */
+        whenDressed() {
+            return Promise.all(pending.slice()).then(() => undefined);
         },
 
         /** Remove the avatar and release its GPU resources. */
@@ -2057,6 +2858,7 @@ export const createAvatar = (THREE, appearance, options) => {
             if (group.parent) {
                 group.parent.remove(group);
             }
+            undress();
             clearParts();
             geometries.forEach((g) => g.dispose());
             materials.forEach((m) => m.dispose());

@@ -160,15 +160,21 @@ const isGen = (gen) => Number.isInteger(gen) && gen >= 0 && gen <= MAX_GEN;
  * @param {Object} peer
  * @returns {Object}
  */
-const copyPeer = (peer) => ({
-    peerid: peer.peerid,
-    name: peer.name,
-    kind: peer.kind,
-    connected: peer.connected,
-    // How their avatar looks (a vrroom-avatar/1 JSON string, '' for today's look) and their picture.
-    appearance: peer.appearance || '',
-    picture: peer.picture || '',
-});
+/**
+ * The roster fields that say how a person's avatar looks, all strings ('' for none): appearance (a
+ * vrroom-avatar/1 JSON string), picture (their profile picture URL) and assets (a JSON object of
+ * costume and hat URLs). Every one of them is kept and compared, so a field added to the roster is
+ * added here once.
+ */
+const LOOK_FIELDS = ['appearance', 'picture', 'assets'];
+
+const copyPeer = (peer) => {
+    const copy = {peerid: peer.peerid, name: peer.name, kind: peer.kind, connected: peer.connected};
+    LOOK_FIELDS.forEach((field) => {
+        copy[field] = peer[field] || '';
+    });
+    return copy;
+};
 
 /**
  * Whether a transceiver carries the given kind of media and is usable.
@@ -1018,18 +1024,19 @@ class MeshTransport extends Transport {
             seen.add(entry.peerid);
             const name = String(entry.name || '');
             const kind = entry.kind === 'preview' ? 'preview' : 'attempt';
-            const appearance = typeof entry.appearance === 'string' ? entry.appearance : '';
-            const picture = typeof entry.picture === 'string' ? entry.picture : '';
+            const look = {};
+            LOOK_FIELDS.forEach((field) => {
+                look[field] = typeof entry[field] === 'string' ? entry[field] : '';
+            });
             const peer = this.peers.get(entry.peerid);
             if (!peer) {
-                const added = {peerid: entry.peerid, name, kind, connected: false, appearance, picture};
+                const added = {peerid: entry.peerid, name, kind, connected: false, ...look};
                 this.peers.set(entry.peerid, added);
                 this.emit('peerjoined', {peer: copyPeer(added)});
-            } else if (peer.name !== name || peer.kind !== kind || peer.appearance !== appearance || peer.picture !== picture) {
+            } else if (peer.name !== name || peer.kind !== kind || LOOK_FIELDS.some((field) => peer[field] !== look[field])) {
                 peer.name = name;
                 peer.kind = kind;
-                peer.appearance = appearance;
-                peer.picture = picture;
+                Object.assign(peer, look);
                 this.emit('peerupdated', {peer: copyPeer(peer)});
             }
         });

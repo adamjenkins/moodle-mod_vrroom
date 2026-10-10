@@ -23,7 +23,8 @@ namespace mod_vrroom\hook;
  * listed people at once. A listener calls set_appearance() for the peers whose look it knows; the
  * others keep today's avatar. The appearance document ("vrroom-avatar/1", AVATAR-DESIGN.md) is
  * validated by the listener; here it is only checked to be an array of at most MAX_BYTES of JSON,
- * and the picture to be a URL. Peers that are not in the list are ignored.
+ * and the picture and the assets (the costume models the document names, ASSET_NAMES) to be http(s)
+ * URLs. Peers that are not in the list are ignored.
  *
  * @package    mod_vrroom
  * @copyright  2026 Adam Jenkins <adam@wisecat.net>
@@ -35,10 +36,13 @@ final class avatar_appearance {
     /** @var int Largest appearance document accepted, in bytes of JSON. */
     public const MAX_BYTES = 2048;
 
+    /** @var string[] Names of the assets a listener may give: the outfit (body or device) and the hat models. */
+    public const ASSET_NAMES = ['outfit', 'hat'];
+
     /** @var array<string, int> peerid => userid of the listed peers. */
     private array $peers = [];
 
-    /** @var array<string, array{appearance: array, picture: string}> What listeners set, by peer id. */
+    /** @var array<string, array{appearance: array, picture: string, assets: array<string, string>}> What listeners set, by peer id. */
     private array $appearances = [];
 
     /**
@@ -87,15 +91,17 @@ final class avatar_appearance {
      * Set the look of one listed person.
      *
      * A later call for the same peer replaces the earlier one. An unknown peer, an appearance whose
-     * JSON is longer than MAX_BYTES (or cannot be encoded) and a picture that is not a URL are ignored
-     * (the picture alone is dropped).
+     * JSON is longer than MAX_BYTES (or cannot be encoded) are ignored. A picture that is not an http(s)
+     * URL is dropped (the look stays), and so is each asset whose name is not in ASSET_NAMES or whose
+     * value is not a clean http(s) URL.
      *
      * @param string $peerid A peer id of get_peers().
      * @param array $appearance The appearance document, already validated by the listener.
      * @param string $pictureurl The profile picture to show on the badge, '' for none.
+     * @param array $assets Asset name ('outfit', 'hat') => URL of the model (glTF binary) the document names.
      * @return void
      */
-    public function set_appearance(string $peerid, array $appearance, string $pictureurl = ''): void {
+    public function set_appearance(string $peerid, array $appearance, string $pictureurl = '', array $assets = []): void {
         if (!array_key_exists($peerid, $this->peers)) {
             return;
         }
@@ -103,20 +109,40 @@ final class avatar_appearance {
         if ($json === false || strlen($json) > self::MAX_BYTES) {
             return;
         }
-        $picture = '';
-        if ($pictureurl !== '') {
-            $cleaned = clean_param($pictureurl, PARAM_URL);
-            if ($cleaned === $pictureurl && preg_match('~^https?://~i', $cleaned)) {
-                $picture = $cleaned;
+        $picture = self::clean_url($pictureurl);
+        $cleanassets = [];
+        foreach (self::ASSET_NAMES as $name) {
+            if (isset($assets[$name]) && is_string($assets[$name])) {
+                $url = self::clean_url($assets[$name]);
+                if ($url !== '') {
+                    $cleanassets[$name] = $url;
+                }
             }
         }
-        $this->appearances[$peerid] = ['appearance' => $appearance, 'picture' => $picture];
+        $this->appearances[$peerid] = ['appearance' => $appearance, 'picture' => $picture, 'assets' => $cleanassets];
+    }
+
+    /**
+     * The URL itself when it is a clean http(s) URL, '' otherwise.
+     *
+     * @param string $url A URL from a listener.
+     * @return string
+     */
+    private static function clean_url(string $url): string {
+        if ($url === '') {
+            return '';
+        }
+        $cleaned = clean_param($url, PARAM_URL);
+        if ($cleaned === $url && preg_match('~^https?://~i', $cleaned)) {
+            return $cleaned;
+        }
+        return '';
     }
 
     /**
      * What the listeners set.
      *
-     * @return array<string, array{appearance: array, picture: string}> peerid => look
+     * @return array<string, array{appearance: array, picture: string, assets: array<string, string>}> peerid => look
      */
     public function get_appearances(): array {
         return $this->appearances;
