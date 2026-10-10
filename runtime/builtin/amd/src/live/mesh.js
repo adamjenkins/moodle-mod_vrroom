@@ -1202,6 +1202,15 @@ class MeshTransport extends Transport {
     }
 
     /**
+     * Whether the site gave this room any STUN or TURN server.
+     *
+     * @returns {boolean}
+     */
+    hasIceServers() {
+        return this.iceservers.length > 0;
+    }
+
+    /**
      * Send to every peer whose channel is open.
      *
      * @param {string} channel 'pose' or 'state'.

@@ -71,6 +71,11 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
 
 ### Fixed
 
+- Live mode: when a person cannot be connected to and the site has no STUN or TURN server, the
+  participant list says why and to ask the administrator (`liveconnectfailednoservers`); the built-in
+  run mode's settings page warns while live mode is on without a usable server
+  (`\vrroomruntime_builtin\local\live\config::ice_warning()`).
+
 - A failed activity save drops the course's cached module info without writing to the database
   (`instance_manager::drop_course_cache()`), so on PostgreSQL, where a failed query aborts the
   transaction, the rollback still runs.

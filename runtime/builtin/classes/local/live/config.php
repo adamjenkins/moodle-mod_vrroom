@@ -140,6 +140,22 @@ final class config {
     }
 
     /**
+     * What is wrong with the STUN and TURN settings for live rooms between people on different
+     * networks, if anything.
+     *
+     * @return string|null A vrroomruntime_builtin lang string key, or null when a server is usable.
+     */
+    public static function ice_warning(): ?string {
+        $stun = self::parse_urls((string)get_config(self::COMPONENT, 'livestunurls'), ['stun', 'stuns']);
+        $turn = self::parse_urls((string)get_config(self::COMPONENT, 'liveturnurls'), self::TURN_SCHEMES);
+        $secret = (string)get_config(self::COMPONENT, 'liveturnsecret');
+        if ($stun || ($turn && $secret !== '')) {
+            return null;
+        }
+        return $turn ? 'liveicewarningnosecret' : 'liveicewarningnone';
+    }
+
+    /**
      * TURN REST API username.
      *
      * @param string $peerid Peer id.

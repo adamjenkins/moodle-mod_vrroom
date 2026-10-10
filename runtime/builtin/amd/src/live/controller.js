@@ -41,7 +41,8 @@ import {region, announce, plainText, startScene} from 'vrroomruntime_builtin/uti
 const STRINGS = [
     'errorlivebusy', 'errorlivedisabled', 'errorlivenoroom', 'errorlivenotallowed', 'errorliveroomgone',
     'errorliveroomlimit', 'errorliveroomnotfound',
-    'livealone', 'liveclosed', 'liveconnectfailed', 'liveconnecting', 'livecurrentroom', 'livefull', 'livejoined',
+    'livealone', 'liveclosed', 'liveconnectfailed', 'liveconnectfailednoservers', 'liveconnecting', 'livecurrentroom',
+    'livefull', 'livejoined',
     'livejoinfailed', 'livejoining', 'liveleft', 'livemicdenied', 'livemicinsecure', 'livemicoff',
     'livemicon', 'livemicstate_muted', 'livemicstate_off', 'livemicstate_on', 'livemute',
     'livemutepeer', 'liveparticipants', 'livepeerjoined', 'livepeerleft', 'livereconnecting',
@@ -1317,7 +1318,10 @@ class LiveController extends Emitter {
             let where;
             if (!peer.connected) {
                 const since = this.firstseen.get(peer.peerid) || now;
-                where = now - since > CONNECT_TIMEOUT ? this.str('liveconnectfailed', name) : this.str('liveconnecting');
+                // Without STUN or TURN servers only people on the same network can connect: say so.
+                const noservers = typeof this.transport.hasIceServers === 'function' && !this.transport.hasIceServers();
+                const failed = noservers ? 'liveconnectfailednoservers' : 'liveconnectfailed';
+                where = now - since > CONNECT_TIMEOUT ? this.str(failed, name) : this.str('liveconnecting');
             } else if (state) {
                 where = this.whereText(state.m, state.sc);
             } else {

@@ -164,6 +164,21 @@ final class config_test extends \advanced_testcase {
     }
 
     /**
+     * The settings warning: none when a STUN server, or TURN servers with their secret, are set.
+     */
+    public function test_ice_warning(): void {
+        $this->resetAfterTest();
+        $this->assertSame('liveicewarningnone', config::ice_warning());
+        set_config('liveturnurls', 'turn:turn.example.org:3478', 'vrroomruntime_builtin');
+        $this->assertSame('liveicewarningnosecret', config::ice_warning());
+        set_config('liveturnsecret', 'secret', 'vrroomruntime_builtin');
+        $this->assertNull(config::ice_warning());
+        set_config('liveturnurls', '', 'vrroomruntime_builtin');
+        set_config('livestunurls', 'stun:stun.example.org', 'vrroomruntime_builtin');
+        $this->assertNull(config::ice_warning());
+    }
+
+    /**
      * The TURN helpers.
      */
     public function test_turn_helpers(): void {
@@ -188,6 +203,11 @@ final class config_test extends \advanced_testcase {
         $html = $page->output_html();
         $this->assertStringContainsString('livestunurls', $html);
         $this->assertStringContainsString('liveturnsecret', $html);
+        // Nothing set: the page warns that only people on one network can connect.
+        $this->assertStringContainsString(s(get_string('liveicewarningnone', 'vrroomruntime_builtin')), $html);
+        set_config('livestunurls', 'stun:stun.example.org', 'vrroomruntime_builtin');
+        $html = admin_get_root(true, true)->locate('vrroomruntimesettingbuiltin')->output_html();
+        $this->assertStringNotContainsString(s(get_string('liveicewarningnone', 'vrroomruntime_builtin')), $html);
 
         $setting = new \vrroomruntime_builtin\admin\setting_iceurls(
             'vrroomruntime_builtin/livestunurls',

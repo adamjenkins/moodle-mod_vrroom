@@ -33,6 +33,21 @@ if ($ADMIN->fulltree) {
         new lang_string('livesettings_desc', 'vrroomruntime_builtin')
     ));
 
+    // Live rooms between people on different networks need a STUN or TURN server.
+    $icewarning = \vrroomruntime_builtin\local\live\config::is_enabled()
+        ? \vrroomruntime_builtin\local\live\config::ice_warning() : null;
+    if ($icewarning !== null) {
+        $settings->add(new admin_setting_heading(
+            'vrroomruntime_builtin/liveicewarning',
+            '',
+            $OUTPUT->notification(
+                get_string($icewarning, 'vrroomruntime_builtin'),
+                \core\output\notification::NOTIFY_WARNING,
+                false
+            )
+        ));
+    }
+
     $settings->add(new admin_setting_configcheckbox(
         'vrroomruntime_builtin/liveenabled',
         new lang_string('liveenabled', 'vrroomruntime_builtin'),
