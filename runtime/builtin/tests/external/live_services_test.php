@@ -227,8 +227,8 @@ final class live_services_test extends \advanced_testcase {
         $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'slim', 'head' => 'square', 'color' => 'green', 'picture' => true];
         $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
         $assets = [
-            'outfit' => 'https://example.org/local/avatar/costumes/pirate-captain.glb',
-            'hat' => 'https://example.org/local/avatar/costumes/hat-pirate.glb',
+            'outfit' => 'https://example.org/local/vravatar/costumes/pirate-captain.glb',
+            'hat' => 'https://example.org/local/vravatar/costumes/hat-pirate.glb',
         ];
         $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($a, $doc, $picture, $assets): void {
             foreach ($hook->get_peers() as $peer) {

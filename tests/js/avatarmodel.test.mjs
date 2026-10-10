@@ -972,14 +972,14 @@ test('the side part has a darker crown under its step, so no skin shows through 
 // Costumes: the pure parts.
 
 test('assets: only the outfit and the hat, as clean http(s) URLs, from an object or JSON', () => {
-    const url = 'https://example.org/local/avatar/costumes/suit-tie.glb';
+    const url = 'https://example.org/local/vravatar/costumes/suit-tie.glb';
     assert.deepEqual(parseAssets({outfit: url, hat: 'http://example.org/h.glb', other: url}),
         {outfit: url, hat: 'http://example.org/h.glb'});
     assert.deepEqual(parseAssets(JSON.stringify({outfit: url})), {outfit: url});
     ['', '{', '[]', 'null', '"x"', null, undefined, 3, [url]].forEach((value) => {
         assert.deepEqual(parseAssets(value), {}, JSON.stringify(value));
     });
-    assert.deepEqual(parseAssets({outfit: 'javascript:alert(1)', hat: '/local/avatar/x.glb'}), {});
+    assert.deepEqual(parseAssets({outfit: 'javascript:alert(1)', hat: '/local/vravatar/x.glb'}), {});
     assert.deepEqual(parseAssets({outfit: ' ' + url + ' '}), {outfit: url}, 'trimmed');
     assert.deepEqual(parseAssets({outfit: 'https://example.org/' + 'x'.repeat(2100)}), {}, 'too long');
 });

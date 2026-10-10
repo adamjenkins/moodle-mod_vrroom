@@ -82,5 +82,5 @@ First release.
 - Webcams in live rooms: turn your camera on and others see you on the face of your avatar; turn it
   off and your avatar's face comes back, without leaving the room. Teachers and administrators can
   turn webcams off.
-- Avatars can be designed by each user with the optional VR avatar plugin (local_avatar).
+- Avatars can be designed by each user with the optional VR avatar plugin (local_vravatar).
 - People appearing in a live room "beam in" with a short, soft flash of light.

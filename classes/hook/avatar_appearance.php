@@ -17,7 +17,7 @@
 namespace mod_vrroom\hook;
 
 /**
- * Lets a plugin (such as local_avatar) say how the people in a live room look.
+ * Lets a plugin (such as local_vravatar) say how the people in a live room look.
  *
  * Dispatched once per peer list that a live room sends to the browser (join and every poll), for all
  * listed people at once. A listener calls set_appearance() for the peers whose look it knows; the

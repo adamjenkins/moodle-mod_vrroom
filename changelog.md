@@ -44,7 +44,7 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   While the video shows, the avatar's head grows to twice its size, upwards from the neck
   (`avatarmodel.videoHeadScale()`), so the face can be seen across the room.
 - Hook `\mod_vrroom\hook\avatar_appearance`, dispatched when the built-in run mode lists the people in
-  a live room: an optional plugin (such as local_avatar) can describe how each avatar looks
+  a live room: an optional plugin (such as local_vravatar) can describe how each avatar looks
   (`vrroom-avatar/1`) and give a profile picture. Without a listener every avatar looks as before.
 - The avatar builder (`vrroomruntime_builtin/live/avatarmodel`) draws designed avatars (body, head,
   colours, hair, glasses, hats, a face screen with face, profile picture or webcam): 14 hairstyles and
@@ -54,7 +54,7 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   (`outfit`, `hat`; http(s) only), sent to the browser as the peers' `assets`; the avatar builder wears
   body costumes (the head on the costume's neck, accent-tinted materials, lights) and device costumes
   (a PC or TV whose screen shows the face, profile picture or webcam), and model hats. Costume files
-  come from an optional plugin such as local_avatar. `$plugin->version` 2026101001 (API addition).
+  come from an optional plugin such as local_vravatar. `$plugin->version` 2026101001 (API addition).
 - Live rooms pass every look field (appearance, picture, assets) through the roster, so costumes
   reach the other people in the room; black and white added to the avatar colours; costume lamps
   are larger with a soft glow.

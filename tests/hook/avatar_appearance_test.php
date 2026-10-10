@@ -90,13 +90,13 @@ final class avatar_appearance_test extends \advanced_testcase {
     public function test_set_appearance_assets(): void {
         $hook = new avatar_appearance([['peerid' => self::PEERA, 'userid' => 5]], \context_system::instance());
         $doc = ['schema' => 'vrroom-avatar/1', 'outfit' => 'pirate-captain', 'hat' => 'pirate'];
-        $outfit = 'https://example.org/local/avatar/costumes/pirate-captain.glb';
-        $hat = 'http://example.org/local/avatar/costumes/hat-pirate.glb';
+        $outfit = 'https://example.org/local/vravatar/costumes/pirate-captain.glb';
+        $hat = 'http://example.org/local/vravatar/costumes/hat-pirate.glb';
 
         $hook->set_appearance(self::PEERA, $doc, '', [
             'outfit' => $outfit,
             'hat' => $hat,
-            'shoes' => 'https://example.org/local/avatar/costumes/shoes.glb',
+            'shoes' => 'https://example.org/local/vravatar/costumes/shoes.glb',
         ]);
         $this->assertSame(['outfit' => $outfit, 'hat' => $hat], $hook->get_appearances()[self::PEERA]['assets']);
 

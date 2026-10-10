@@ -487,7 +487,7 @@ final class room_manager {
      * The other fresh peers of a peer's room (activity, group and room number), with names made on the server.
      *
      * How each person looks comes from the listeners of \mod_vrroom\hook\avatar_appearance (such as
-     * local_avatar), dispatched once for the whole list: 'appearance' is the JSON of the appearance
+     * local_vravatar), dispatched once for the whole list: 'appearance' is the JSON of the appearance
      * document, 'picture' the profile picture URL and 'assets' the JSON object of the costume model URLs
      * by name ('outfit', 'hat'), all '' when no listener set them ("today's look").
      *

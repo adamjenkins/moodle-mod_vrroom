@@ -17,7 +17,7 @@
  * A simple procedural avatar for a person in a live room: a head with a face screen, a body,
  * hands in VR, a name label and a ring that shows when the person speaks.
  *
- * The same builder draws the live avatars and the preview of the avatar designer (local_avatar),
+ * The same builder draws the live avatars and the preview of the avatar designer (local_vravatar),
  * so what a person designs is exactly what the others see.
  *
  * Appearance document "vrroom-avatar/1" (only names are stored and sent; the hex values are here).
@@ -49,7 +49,7 @@
  * moustache has a pale rim of it so it shows on the dark screen; stubble is a soft shadow in a light
  * tint of it on the face screen).
  * "outfit" names a costume: "none", or a costume id (lower-case letters, digits and hyphens; which
- * ids exist is up to the plugin that offers costumes, local_avatar). The hat "pirate" is a model too.
+ * ids exist is up to the plugin that offers costumes, local_vravatar). The hat "pirate" is a model too.
  *
  * Costumes (models, "vrroom-costume/1"): the builder never knows where costumes come from. The caller
  * gives the model URLs as assets {outfit: url, hat: url} (createAvatar() option assets, the third

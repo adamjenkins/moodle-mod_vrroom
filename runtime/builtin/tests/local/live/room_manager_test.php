@@ -778,7 +778,7 @@ final class room_manager_test extends \advanced_testcase {
         [$user, $attempt] = $this->learner($activity);
         $doc = ['schema' => 'vrroom-avatar/1', 'body' => 'broad', 'color' => 'red', 'picture' => true];
         $picture = 'https://example.org/pluginfile.php/1/user/icon/boost/f1';
-        $outfit = 'https://example.org/local/avatar/costumes/robot-screen.glb';
+        $outfit = 'https://example.org/local/vravatar/costumes/robot-screen.glb';
         $callback = function (\mod_vrroom\hook\avatar_appearance $hook) use ($other, $plain, $doc, $picture, $outfit): void {
             $this->assertInstanceOf(\context_module::class, $hook->get_context());
             $hook->set_appearance((string)$other->peerid, $doc, $picture, ['outfit' => $outfit, 'hat' => 'data:x', 'x' => $outfit]);
