@@ -26,7 +26,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {SCHEMA, COLOURS, HAIR_COLOURS, CHOICES, FLAGS, DEFAULT_APPEARANCE, APPEARANCE_MAX, FADE_MS,
-    cleanAppearance, parseAppearance, cleanPictureUrl, coverCrop, fadeValue, hasLiveVideo, hueOf}
+    cleanAppearance, parseAppearance, cleanPictureUrl, coverCrop, fadeValue, hasLiveVideo, hueOf, videoHeadScale}
     from '../../runtime/builtin/amd/src/live/avatarmodel.js';
 
 const DELTA = 1e-9;
@@ -195,4 +195,16 @@ test('the fallback hue is stable and in range', () => {
         const hue = hueOf(id);
         assert.ok(Number.isInteger(hue) && hue >= 0 && hue < 360, id);
     }
+});
+
+test('the head doubles while the webcam shows, growing upwards from the neck', () => {
+    assert.deepEqual(videoHeadScale(0), {scale: 1, lift: 0});
+    const full = videoHeadScale(1);
+    assert.equal(full.scale, 2);
+    // Lifted by one head radius: the bottom of the doubled head stays where the bottom was.
+    assert.ok(Math.abs(full.lift - 0.12) < DELTA);
+    const half = videoHeadScale(0.5);
+    assert.ok(half.scale > 1 && half.scale < 2);
+    assert.deepEqual(videoHeadScale(-3), {scale: 1, lift: 0});
+    assert.equal(videoHeadScale(7).scale, 2);
 });

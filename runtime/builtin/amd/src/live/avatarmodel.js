@@ -126,6 +126,23 @@ const HEAD_RADIUS = 0.12;
 /** Half size of the rounded-square head (m). */
 const HEAD_HALF = 0.11;
 
+/**
+ * How much the head grows while the webcam shows (1 = twice its size), so the face on the screen can
+ * be seen across the room. It grows with the video's fade, upwards from the neck.
+ */
+export const VIDEO_HEAD_GROWTH = 1;
+
+/**
+ * Head scale and how far the head is lifted (m) at a webcam fade value.
+ *
+ * @param {number} value Video fade, 0 (no video) to 1 (video fully shown).
+ * @returns {{scale: number, lift: number}}
+ */
+export const videoHeadScale = (value) => {
+    const grow = Math.min(1, Math.max(0, Number(value) || 0)) * VIDEO_HEAD_GROWTH;
+    return {scale: 1 + grow, lift: grow * HEAD_RADIUS};
+};
+
 /** Body shapes: capsule radius and length of its straight part (m). */
 const BODIES = {
     capsule: {radius: 0.18, length: 0.5},
@@ -550,6 +567,8 @@ export const createAvatar = (THREE, appearance, options) => {
     let picturetoken = 0;
     let bodydrop = HEAD_RADIUS + NECK + BODIES.capsule.radius + BODIES.capsule.length / 2;
     let lastpose = {h: [0, STANDING_HEAD_HEIGHT, 0, 0, 0, 0, 1], l: null, r: null};
+    // The webcam fade the head's size follows (videoHeadScale()).
+    let headgrow = 0;
     let lastmode = '3d';
     let glasses = null;
     let accentcss = COLOURS.grey;
@@ -889,7 +908,9 @@ export const createAvatar = (THREE, appearance, options) => {
      */
     function applyPose() {
         const h = lastpose.h;
-        head.position.set(h[0], h[1], h[2]);
+        const grown = videoHeadScale(headgrow);
+        head.position.set(h[0], h[1] + grown.lift, h[2]);
+        head.scale.setScalar(grown.scale);
         quaternion.set(h[3], h[4], h[5], h[6]).normalize();
         head.quaternion.copy(quaternion);
         forward.set(0, 0, -1).applyQuaternion(quaternion);
@@ -898,8 +919,10 @@ export const createAvatar = (THREE, appearance, options) => {
         }
         body.position.set(h[0], h[1] - bodydrop, h[2]);
         body.rotation.set(0, yaw, 0);
-        label.position.set(h[0], h[1] + LABEL_HEIGHT, h[2]);
-        ring.position.set(h[0], h[1] + RING_HEIGHT, h[2]);
+        // The name tag and the speaking ring stay just above the head, however big it is.
+        const above = grown.lift + (grown.scale - 1) * HEAD_RADIUS;
+        label.position.set(h[0], h[1] + LABEL_HEIGHT + above, h[2]);
+        ring.position.set(h[0], h[1] + RING_HEIGHT + above, h[2]);
         const immersive = lastmode === 'vr' || lastmode === 'mr' || lastmode === 'ar';
         placeHand(hands[0], immersive ? lastpose.l : null);
         placeHand(hands[1], immersive ? lastpose.r : null);
@@ -950,6 +973,10 @@ export const createAvatar = (THREE, appearance, options) => {
     function applyVideoState(at) {
         const value = fadeValue(fade, at);
         videomaterial.opacity = value;
+        if (Math.abs(value - headgrow) > 1e-4) {
+            headgrow = value;
+            applyPose();
+        }
         videoscreen.visible = value > 0.001 || fade.to > 0;
         if (glasses) {
             glasses.visible = value < 0.5;

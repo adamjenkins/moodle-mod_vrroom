@@ -14,6 +14,8 @@ ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
   connection, `replaceTrack`, about 320×240 at 15 fps). Per-person "Hide video for me". Site setting
   `vrroomruntime_builtin/livevideo` and activity setting `vrroom.livevideo` (both default on;
   `$plugin->version` 2026101000, schema change with upgrade step; built-in run mode 2026101000).
+  While the video shows, the avatar's head grows to twice its size, upwards from the neck
+  (`avatarmodel.videoHeadScale()`), so the face can be seen across the room.
 - Hook `\mod_vrroom\hook\avatar_appearance`, dispatched when the built-in run mode lists the people in
   a live room: an optional plugin (such as local_avatar) can describe how each avatar looks
   (`vrroom-avatar/1`) and give a profile picture. Without a listener every avatar looks as before.
