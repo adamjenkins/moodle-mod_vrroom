@@ -3,6 +3,19 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-10-11
+
+### Added
+
+- Camp listing screenshots with captions (`.camp/screenshots/`, `screenshots:` in `.camp/listing.yml`).
+- `.gitattributes` with export-ignore rules (`.github`, `.gitattributes`, `.gitignore`, `.camp`,
+  `tests`, `node_modules`), which camp's release workflow requires; v0.1.0 failed to publish to
+  camp without it.
+
+### Changed
+
+- `$plugin->version` 2026101101, `$plugin->release` 0.1.1. No code changes.
+
 ## [0.1.0] - 2026-10-11
 
 ALPHA. First release, Moodle 5.2 and 5.3.

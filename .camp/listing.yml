@@ -28,5 +28,26 @@ labels:
   #   donation-supported | commercial-support-available
   #   requires-core-patch (needs modifications to Moodle core to work)
   - fully-free
+screenshots:
+  - path: .camp/screenshots/01-museum-walk.jpg
+    caption: 'A gallery walk in the Museum entrance hall room (Joshua Johanson, CC BY 3.0) from the bundled room pack.'
+  - path: .camp/screenshots/02-space-station.jpg
+    caption: 'Living in orbit: stations around the space station room. Students walk with keyboard, mouse or touch.'
+  - path: .camp/screenshots/03-station.jpg
+    caption: 'Opening a station: its title and text appear in a panel beside the room.'
+  - path: .camp/screenshots/04-question.jpg
+    caption: 'A question-bank question at a station, unlocked by walking there. Answers are graded on the server.'
+  - path: .camp/screenshots/05-room-editor.jpg
+    caption: 'The room editor: rooms, zones and stations on the left, the 3D room with move handles on the right.'
+  - path: .camp/screenshots/06-live-room.jpg
+    caption: 'A live room: students see each other as avatars, with the people list and microphone and camera controls.'
+  - path: .camp/screenshots/07-photo-room-editor.jpg
+    caption: 'A 360° photo room in the editor, with information points placed on the photo (photo: Poly Haven, CC0).'
+  - path: .camp/screenshots/08-photo-room.jpg
+    caption: 'A student in the 360° photo room opens an information point (photo: Poly Haven, CC0).'
+  - path: .camp/screenshots/09-list-view.jpg
+    caption: 'The list view: the same stations and questions as an ordinary page, for keyboards and screen readers.'
+  - path: .camp/screenshots/10-phone.jpg
+    caption: 'On a phone in fullscreen: the touch stick, a station panel and the drag settings.'
 links:
   issues: https://github.com/adamjenkins/moodle-mod_vrroom/issues

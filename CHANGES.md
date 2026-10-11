@@ -1,5 +1,12 @@
 # Changes
 
+## 0.1.1 (2026-10-11) — ALPHA
+
+The first release published to camp. The plugin code is the same as 0.1.0.
+
+- Screenshots and captions for the camp listing.
+- Development files (tests, CI workflows, the camp listing) are left out of the release ZIP.
+
 ## 0.1.0 (2026-10-11) — ALPHA
 
 First release.
