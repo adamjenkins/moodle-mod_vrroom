@@ -1,0 +1,32 @@
+# camp listing manifest: descriptive content for the plugin's page.
+# camp ingests this file at each tagged release.
+# Schema: https://camp-registry.org/schema/listing.schema.json
+name: VR room
+summary: "3D rooms students explore in the browser: stations with models, images, texts and question-bank questions, graded from xAPI statements."
+description: |
+  VR room is an activity that puts students in a 3D room they explore in the
+  browser, on a computer, a phone or a VR headset. Students walk between
+  stations, look at models, images and texts, and answer questions from the
+  course question bank. Everything they do is recorded as xAPI statements,
+  and the grade and activity completion are calculated from those statements
+  on the server, so the activity runs without a teacher present.
+
+  - A room editor for teachers: choose a room, place stations and items,
+    upload models, images and 360° photos.
+  - 360° photo rooms and tours, with points placed on the photo.
+  - Live rooms where several people meet, see each other as avatars and talk.
+  - A list view of every activity that shows the same stations, texts and
+    questions as an ordinary page, works with a keyboard and a screen reader,
+    and is used automatically when a browser cannot show 3D.
+
+  No external services: the 3D viewer (three.js) is bundled. Live mode
+  connects browsers directly; STUN and TURN servers are used only if an
+  administrator adds them. Moodle 5.2 and 5.3. ALPHA.
+labels:
+  # Disclosure labels (RFC §4.7):
+  #   fully-free | freemium | paid-service | external-account
+  #   donation-supported | commercial-support-available
+  #   requires-core-patch (needs modifications to Moodle core to work)
+  - fully-free
+links:
+  issues: https://github.com/adamjenkins/moodle-mod_vrroom/issues

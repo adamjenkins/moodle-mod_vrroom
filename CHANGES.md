@@ -1,6 +1,6 @@
 # Changes
 
-## 0.1.0 (not yet tagged) — ALPHA
+## 0.1.0 (2026-10-11) — ALPHA
 
 First release.
 

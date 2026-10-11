@@ -3,12 +3,14 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-10-11
 
-ALPHA. First release, Moodle 5.2 and 5.3. Not yet tagged.
+ALPHA. First release, Moodle 5.2 and 5.3.
 
 ### Added
 
+- camp registry listing (`.camp/listing.yml`) and release workflow
+  (`.github/workflows/camp-release.yml`).
 - 360° photo rooms (server side): a new environment type `panorama` (`{type:'panorama', file,
   northoffset?, sky?}`; no bounds, lights or shape) and an optional `placement {yaw, pitch, distance?}`
   on every item of a photo room, from which the item's position is derived
