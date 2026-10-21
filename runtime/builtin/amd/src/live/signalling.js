@@ -27,6 +27,7 @@
  */
 
 import Ajax from 'core/ajax';
+import Config from 'core/config';
 import Log from 'core/log';
 
 /** Web-service request timeout in ms. */
@@ -434,10 +435,10 @@ class Signalling {
         const peerid = this.peerid;
         this.stop();
         this.peerid = null;
-        if (!peerid || typeof M === 'undefined' || !M.cfg) {
+        if (!peerid) {
             return;
         }
-        const url = M.cfg.wwwroot + '/lib/ajax/service.php?sesskey=' + encodeURIComponent(M.cfg.sesskey)
+        const url = Config.wwwroot + '/lib/ajax/service.php?sesskey=' + encodeURIComponent(Config.sesskey)
             + '&info=vrroomruntime_builtin_live_leave';
         const body = JSON.stringify([{index: 0, methodname: 'vrroomruntime_builtin_live_leave', args: {peerid: peerid}}]);
         try {

@@ -147,7 +147,7 @@
 .vrroom-mode-3d .vrroom-progress {
     margin-top: 0.75rem;
     padding: 0.75rem;
-    border: 1px solid rgba(0, 0, 0, 0.175);
+    border: 1px solid var(--mds-border-translucent, var(--bs-border-color-translucent, rgba(0, 0, 0, 0.175)));
     border-radius: 0.375rem;
 }
 
