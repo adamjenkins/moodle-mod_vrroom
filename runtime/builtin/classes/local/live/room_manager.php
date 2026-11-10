@@ -176,7 +176,8 @@ final class room_manager {
      * Counts only, never names. The asking user's own presence (another window of theirs) is not
      * counted: joining replaces it, so it takes no place, and counting it showed a room as full
      * ("2 of 2") with a Join button. A room the teacher made smaller than its occupancy shows a
-     * count above its capacity and is not joinable.
+     * count above its capacity, is not joinable and is flagged overcapacity, so the list says why
+     * nobody can join until people leave (the people already in it stay).
      *
      * @param \stdClass $vrroom vrroom row.
      * @param int $groupid The group whose rooms to list (already resolved), 0 without groups.
@@ -209,12 +210,14 @@ final class room_manager {
         $rooms = [];
         foreach ($numbers as $number) {
             $number = (int)$number;
+            $count = (int)($others[$number] ?? 0);
             $rooms[] = [
                 'number' => $number,
                 'name' => get_string('liveroomname', 'vrroomruntime_builtin', $number),
-                'count' => (int)($others[$number] ?? 0),
+                'count' => $count,
                 'capacity' => $capacity,
-                'joinable' => (int)($others[$number] ?? 0) < $capacity,
+                'joinable' => $count < $capacity,
+                'overcapacity' => $count > $capacity,
             ];
         }
 

@@ -882,8 +882,13 @@ const start = (root, api, response, strings) => {
                 noteString('editorenvstart', null);
             }
         },
-        onClearance: (cramped) => {
+        onClearance: (cramped, buried = []) => {
             if (!cramped.length) {
+                if (buried.length) {
+                    // Stations and objects left in the furniture, typically after the surroundings changed.
+                    noteString('editorinfurniture', nameList(buried.map((b) => b.name)), 'clearance');
+                    return;
+                }
                 hideNote('clearance');
                 return;
             }

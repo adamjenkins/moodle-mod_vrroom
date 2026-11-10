@@ -318,6 +318,7 @@ class Panel {
                 count: wholeNumber(room.count),
                 capacity: wholeNumber(room.capacity),
                 joinable: !!room.joinable,
+                overcapacity: !!room.overcapacity,
             }));
         this.canstart = dynamic && !!answer.canstart;
         const context = {

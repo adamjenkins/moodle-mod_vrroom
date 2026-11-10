@@ -362,6 +362,41 @@ final class attempt_manager_test extends \advanced_testcase {
     }
 
     /**
+     * A second finish from a stale in-progress copy is refused, records nothing more, and the
+     * finish lock is released so the same activity's other attempts can still be finished.
+     *
+     * @return void
+     */
+    public function test_finish_from_stale_copy_records_once(): void {
+        global $DB;
+        $fx = $this->setup_activity();
+        [$attempt] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$fx->student->id);
+        $stale = clone $attempt;
+        attempt_manager::finish($attempt);
+
+        $sink = $this->redirectEvents();
+        try {
+            attempt_manager::finish($stale);
+            $this->fail('A finished attempt must not be finished again');
+        } catch (\moodle_exception $e) {
+            $this->assertSame('errorattemptclosed', $e->errorcode);
+        }
+        $events = $sink->get_events();
+        $sink->close();
+        $this->assertEmpty(array_filter($events, fn($e) => $e instanceof \mod_vrroom\event\attempt_finished));
+        $this->assertSame(1, $DB->count_records('vrroom_events', ['attemptid' => $attempt->id, 'verb' => 'completed',
+            'objecttype' => 'activity']));
+
+        // The lock taken for the first attempt was released.
+        $lock = \core\lock\lock_config::get_lock_factory('mod_vrroom')->get_lock('finish_' . (int)$attempt->id, 0);
+        $this->assertNotFalse($lock);
+        $lock->release();
+        $other = $this->getDataGenerator()->create_and_enrol($fx->course, 'student');
+        [$attempt2] = attempt_manager::start_or_resume($fx->cm, $fx->vrroom, (int)$other->id);
+        $this->assertSame('finished', attempt_manager::finish($attempt2)->state);
+    }
+
+    /**
      * The ownership and state checks of require_own_open_attempt.
      *
      * @return void

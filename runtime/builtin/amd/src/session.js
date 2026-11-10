@@ -25,6 +25,7 @@
  */
 
 import Ajax from 'core/ajax';
+import Config from 'core/config';
 import Log from 'core/log';
 import Notification from 'core/notification';
 import {evaluate, classify, STATUS} from 'vrroomruntime_builtin/graph';
@@ -34,7 +35,7 @@ import {plainText, isClosedError} from 'vrroomruntime_builtin/util';
 /** Order of objective states, used to merge server and local state. */
 const RANK = {locked: 0, available: 1, completed: 2};
 
-/** Resume position is saved this often (ms). */
+/** Resume position is saved this often (ms), and also when the page is hidden or left. */
 const RESUME_INTERVAL = 10000;
 
 /** The deadline is checked this often (ms). */
@@ -158,10 +159,14 @@ class Session {
         this.view = this.buildView();
         this.reconciling = null;
         this.resumetimer = null;
+        this.resumegetter = null;
+        this.resumesaved = '';
         this.queue = this.preview ? null : createQueue(config, (result) => this.batchDone(result), {
             onFailure: (failing) => this.emit({type: 'failure', failing: failing}),
         });
         this.onPageHide = () => {
+            // The position of the last few seconds would be lost to the 10 s interval otherwise.
+            this.saveResume(true);
             if (this.active) {
                 this.record('exited', 'scene', this.sceneid, this.sceneid);
                 this.record('terminated', 'activity', null, null);
@@ -172,6 +177,13 @@ class Session {
             }
         };
         window.addEventListener('pagehide', this.onPageHide);
+        this.onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                // A hidden tab may be frozen or discarded without a pagehide event.
+                this.saveResume(true);
+            }
+        };
+        document.addEventListener('visibilitychange', this.onVisibilityChange);
     }
 
     /**
@@ -928,7 +940,7 @@ class Session {
     }
 
     /**
-     * Save the position every 10 s while a 3D view runs.
+     * Save the position every 10 s while a 3D view runs, and when the page is hidden or left.
      *
      * @param {Function} getter Returns {scene, position, yaw, key} (key: the room's layout key), or null.
      */
@@ -937,22 +949,59 @@ class Session {
         if (this.preview || !this.config.resume || !this.config.attemptid) {
             return;
         }
+        this.resumegetter = getter;
         this.resumetimer = window.setInterval(() => {
-            if (this.closed || document.visibilityState === 'hidden') {
+            if (document.visibilityState === 'hidden') {
                 return;
             }
-            const data = getter();
-            if (!data) {
-                return;
-            }
-            call('core_xapi_post_state', {
-                component: 'mod_vrroom',
-                activityId: this.config.resume.activityid,
-                agent: JSON.stringify(this.config.actor),
-                stateId: this.config.resume.stateid,
-                stateData: JSON.stringify(data),
-            }).catch(() => null);
+            this.saveResume(false);
         }, RESUME_INTERVAL);
+    }
+
+    /**
+     * Post the current position as the resume state, unless it is the one saved last.
+     *
+     * @param {boolean} beacon Send it with navigator.sendBeacon (the page is being hidden or left),
+     *     which outlives the page, instead of a normal AJAX call.
+     */
+    saveResume(beacon) {
+        if (this.closed || !this.resumegetter) {
+            return;
+        }
+        let data = null;
+        try {
+            data = this.resumegetter();
+        } catch (e) {
+            Log.debug(e);
+            return;
+        }
+        if (!data) {
+            return;
+        }
+        const statedata = JSON.stringify(data);
+        if (statedata === this.resumesaved) {
+            return;
+        }
+        const args = {
+            component: 'mod_vrroom',
+            activityId: this.config.resume.activityid,
+            agent: JSON.stringify(this.config.actor),
+            stateId: this.config.resume.stateid,
+            stateData: statedata,
+        };
+        if (beacon && navigator.sendBeacon) {
+            const url = `${Config.wwwroot}/lib/ajax/service.php?sesskey=${encodeURIComponent(Config.sesskey)}` +
+                '&info=core_xapi_post_state';
+            const body = JSON.stringify([{index: 0, methodname: 'core_xapi_post_state', args: args}]);
+            if (navigator.sendBeacon(url, body)) {
+                this.resumesaved = statedata;
+            }
+            return;
+        }
+        call('core_xapi_post_state', args).then(() => {
+            this.resumesaved = statedata;
+            return null;
+        }).catch(() => null);
     }
 
     /**
@@ -963,6 +1012,7 @@ class Session {
             window.clearInterval(this.resumetimer);
             this.resumetimer = null;
         }
+        this.resumegetter = null;
     }
 
     /**
@@ -991,6 +1041,7 @@ class Session {
         this.stopResume();
         this.stopTimer();
         window.removeEventListener('pagehide', this.onPageHide);
+        document.removeEventListener('visibilitychange', this.onVisibilityChange);
         if (this.queue) {
             this.queue.stop();
         }

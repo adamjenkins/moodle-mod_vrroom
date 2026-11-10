@@ -27,13 +27,15 @@
 
     Data attributes required for JS:
     * data-region: vrroom-live-roomlist, vrroom-live-room, vrroom-live-roomname, vrroom-live-occupancy,
-      vrroom-live-roomfull, vrroom-live-noroom, vrroom-live-allfull, vrroom-live-startreason
+      vrroom-live-roomfull, vrroom-live-overcapacity, vrroom-live-noroom, vrroom-live-allfull,
+      vrroom-live-startreason
     * data-action: vrroom-live-joinroom, vrroom-live-start
     * data-room: the room number of a room and of its Join button
 
     Context variables required for this template:
     * cmid - course module id
-    * rooms - [{number, name, count, capacity, joinable}] the rooms; name is plain text from the server
+    * rooms - [{number, name, count, capacity, joinable, overcapacity}] the rooms; name is plain text from
+      the server; overcapacity: more people are in the room than its size (the teacher made it smaller)
     * hasrooms - there is at least one room
     * dynamic - students open rooms (shows "Start a new room")
     * norooms - students open rooms and none is open
@@ -47,8 +49,8 @@
     {
         "cmid": 12,
         "rooms": [
-            {"number": 1, "name": "Room 1", "count": 2, "capacity": 2, "joinable": false},
-            {"number": 2, "name": "Room 2", "count": 1, "capacity": 2, "joinable": true}
+            {"number": 1, "name": "Room 1", "count": 3, "capacity": 2, "joinable": false, "overcapacity": true},
+            {"number": 2, "name": "Room 2", "count": 1, "capacity": 2, "joinable": true, "overcapacity": false}
         ],
         "hasrooms": true,
         "dynamic": true,
@@ -78,6 +80,9 @@
         {{^joinable}}
         <span class="text-muted ms-auto" data-region="vrroom-live-roomfull">{{#str}}liveroomfull, vrroomruntime_builtin{{/str}}</span>
         {{/joinable}}
+        {{#overcapacity}}
+        <span class="small text-muted w-100" data-region="vrroom-live-overcapacity">{{#str}}liveroomovercapacity, vrroomruntime_builtin{{/str}}</span>
+        {{/overcapacity}}
     </li>
     {{/rooms}}
 </ul>

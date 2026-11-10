@@ -488,22 +488,49 @@ export const init = (stage, model, context) => {
         return nearest;
     };
 
-    // The last cramped start points told to the editor.
+    /**
+     * Whether a station zone or an object stands in the surroundings' furniture: one ray down from
+     * eye height above its position meets the room's own model (not the props) higher than the
+     * floor tolerance. Something on a table top is fine, something under it or inside it is not.
+     *
+     * @param {Object} object Zone, prop or interactable document.
+     * @returns {boolean}
+     */
+    const inFurniture = (object) => {
+        if (!handle || !handle.environment || !handle.environment.group || !object) {
+            return false;
+        }
+        handle.root.updateMatrixWorld(true);
+        const p = vec3(object.position, [0, 0, 0]);
+        const ray = new THREE.Raycaster();
+        ray.set(new THREE.Vector3(p[0], p[1] + EYEHEIGHT, p[2]), new THREE.Vector3(0, -1, 0));
+        ray.far = EYEHEIGHT - FLOORTOLERANCE;
+        return ray.intersectObjects([handle.environment.group], true).length > 0;
+    };
+
+    /** The collections whose things are checked against the furniture (start points have their own test). */
+    const FURNITURECHECKED = ['zone', 'prop', 'interactable'];
+
+    // The last cramped start points and things in furniture told to the editor.
     let lastclearance = '';
 
-    /** Tell the editor which start points of the drawn room are cramped, when that changes. */
+    /**
+     * Tell the editor which start points of the drawn room are cramped, and which stations and
+     * objects stand in furniture (after the surroundings changed, for example), when that changes.
+     */
     const checkClearance = () => {
         const scene = model.getActiveScene();
         if (!scene || !handle || !context.actions.onClearance) {
             return;
         }
         const cramped = [];
+        const buried = [];
         if (photomode) {
             // Nobody walks in a photo room: nothing can be cramped.
-            const key = JSON.stringify([scene.id, cramped]);
+            const key = JSON.stringify([scene.id, cramped, buried]);
             if (key !== lastclearance) {
                 lastclearance = key;
-                context.actions.onClearance(cramped);
+                context.actions.onClearance(cramped, buried);
             }
             return;
         }
@@ -518,10 +545,19 @@ export const init = (stage, model, context) => {
                 cramped.push({id: spawn.id, name: name, number: index + 1, distance: r3(distance)});
             }
         });
-        const key = JSON.stringify([scene.id, cramped]);
+        // Things hidden at the start are checked too: a rule shows them later in the same place.
+        FURNITURECHECKED.forEach((kind) => {
+            const list = Array.isArray(scene[COLLECTIONS[kind]]) ? scene[COLLECTIONS[kind]] : [];
+            list.forEach((object) => {
+                if (object && object.id && inFurniture(object)) {
+                    buried.push({kind: kind, id: object.id, name: displayName(object)});
+                }
+            });
+        });
+        const key = JSON.stringify([scene.id, cramped, buried]);
         if (key !== lastclearance) {
             lastclearance = key;
-            context.actions.onClearance(cramped);
+            context.actions.onClearance(cramped, buried);
         }
     };
 

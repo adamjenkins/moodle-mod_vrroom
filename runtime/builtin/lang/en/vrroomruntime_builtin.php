@@ -118,6 +118,7 @@ $string['liveroomjoin'] = 'Join';
 $string['liveroomname'] = 'Room {$a}';
 $string['liveroomnamegroup'] = '{$a->group}: Room {$a->number}';
 $string['liveroomoccupancy'] = '{$a->count} of {$a->capacity}';
+$string['liveroomovercapacity'] = 'The room size was made smaller than the number of people in this room. Nobody can join until some of them leave.';
 $string['liveroomremoved'] = 'Your room was removed when the teacher changed the number of rooms. Choose another room.';
 $string['liverooms'] = 'Rooms';
 $string['liveroomslistfailed'] = 'The list of rooms could not be loaded. It will be tried again.';

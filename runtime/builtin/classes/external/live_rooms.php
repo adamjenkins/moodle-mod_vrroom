@@ -113,6 +113,10 @@ class live_rooms extends external_api {
             'count' => new external_value(PARAM_INT, 'People in the room now, not counting the user'),
             'capacity' => new external_value(PARAM_INT, 'Most people in the room'),
             'joinable' => new external_value(PARAM_BOOL, 'Whether the user can join the room now'),
+            'overcapacity' => new external_value(
+                PARAM_BOOL,
+                'Whether more people are in the room than its size (the teacher made it smaller)'
+            ),
         ]);
     }
 }

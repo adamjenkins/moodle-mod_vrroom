@@ -31,6 +31,7 @@ use mod_vrroom\local\instance_manager;
 use mod_vrroom\local\live_settings;
 use mod_vrroom\local\questions\mode;
 use mod_vrroom\local\runtime\registry as runtime_registry;
+use mod_vrroom\local\template\field_carry;
 use mod_vrroom\local\template\registry as template_registry;
 
 /**
@@ -76,6 +77,16 @@ class mod_vrroom_mod_form extends moodleform_mod {
         $mform->registerNoSubmitButton('vrroom_choosetemplate');
 
         $name = $this->resolve_template();
+        if ($name !== null) {
+            // What was typed in another template's fields survives switching to it and back
+            // (Gallery, Escape, Gallery): kept in the session for this form, posted again here.
+            field_carry::apply(
+                $courseid . ':' . ($this->_instance ? 'cm' . (int)$this->_cm->id : 'section' . (int)$this->_section),
+                $name,
+                optional_param('vrroom_choosetemplate', '', PARAM_RAW) !== '',
+                optional_param('vrroom_formtemplate', '', PARAM_PLUGIN)
+            );
+        }
         if ($name === null && $this->_instance) {
             // The activity's template is no longer installed: nothing to show or change.
             $mform->addElement(

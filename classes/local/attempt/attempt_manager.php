@@ -60,6 +60,9 @@ final class attempt_manager {
     /** @var int Seconds to wait for another request of the same user that is starting an attempt. */
     private const START_LOCK_TIMEOUT = 10;
 
+    /** @var int Seconds to wait for another request that is finishing the same attempt. */
+    private const FINISH_LOCK_TIMEOUT = 10;
+
     /**
      * Return the user's attempt in progress, or start a new one.
      *
@@ -318,8 +321,8 @@ final class attempt_manager {
         try {
             self::finish($row, (int)$row->timemodified);
         } catch (\moodle_exception $e) {
-            if ($e->errorcode === 'errorattemptclosed' || $e->errorcode === 'errorattemptmissing') {
-                // Another request finished or deleted it in the meantime.
+            if (in_array($e->errorcode, ['errorattemptclosed', 'errorattemptmissing', 'errorattemptfinishbusy'], true)) {
+                // Another request finished or deleted it in the meantime, or is finishing it now.
                 return false;
             }
             throw $e;
@@ -468,28 +471,43 @@ final class attempt_manager {
      * @param int|null $timenow current time (the deadline when the time ran out)
      * @param bool $timeup whether the attempt is finished because its time ran out
      * @return \stdClass the updated row
-     * @throws \moodle_exception errorattemptclosed when the attempt is not in progress
+     * @throws \moodle_exception errorattemptclosed when the attempt is not in progress, or
+     *     errorattemptfinishbusy when another request holds the finish lock for too long
      */
     public static function finish(\stdClass $attempt, ?int $timenow = null, bool $timeup = false): \stdClass {
         global $CFG, $DB;
         require_once($CFG->libdir . '/completionlib.php');
         $timenow = $timenow ?? time();
 
-        $attempt = self::get_attempt((int)$attempt->id);
-        if ($attempt->state !== self::STATE_INPROGRESS) {
-            throw new \moodle_exception('errorattemptclosed', 'mod_vrroom');
+        // Claim the transition under a lock: two windows, two scripted calls or a window racing the
+        // overdue task would otherwise both pass the state check and record the completion
+        // statements, the attempt_finished event, the grade and completion twice.
+        $lock = \core\lock\lock_config::get_lock_factory('mod_vrroom')->get_lock(
+            'finish_' . (int)$attempt->id,
+            self::FINISH_LOCK_TIMEOUT
+        );
+        if (!$lock) {
+            throw new \moodle_exception('errorattemptfinishbusy', 'mod_vrroom');
         }
-        [$vrroom, $cm, $context] = self::load_activity($attempt);
+        try {
+            $attempt = self::get_attempt((int)$attempt->id);
+            if ($attempt->state !== self::STATE_INPROGRESS) {
+                throw new \moodle_exception('errorattemptclosed', 'mod_vrroom');
+            }
+            [$vrroom, $cm, $context] = self::load_activity($attempt);
 
-        usage::finish($attempt, $timenow);
-        $result = self::recompute($attempt);
+            usage::finish($attempt, $timenow);
+            $result = self::recompute($attempt);
 
-        $DB->update_record('vrroom_attempts', (object) [
-            'id' => (int)$attempt->id,
-            'state' => self::STATE_FINISHED,
-            'timefinish' => $timenow,
-            'timemodified' => $timenow,
-        ]);
+            $DB->update_record('vrroom_attempts', (object) [
+                'id' => (int)$attempt->id,
+                'state' => self::STATE_FINISHED,
+                'timefinish' => $timenow,
+                'timemodified' => $timenow,
+            ]);
+        } finally {
+            $lock->release();
+        }
         $attempt = self::get_attempt((int)$attempt->id);
 
         $score = (float)$result->score;

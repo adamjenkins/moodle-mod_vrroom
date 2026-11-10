@@ -493,9 +493,9 @@ final class room_manager_test extends \advanced_testcase {
         $this->assertSame('fixed', $list['startreason']);
         $this->assertSame([
             ['number' => 1, 'name' => get_string('liveroomname', 'vrroomruntime_builtin', 1), 'count' => 2, 'capacity' => 2,
-                'joinable' => false],
+                'joinable' => false, 'overcapacity' => false],
             ['number' => 2, 'name' => get_string('liveroomname', 'vrroomruntime_builtin', 2), 'count' => 0, 'capacity' => 2,
-                'joinable' => true],
+                'joinable' => true, 'overcapacity' => false],
         ], $list['rooms']);
 
         // A member of a full room may re-enter it (their own presence does not count).
@@ -528,10 +528,13 @@ final class room_manager_test extends \advanced_testcase {
         $rooma = room_manager::list_rooms($activity['vrroom'], 0, (int)$a->id, $this->now)['rooms'][0];
         $this->assertSame(2, $rooma['count']);
         $this->assertTrue($rooma['joinable']);
+        $this->assertFalse($rooma['overcapacity']);
         // Someone outside the room sees all three.
         $roomd = room_manager::list_rooms($activity['vrroom'], 0, (int)$d->id, $this->now)['rooms'][0];
         $this->assertSame(3, $roomd['count']);
         $this->assertFalse($roomd['joinable']);
+        // Full but not over: three people in a room of three.
+        $this->assertFalse($roomd['overcapacity']);
 
         // The teacher lowers the room size to 2 with three people in: above capacity, not joinable.
         $DB->set_field('vrroom', 'livemaxusers', 2, ['id' => $activity['vrroom']->id]);
@@ -541,6 +544,7 @@ final class room_manager_test extends \advanced_testcase {
         $this->assertSame(3, $list['rooms'][0]['count']);
         $this->assertSame(2, $list['rooms'][0]['capacity']);
         $this->assertFalse($list['rooms'][0]['joinable']);
+        $this->assertTrue($list['rooms'][0]['overcapacity']);
         $this->refused($activity, $d, $attemptd, 1, 'errorliveroomfull');
     }
 
