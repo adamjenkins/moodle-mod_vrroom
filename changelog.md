@@ -3,6 +3,44 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.2] - 2026-11-10
+
+### Added
+
+- `\mod_vrroom\local\template\field_carry`: keeps the submitted `<template>_*` fields of the
+  template switched away from in `$SESSION->mod_vrroom_templatefields` (per form: course plus
+  activity or section) and posts them again on the template-switch reload back to it; a form shown
+  afresh forgets them. Called from `mod_form.php` on the `vrroom_choosetemplate` no-submit reload.
+- Room editor (`amd/src/editor_view.js`, `editor_app.js`): stations (zones), props and
+  interactables, including ones hidden at the start, are checked by a downward ray from eye height
+  against the environment model; those standing in furniture are listed with the new string
+  `editorinfurniture` in the clearance note.
+- Built-in runtime: `vrroomruntime_builtin_live_rooms` returns a new `overcapacity` flag per room
+  (`room_manager`), and `liveroomlist.mustache` shows the new string `liveroomovercapacity` for
+  such rooms.
+- Lang strings `editorinfurniture`, `errorattemptfinishbusy` (mod_vrroom) and
+  `liveroomovercapacity` (vrroomruntime_builtin).
+- New tests `tests/local/template/field_carry_test.php` and additions to
+  `tests/local/attempt/attempt_manager_test.php` and the built-in runtime's
+  `tests/local/live/room_manager_test.php`.
+
+### Changed
+
+- Built-in runtime `session.js`: the resume position is also saved on `pagehide` and when the
+  document becomes hidden, through `navigator.sendBeacon` to `core_xapi_post_state`; an unchanged
+  position is not posted again.
+- `live/signalling.js` and `session.js` read `wwwroot` and `sesskey` from `core/config` instead
+  of the legacy `M.cfg` global.
+- `styles.css`: the 3D progress panel border uses `--mds-border-translucent`, falling back to
+  `--bs-border-color-translucent` and then the previous colour.
+
+### Fixed
+
+- `attempt_manager::finish()` now runs under a `mod_vrroom` lock (`finish_<attemptid>`, 10 s
+  timeout), so concurrent finishes no longer record the completion statements, the
+  `attempt_finished` event, the grade and completion twice. A request that cannot get the lock
+  throws `errorattemptfinishbusy`; `close_if_abandoned()` treats it like an attempt already closed.
+
 ## [0.1.1] - 2026-10-11
 
 ### Added
