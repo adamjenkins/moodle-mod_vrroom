@@ -1,0 +1,10 @@
+{
+    "name": "adamjenkins/moodle-mod_vrroom",
+    "description": "3D rooms students explore in the browser: stations with models, images, texts and question-bank questions, graded from xAPI statements",
+    "type": "moodle-mod",
+    "require": {
+        "moodle/moodle": ">=5.2 <5.4",
+        "moodle/composer-installer": "^1.0"
+    },
+    "license": "GPL-3.0-or-later"
+}
