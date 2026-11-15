@@ -3,6 +3,12 @@
 All notable changes to this plugin are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.3] - 2026-11-15
+
+### Added
+
+- `composer.json` (package `adamjenkins/moodle-mod_vrroom`, type `moodle-mod`, requiring `moodle/moodle` `>=5.2 <5.4` and `moodle/composer-installer` `^1.0`) for installing from Packagist.
+
 ## [0.1.2] - 2026-11-10
 
 ### Added
